@@ -11,7 +11,19 @@ Esta guía recoge las normas que seguimos todos los miembros del grupo para trab
 - Antes de cada commit, revisa con `git status` qué archivos vas a incluir y comprueba que no hay archivos de datos.
 - El entorno virtual (`.venv/`) tampoco se sube.
 
-## 2. Modelo de ramas
+## 2. Guía de Estilo de Código y PEP 8
+
+- **Estilo base:** Seguimos estrictamente la convención de estilo **PEP 8** para Python.
+- **Herramienta de automatización:** Todo el equipo debe utilizar la extensión **autopep8** (o Ruff) en VSCode para formatear el código automáticamente al guardar.
+- **Convenciones de nombres obligatorias:**
+  - `CapWords` para Clases (ej. `ProcesadorCSV`).
+  - `snake_case` para funciones, métodos y variables (ej. `calcular_metricas`, `datos_procesados`).
+  - `MAYUSCULAS_CON_GUION_BAJO` para constantes globales (ej. `MAX_ITERACIONES = 100`).
+- **Orden de importaciones:** Las librerías deben estructurarse en tres bloques separados por una línea vacía (estándar, terceros y locales), ordenados alfabéticamente.
+- **Límites:** Mantener las líneas de código por debajo del límite acordado (recomendado: 79–88 caracteres) utilizando paréntesis para la continuación de líneas largas en lugar de barras invertidas (`\`).
+
+
+## 3. Modelo de ramas
 
 | Rama | Función |
 |------|---------|
@@ -28,7 +40,20 @@ Formato de los nombres:
 
 Ejemplos: `feature/10-importacion-datos`, `fix/error-lectura-csv`, `docs/actualizar-readme`.
 
-## 3. Flujo de trabajo
+## 4. Flujo de trabajo
+
+### Clonar el repositorio
+```bash
+git clone https://github.com/xabierpc/SIKORIUS.git
+cd SIKORIUS
+git switch dev
+```
+
+### Crear el entorno y probarlo
+```bash
+uv sync
+uv run sikorius
+```
 
 ### Crear una rama de trabajo
 
@@ -92,14 +117,14 @@ git merge --no-ff dev
 git push
 ```
 
-## 4. Mensajes de commit
+## 5. Mensajes de commit
 
 - En español, en presente y en modo indicativo: «Añade…», «Corrige…», «Elimina…».
 - Primera línea breve (máximo unos 70 caracteres), sin punto final, que diga **qué** cambia.
 - Si hace falta explicar el **porqué**, se deja una línea en blanco y se añade un párrafo.
 - Un commit = un cambio lógico. Mejor varios commits pequeños que uno enorme.
 
-## 5. Dependencias con uv
+## 6. Dependencias con uv
 
 El proyecto se gestiona con [uv](https://docs.astral.sh/uv/). **No se usa `pip install`** ni se edita el entorno a mano.
 
@@ -112,7 +137,7 @@ El proyecto se gestiona con [uv](https://docs.astral.sh/uv/). **No se usa `pip i
 
 Al cambiar dependencias se modifican `pyproject.toml` y `uv.lock`: **se suben los dos en el mismo commit**, en una rama de trabajo como cualquier otro cambio. Así todos instalan exactamente las mismas versiones.
 
-## 6. README y documentación
+## 7. README y documentación
 
 - La documentación del proyecto va en la carpeta `docs/`; el `README.md` contiene la descripción y las instrucciones de instalación y ejecución.
 - Los cambios de documentación se hacen en una rama `docs/<descripcion>` creada desde `dev` y se fusionan en `dev` como cualquier otra rama.
