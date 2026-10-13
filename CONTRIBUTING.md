@@ -92,7 +92,7 @@ Si aparece un **conflicto**:
 
 Comprueba que el proyecto sigue funcionando (`uv run sikorius`) antes de continuar.
 
-### Fusionar la rama en dev y eliminarla
+### Fusionar la rama en dev
 
 Se puede hacer con un Pull Request en GitHub (base: `dev`) o en local:
 
@@ -102,8 +102,6 @@ git pull
 git merge --no-ff feature/10-importacion-datos
 git push
 
-git branch -d feature/10-importacion-datos           # borra la rama local
-git push origin --delete feature/10-importacion-datos # borra la rama en GitHub
 ```
 
 ### Publicar una release en main
