@@ -5,6 +5,9 @@ description = "Aplicación con interfaz gráfica para crear, visualizar y usar m
 readme = "README.md"
 authors = [
     { name = "xabier.pcabanas", email = "xabier.pcabanas@udc.es" }
+    { name = "hugo.costa.bouzada", email = "hugo.costa.bouzada@udc.es" }
+    { name = "raul.pita.seoane", email = "raul.pita.seoane@udc.es" }
+    { name = "pepe.lopez.martinez", email = "pepe.lopez.martinez@udc.es" }
 ]
 requires-python = ">=3.12"
 dependencies = []
