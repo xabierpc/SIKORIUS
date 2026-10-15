@@ -4,9 +4,9 @@ version = "0.1.0"
 description = "Aplicación con interfaz gráfica para crear, visualizar y usar modelos de regresión lineal a partir de CSV, Excel y SQLite"
 readme = "README.md"
 authors = [
-    { name = "xabier.pcabanas", email = "xabier.pcabanas@udc.es" }
-    { name = "hugo.costa.bouzada", email = "hugo.costa.bouzada@udc.es" }
-    { name = "raul.pita.seoane", email = "raul.pita.seoane@udc.es" }
+    { name = "xabier.pcabanas", email = "xabier.pcabanas@udc.es" },
+    { name = "hugo.costa.bouzada", email = "hugo.costa.bouzada@udc.es" },
+    { name = "raul.pita.seoane", email = "raul.pita.seoane@udc.es" },
     { name = "pepe.lopez.martinez", email = "pepe.lopez.martinez@udc.es" }
 ]
 requires-python = ">=3.12"
