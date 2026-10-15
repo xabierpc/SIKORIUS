@@ -7,26 +7,45 @@ Esta guía recoge las normas que seguimos todos los miembros del grupo para trab
 - Cada uno trabaja desde su propio clon local del repositorio.
 - **Nunca se hacen commits directamente en `main` ni en `dev`.** Todo el trabajo se hace en ramas `feature/`, `fix/` o `docs/`.
 - **Nunca se suben archivos de datos**: ni datasets, ni modelos generados, ni resultados.
-- Los datos se guardan en local en la carpeta `data/` de la raíz del proyecto. Está excluida en el `.gitignore`, así que Git la ignora.
+- Los datos se guardan en local en la carpeta `data/` de la raíz del proyecto. Está incluida en el `.gitignore`, así que Git la ignora.
 - Antes de cada commit, revisa con `git status` qué archivos vas a incluir y comprueba que no hay archivos de datos.
 - El entorno virtual (`.venv/`) tampoco se sube.
 
-## 2. Guía de Estilo de Código y PEP 8
+## 2. Guía de estilo de código (PEP 8)
 
-- **Estilo base:** Seguimos estrictamente la convención de estilo **PEP 8** para Python.
-- **Herramienta de automatización:** Todo el equipo debe utilizar la extensión **autopep8** (o Ruff) en VSCode para formatear el código automáticamente al guardar.
-- **Convenciones de nombres obligatorias:**
-  - `CapWords` para Clases (ej. `ProcesadorCSV`).
-  - `snake_case` para funciones, métodos y variables (ej. `calcular_metricas`, `datos_procesados`).
-  - `MAYUSCULAS_CON_GUION_BAJO` para constantes globales (ej. `MAX_ITERACIONES = 100`).
-- **Orden de importaciones:** Las librerías deben estructurarse en tres bloques separados por una línea vacía (estándar, terceros y locales), ordenados alfabéticamente.
-- **Límites:** Mantener las líneas de código por debajo del límite acordado (recomendado: 79–88 caracteres) utilizando paréntesis para la continuación de líneas largas en lugar de barras invertidas (`\`).
+Seguimos la [PEP 8](https://peps.python.org/pep-0008/). El formato se aplica automáticamente con **autopep8**,
+configurado en el `pyproject.toml`, así que todos formateamos igual.
 
+- **Herramienta**:
+- Instala la extensión **autopep8** de Microsoft en VS Code. El código se formatea al guardar.
+- autopep8 corrige sangría, espacios, líneas en blanco y líneas largas. **No** ordena imports ni revisa los nombres: eso es responsabilidad de cada uno y se revisa en las Pull Requests.
+- Para revisar desde la terminal: `uv run autopep8 --diff -r src tests` muestra lo que cambiaría sin tocar nada.
+
+- **Nombres** (en español, sin tildes ni ñ):
+- Variables, funciones y métodos: `snake_case`. P. ej.: `calcular_metricas`, `datos_procesados`.
+- Clases: `CapWords`. P. ej.: `ProcesadorCSV`.
+- Constantes: `MAYÚSCULAS_CON_GUION_BAJO`. P. ej.: `MAX_ITERACIONES = 100`.
+- Módulos: minúsculas y cortos. P. ej.: `datos.py`.
+- Uso interno: con guion bajo delante. P. ej.: `_validar_columnas()`.
+
+- **Formato**:
+- Indentación de 4 espacios, nunca tabuladores.
+- Líneas de 79 caracteres como máximo. Para partir una línea se usan paréntesis, no `\`.
+- Dos líneas en blanco entre funciones y clases; una entre métodos.
+- Espacios alrededor de los operadores y después de las comas. Sin espacios dentro de paréntesis ni en `=` de argumentos con nombre: `f(x=1)`.
+
+- **Imports**:
+- Uno por línea, en tres bloques separados por una línea en blanco: biblioteca estándar, terceros y propios
+(`from sikorius.datos import ...`). Dentro de cada bloque, en orden alfabético.
+
+- **Comentarios**
+- Solo cuando expliquen el *porqué*, no lo que ya dice el código.
+- Docstring (`"""..."""`) en cada módulo, clase y función pública.
 
 ## 3. Modelo de ramas
 
 | Rama | Función |
-|------|---------|
+| ------ | --------- |
 | `main` | Solo versiones estables. Únicamente recibe cambios desde `dev` al publicar una release. |
 | `dev` | Rama de integración del desarrollo. Aquí se fusionan las ramas de trabajo terminadas. |
 | `feature/<numero>-<descripcion>` | Una rama por historia de usuario o tarea. Se crea desde `dev`. |
@@ -43,6 +62,7 @@ Ejemplos: `feature/10-importacion-datos`, `fix/error-lectura-csv`, `docs/actuali
 ## 4. Flujo de trabajo
 
 ### Clonar el repositorio
+
 ```bash
 git clone https://github.com/xabierpc/SIKORIUS.git
 cd SIKORIUS
@@ -50,6 +70,7 @@ git switch dev
 ```
 
 ### Crear el entorno y probarlo
+
 ```bash
 uv sync
 uv run sikorius
@@ -115,10 +136,12 @@ git merge --no-ff dev
 git push
 ```
 
+ **Las ramas no se eliminan, ni en local ni en GitHub, para conservar el historial del trabajo.**
+
 ## 5. Mensajes de commit
 
 - En español, en presente y en modo indicativo: «Añade…», «Corrige…», «Elimina…».
-- Primera línea breve (máximo unos 70 caracteres), sin punto final, que diga **qué** cambia.
+- Primera línea breve (máximo 70 caracteres), sin punto final, que diga **qué** cambia.
 - Si hace falta explicar el **porqué**, se deja una línea en blanco y se añade un párrafo.
 - Un commit = un cambio lógico. Mejor varios commits pequeños que uno enorme.
 
