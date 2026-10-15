@@ -81,7 +81,8 @@ uv run sikorius
 ```bash
 git switch dev
 git pull                                   # trae lo último de dev
-git switch -c feature/10-importacion-datos # crea la rama y se cambia a ella
+git switch -c feature/10-101-importacion-datos # crea la rama y se cambia a ella. El primer número corresponde a la historia y el segundo a la tarea correspondiente
+
 ```
 
 ### Trabajar y hacer commits
@@ -90,7 +91,7 @@ git switch -c feature/10-importacion-datos # crea la rama y se cambia a ella
 git status                  # revisa qué ha cambiado (¡sin archivos de datos!)
 git add <archivos>
 git commit -m "Añade lectura de ficheros CSV"
-git push -u origin feature/10-importacion-datos   # el primer push; después basta con git push
+git push -u origin feature/10-101-importacion-datos   # el primer push; después basta con git push
 ```
 
 ### Actualizar la rama con los últimos cambios de dev
@@ -100,7 +101,7 @@ Antes de fusionar, incorpora a tu rama lo que otros hayan subido a `dev`:
 ```bash
 git switch dev
 git pull
-git switch feature/10-importacion-datos
+git switch feature/10-101-importacion-datos
 git merge dev
 ```
 
@@ -120,7 +121,7 @@ Se puede hacer con un Pull Request en GitHub (base: `dev`) o en local:
 ```bash
 git switch dev
 git pull
-git merge --no-ff feature/10-importacion-datos
+git merge --no-ff feature/10-101-importacion-datos
 git push
 
 ```
