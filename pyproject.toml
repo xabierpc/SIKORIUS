@@ -10,7 +10,10 @@ authors = [
     { name = "pepe.lopez.martinez", email = "pepe.lopez.martinez@udc.es" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.6",
+]
 
 [project.scripts]
 sikorius = "sikorius:main"
