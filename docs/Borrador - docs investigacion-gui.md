@@ -114,15 +114,13 @@ cargado con él).
 
 - [ ] Botón que muestra un mensaje con el valor introducido o seleccionado.
 
-Cómo ejecutarla: **[COMPLETAR CON EL NOMBRE DEL ARCHIVO, p. ej. `uv run python prototipos/prueba_nicegui.py`]**
+Cómo ejecutarla: 'uv run python src\sikorius\NiceGUI.py'
 
 ## 7. Dificultades encontradas y cómo se resolvieron
 
-**[COMPLETAR con lo que encuentre Raúl en la prueba de concepto.]**:
+Con NiceGUI no se encontraron dificultades en las primeras pruebas puesto que hay mucha información proporcionada por
+los desarrolladores de la interfaz en su página: https://nicegui.io/documentation .
 
-| Dificultad | Solución |
-| --- | --- |
-| … | … |
 
 ## 8. Fuentes
 
