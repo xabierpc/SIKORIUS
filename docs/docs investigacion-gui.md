@@ -89,8 +89,6 @@ navegador. Para ello usa la librería pywebview.
    - En **Streamlit**, cada interacción reejecuta todo el script, y cada paso tiene que comprobar en `session_state` qué se hizo antes.
 3. **Tablas grandes (US 14 y 37).** El dataset de ejemplo (housing) tiene 20.640 filas. Las dos librerías trabajan directamente con DataFrames de pandas.
 
- **[COMPLETAR comprobando en la prueba de concepto cómo responde cada tabla con el dataset completo.]**
-
 **Riesgos de elegir NiceGUI:**
 
 - A pesar de ser más efectivo a nivel de requisitos, el modo nativo depende de pywebview y del motor web del sistema: .NET en Windows y WebKitGTK o Qt en Linux.
@@ -101,7 +99,7 @@ navegador. Para ello usa la librería pywebview.
 
 ## 6. Prueba de concepto
 
-Código en `prototipos/` (separado de `src/`, como pide la US). **[FALTA COMPLETAR con la prueba]** Debe incluir:
+Código en `prototipos/` (separado de `src/`, como pide la US). Debe incluir:
 
 - [ ] Ventana con título.
 
@@ -118,9 +116,11 @@ Cómo ejecutarla: 'uv run python src\sikorius\NiceGUI.py'
 
 ## 7. Dificultades encontradas y cómo se resolvieron
 
-Con NiceGUI no se encontraron dificultades en las primeras pruebas puesto que hay mucha información proporcionada por
-los desarrolladores de la interfaz en su página: https://nicegui.io/documentation .
+Con NiceGUI no se encontraron dificultades en las primeras pruebas puesto que hay mucha información proporcionada por los
+desarrolladores de la interfaz en su página.
 
+Por otra parte, Streamlit no terminó de convencernos a la hora de programar y configurarlo, siendo así más rico de información
+online NiceGUI, por lo que, finalmente, subimos las dos para hacer una comparación, pero nos quedaremos con la primera para la versión final.
 
 ## 8. Fuentes
 
