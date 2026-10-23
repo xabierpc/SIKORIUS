@@ -1,6 +1,6 @@
 """Pruebas de la ENTRADA del modelo (columnas de entrada o features).
 
-Prueba la parte de entrada de ``src/sikorius/datos-entrada-y-salida.py``:
+Prueba la parte de entrada de ``src/sikorius/datos_entrada_salida.py``:
 
 - La estructura del archivo.
 - ``SelectorFeatures``: elección de las columnas de entrada (simple o

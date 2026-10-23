@@ -1,6 +1,6 @@
 """Pruebas de la SALIDA del modelo (columna de salida o target).
 
-Prueba la parte de salida de ``src/sikorius/datos-entrada-y-salida.py``:
+Prueba la parte de salida de ``src/sikorius/datos_entrada_salida.py``:
 
 - ``SelectorTarget``: elección de la columna de salida, sin poder repetir
   una columna de entrada.

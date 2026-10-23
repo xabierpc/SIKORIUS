@@ -1,8 +1,8 @@
 """Utilidades compartidas por test_entrada.py y test_salida.py.
 
-Cargan el archivo ``src/sikorius/datos-entrada-y-salida.py``. Como su nombre
-lleva guiones, no se puede importar con ``import``: se carga con
-``importlib``. Se usan los elementos reales de NiceGUI sin arrancar el
+Cargan el archivo ``src/sikorius/datos_entrada_salida.py`` con
+``importlib`` (se mantiene así desde que el archivo tenía guiones en el
+nombre). Se usan los elementos reales de NiceGUI sin arrancar el
 servidor.
 
 pytest carga este archivo solo; los fixtures (``datos``, ``pagina``,
@@ -20,7 +20,7 @@ import pytest
 from nicegui import ui
 
 RUTA_MODULO = (Path(__file__).resolve().parent.parent
-               / "src" / "sikorius" / "datos-entrada-y-salida.py")
+               / "src" / "sikorius" / "datos_entrada_salida.py")
 
 
 def _cargar_modulo():
