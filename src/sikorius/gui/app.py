@@ -6,9 +6,9 @@ from nicegui import ui
 
 from sikorius.estado import estado
 from sikorius.gui.selector_archivos import seleccionar_archivo
+from sikorius.gui.selector_columnas import PanelSeleccionColumnas
 from sikorius.gui.tabla_datos import TablaDatos
 from sikorius.importador import ErrorImportacion
-
 
 
 def carpeta_inicial():
@@ -40,6 +40,11 @@ def pagina_principal():
         ui.label("Datos").classes("text-lg font-semibold")
         tabla = TablaDatos()
 
+    # --- Selección de columnas de entrada y salida (historia #11) ---
+    with ui.card().classes("w-full"):
+        ui.label("Columnas del modelo").classes("text-lg font-semibold")
+        panel_columnas = PanelSeleccionColumnas(estado)
+
     def refrescar():
         """Muestra en pantalla los datos guardados en el estado."""
         etiqueta_ruta.set_text(estado.ruta)
@@ -47,6 +52,7 @@ def pagina_principal():
             str(len(estado.datos)) + " filas y "
             + str(len(estado.datos.columns)) + " columnas")
         tabla.mostrar(estado.datos)
+        panel_columnas.cargar_columnas(estado.datos)
 
     async def cargar_dataset():
         ruta = await seleccionar_archivo(carpeta_inicial())
@@ -62,8 +68,6 @@ def pagina_principal():
 
         refrescar()
         ui.notify("Dataset cargado correctamente", type="positive")
-        # Aquí se avisará a los pasos siguientes (p. ej. el selector de
-        # columnas de la historia #11) para que lean estado.datos
 
     boton_cargar.on_click(cargar_dataset)
 
