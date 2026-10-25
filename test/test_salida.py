@@ -25,11 +25,6 @@ import sqlite3
 import pandas as pd
 import pytest
 
-from conftest import (
-    COLUMNAS, RUTA_MODULO, ArchivoSubido, EventoSubida, bytes_csv,
-    bytes_sqlite, bytes_xlsx, desplegar, ejecutar, modulo,
-    oyentes_al_desplegar,
-)
 from sikorius.importador import ErrorImportacion
 
 SelectorFeatures = modulo.SelectorFeatures

@@ -9,8 +9,6 @@ Prueba la parte de entrada de ``src/sikorius/datos-entrada-y-salida.py``:
 - En ``pagina_principal``: subir el dataset, el tipo de regresión y la
   confirmación de las features.
 
-Las utilidades compartidas con test_salida.py están en ``conftest.py``.
-
 Los tests marcados con ``xfail(strict=True)`` documentan FALLOS REALES del
 código actual: hoy fallan a propósito. Cuando se corrija el fallo, pytest
 avisará con XPASS(strict) y habrá que quitar el marcador.
