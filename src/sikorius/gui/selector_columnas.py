@@ -153,10 +153,14 @@ class PanelSeleccionColumnas:
     Trabaja sobre el estado de la aplicación: lee ``estado.datos`` para
     validar y, si la selección es correcta, la guarda con
     ``estado.guardar_seleccion``.
+
+    ``al_cambiar`` (opcional) se llama cada vez que la selección confirmada
+    se guarda o se borra, para que los pasos siguientes se actualicen.
     """
 
-    def __init__(self, estado):
+    def __init__(self, estado, al_cambiar=None):
         self.estado = estado
+        self.al_cambiar = al_cambiar
 
         self.tipo = ui.radio(
             {
@@ -183,10 +187,15 @@ class PanelSeleccionColumnas:
         else:
             self.boton_confirmar.disable()
 
+    def _avisar_cambio(self):
+        if self.al_cambiar is not None:
+            self.al_cambiar()
+
     def _al_cambiar_tipo(self, evento):
         self.features.cambiar_tipo_regresion(evento.value)
         self.estado.borrar_seleccion()
         self.etiqueta_seleccion.set_text("")
+        self._avisar_cambio()
 
     def cargar_columnas(self, df):
         """Muestra las columnas del dataset nuevo y limpia la selección anterior."""
@@ -194,6 +203,7 @@ class PanelSeleccionColumnas:
         self.target.cargar_columnas(df)
         self.etiqueta_seleccion.set_text("")
         self._actualizar_boton()
+        self._avisar_cambio()
 
     def confirmar(self):
         """Valida la selección y, si es correcta, la guarda en el estado."""
@@ -211,3 +221,4 @@ class PanelSeleccionColumnas:
         texto = "Entrada: " + ", ".join(features) + " | Salida: " + objetivo
         self.etiqueta_seleccion.set_text(texto)
         ui.notify("Selección confirmada. " + texto, type="positive", multi_line=True)
+        self._avisar_cambio()
