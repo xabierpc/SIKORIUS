@@ -1,6 +1,6 @@
 """Pruebas de la ENTRADA del modelo (columnas de entrada o features).
 
-Prueba la parte de entrada de ``src/sikorius/datos-entrada-y-salida.py``:
+Prueba la parte de entrada de ``src/sikorius/datos_entrada_salida.py``:
 
 - La estructura del archivo.
 - ``SelectorFeatures``: elección de las columnas de entrada (simple o
@@ -9,7 +9,10 @@ Prueba la parte de entrada de ``src/sikorius/datos-entrada-y-salida.py``:
 - En ``pagina_principal``: subir el dataset, el tipo de regresión y la
   confirmación de las features.
 
-Las utilidades compartidas con test_salida.py están en ``conftest.py``.
+Las utilidades (fixtures ``datos``, ``pagina`` y ``pagina_con_datos`` y los
+falsos de ``ui.upload``) están al principio de este archivo. Antes estaban
+en ``conftest.py`` y se compartían con test_salida.py; ahora cada archivo
+lleva las suyas para no depender de conftest.
 
 Los tests marcados con ``xfail(strict=True)`` documentan FALLOS REALES del
 código actual: hoy fallan a propósito. Cuando se corrija el fallo, pytest
@@ -20,19 +23,178 @@ Ejecución:
 """
 
 import ast
+import asyncio
 import builtins
 import inspect
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
 import pytest
+from nicegui import ui
 
-from conftest import (
-    COLUMNAS, RUTA_MODULO, ArchivoSubido, EventoSubida, bytes_csv,
-    bytes_sqlite, bytes_xlsx, desplegar, ejecutar, modulo,
-    oyentes_al_desplegar,
-)
+import sikorius.datos_entrada_salida as modulo
 from sikorius.importador import ErrorImportacion
+
+# =============================================================================
+# Utilidades (antes estaban en conftest.py; ahora cada archivo lleva las suyas)
+# =============================================================================
+
+RUTA_MODULO = Path(modulo.__file__)
+
+COLUMNAS = ["superficie", "habitaciones", "barrio", "precio"]
+
+
+@pytest.fixture
+def datos():
+    """Dataset pequeño con tres columnas numéricas y una de texto (barrio)."""
+    return pd.DataFrame({
+        "superficie": [60.0, 95.0, 110.0],
+        "habitaciones": [2, 3, 4],
+        "barrio": ["Elviña", "Os Mallos", "Riazor"],
+        "precio": [121000, 189500, 265000],
+    })
+
+
+class ArchivoSubido:
+    """Imita al archivo que entrega ui.upload en el evento."""
+
+    def __init__(self, nombre, contenido=b"", fallo=None):
+        self.name = nombre
+        self.contenido = contenido
+        self.fallo = fallo
+        self.guardado_en = None
+
+    async def save(self, ruta):
+        self.guardado_en = Path(ruta)
+        if self.fallo is not None:
+            raise self.fallo
+        Path(ruta).write_bytes(self.contenido)
+
+
+class EventoSubida:
+    """Imita al evento de ui.upload: solo hace falta el archivo."""
+
+    def __init__(self, archivo):
+        self.file = archivo
+
+
+def bytes_csv(df):
+    return df.to_csv(index=False).encode("utf-8")
+
+
+def bytes_xlsx(df, tmp_path):
+    ruta = tmp_path / "origen.xlsx"
+    df.to_excel(ruta, index=False)
+    return ruta.read_bytes()
+
+
+def bytes_sqlite(df, tmp_path):
+    ruta = tmp_path / "origen.db"
+    conexion = sqlite3.connect(ruta)
+    df.to_sql("t", conexion, index=False)
+    conexion.close()
+    return ruta.read_bytes()
+
+
+def ejecutar(corrutina):
+    return asyncio.run(corrutina)
+
+
+def oyentes_al_desplegar(selector):
+    """Manejadores del evento de abrir el desplegable de un ui.select."""
+    return [e for e in selector._event_listeners.values()
+            if e.type in ("popup-show", "popupShow")]
+
+
+def desplegar(selector):
+    """Simula que el usuario abre el desplegable (lanza el último manejador)."""
+    manejador = oyentes_al_desplegar(selector)[-1].handler
+    if inspect.signature(manejador).parameters:
+        manejador(None)
+    else:
+        manejador()
+
+
+class Pagina:
+    """Construye la página y guarda lo necesario para manejarla.
+
+    Sustituye ui.button, ui.upload, ui.radio, ui.select y ui.notify por
+    versiones que crean el elemento real pero se quedan con una referencia,
+    para poder pulsar botones, subir archivos y leer los avisos sin servidor.
+    """
+
+    def __init__(self, monkeypatch):
+        self.avisos = []
+        self.botones = {}
+        self.subida = None
+        self.radio = None
+        self.selects = []
+        reales = {n: getattr(ui, n) for n in ("button", "upload", "radio", "select")}
+
+        def button(texto, on_click=None, **kw):
+            self.botones[texto] = on_click
+            return reales["button"](texto, on_click=on_click, **kw)
+
+        def upload(*a, on_upload=None, **kw):
+            self.al_subir = on_upload
+            self.subida = reales["upload"](*a, on_upload=on_upload, **kw)
+            return self.subida
+
+        def radio(*a, **kw):
+            self.radio = reales["radio"](*a, **kw)
+            return self.radio
+
+        def select(*a, **kw):
+            elemento = reales["select"](*a, **kw)
+            self.selects.append(elemento)
+            return elemento
+
+        monkeypatch.setattr(ui, "button", button)
+        monkeypatch.setattr(ui, "upload", upload)
+        monkeypatch.setattr(ui, "radio", radio)
+        monkeypatch.setattr(ui, "select", select)
+        monkeypatch.setattr(ui, "notify", lambda m, **kw: self.avisos.append((m, kw)))
+        monkeypatch.setattr(ui.upload, "reset", lambda self: None, raising=False)
+        modulo.pagina_principal()
+
+    def _ultimo(self, prefijo):
+        """Último ui.select creado cuya etiqueta empieza por el prefijo."""
+        return [s for s in self.selects
+                if str(s.props.get("label", "")).startswith(prefijo)][-1]
+
+    @property
+    def features(self):
+        return self._ultimo("Feature")
+
+    @property
+    def target(self):
+        return self._ultimo("Target")
+
+    def subir(self, nombre, contenido):
+        self.avisos.clear()
+        ejecutar(self.al_subir(EventoSubida(ArchivoSubido(nombre, contenido))))
+
+    def abrir_target(self):
+        desplegar(self.target)
+
+    def confirmar(self):
+        """Pulsa «Confirmar selección» y devuelve el único aviso mostrado."""
+        self.avisos.clear()
+        self.botones["Confirmar selección"]()
+        assert len(self.avisos) == 1
+        return self.avisos[0]
+
+
+@pytest.fixture
+def pagina(monkeypatch):
+    return Pagina(monkeypatch)
+
+
+@pytest.fixture
+def pagina_con_datos(pagina, datos):
+    pagina.subir("datos.csv", bytes_csv(datos))
+    return pagina
 
 SelectorFeatures = modulo.SelectorFeatures
 SelectorTarget = modulo.SelectorTarget
