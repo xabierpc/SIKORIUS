@@ -6,6 +6,7 @@ from nicegui import ui
 
 from sikorius.estado import estado
 from sikorius.gui.selector_archivos import seleccionar_archivo
+from sikorius.gui.panel_separacion import PanelSeparacion
 from sikorius.gui.selector_columnas import PanelSeleccionColumnas
 from sikorius.gui.tabla_datos import TablaDatos
 from sikorius.importador import ErrorImportacion
@@ -43,7 +44,13 @@ def pagina_principal():
     # --- Selección de columnas de entrada y salida (historia #11) ---
     with ui.card().classes("w-full"):
         ui.label("Columnas del modelo").classes("text-lg font-semibold")
-        panel_columnas = PanelSeleccionColumnas(estado)
+        panel_columnas = PanelSeleccionColumnas(
+            estado, al_cambiar=lambda: panel_separacion.actualizar())
+
+    # --- Separación en entrenamiento y test ---
+    with ui.card().classes("w-full"):
+        ui.label("Entrenamiento y test").classes("text-lg font-semibold")
+        panel_separacion = PanelSeparacion(estado)
 
     def refrescar():
         """Muestra en pantalla los datos guardados en el estado."""

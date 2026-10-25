@@ -18,6 +18,13 @@ class EstadoApp:
         self.datos = None
         self.ruta = None
         self.seleccion = None
+        # Separación en entrenamiento y test (historia de separación)
+        self.entrenamiento = None
+        self.test = None
+        self.separacion = None  # parámetros usados: porcentaje_test y semilla
+        # Pasos posteriores, que dependen de la separación
+        self.preprocesado = None
+        self.modelo = None
 
     def hay_datos(self):
         """Indica si ya se ha cargado algún dataset."""
@@ -36,10 +43,44 @@ class EstadoApp:
             "target": target,
             "tipo_regresion": tipo_regresion,
         }
+        self.borrar_separacion()  # con otras columnas hay que volver a separar
 
     def borrar_seleccion(self):
         """Olvida la selección de columnas (p. ej. al cambiar de dataset)."""
         self.seleccion = None
+        self.borrar_separacion()
+
+    def hay_seleccion(self):
+        """Indica si hay una selección de columnas confirmada."""
+        return self.seleccion is not None
+
+    def hay_separacion(self):
+        """Indica si ya se ha separado el dataset en entrenamiento y test.
+
+        El preprocesado y la creación del modelo solo deben permitirse
+        cuando esto devuelve True.
+        """
+        return self.entrenamiento is not None and self.test is not None
+
+    def guardar_separacion(self, entrenamiento, test, porcentaje_test, semilla):
+        """Guarda los conjuntos de entrenamiento y test.
+
+        Descarta el preprocesado y el modelo creados con una separación
+        anterior, porque ya no corresponden a estos conjuntos.
+        """
+        self.entrenamiento = entrenamiento
+        self.test = test
+        self.separacion = {"porcentaje_test": porcentaje_test, "semilla": semilla}
+        self.preprocesado = None
+        self.modelo = None
+
+    def borrar_separacion(self):
+        """Olvida la separación y todo lo que se hizo a partir de ella."""
+        self.entrenamiento = None
+        self.test = None
+        self.separacion = None
+        self.preprocesado = None
+        self.modelo = None
 
     def cargar(self, ruta_archivo):
         """Importa el archivo y, si todo va bien, sustituye los datos actuales.
@@ -57,7 +98,7 @@ class EstadoApp:
         df = importar_datos(ruta_archivo)
         self.datos = df
         self.ruta = str(Path(ruta_archivo).resolve())
-        self.seleccion = None  # las columnas del dataset anterior ya no valen
+        self.borrar_seleccion()  # las columnas del dataset anterior ya no valen
         return df
 
 
