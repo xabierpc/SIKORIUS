@@ -123,7 +123,11 @@ def test_I1_carpeta_con_extension_valida(tmp_path, espias_lectores):
 
 def test_I1_enlace_simbolico_roto(tmp_path):
     enlace = tmp_path / "roto.csv"
-    enlace.symlink_to(tmp_path / "destino_que_no_existe.csv")
+    try:
+        enlace.symlink_to(tmp_path / "destino_que_no_existe.csv")
+    except OSError:
+        # Windows solo deja crearlos como administrador o en modo desarrollador
+        pytest.skip("El sistema no permite crear enlaces simbólicos")
     with pytest.raises(ErrorImportacion, match="no existe"):
         importar_datos(enlace)
 
@@ -222,9 +226,6 @@ def test_I_ruta_relativa_con_puntos(tmp_path, datos, monkeypatch):
     assert len(importar_datos("./../b/../datos.csv")) == 3
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "BUG 5: con None, bytes o int se escapa un TypeError en vez de "
-    "ErrorImportacion. La GUI puede pasar None si se cancela el diálogo."))
 @pytest.mark.parametrize("argumento", [None, b"datos.csv", 123, 1.5, []])
 def test_I_tipo_de_argumento_invalido(argumento):
     with pytest.raises(ErrorImportacion):
@@ -305,15 +306,11 @@ def test_C_bytes_de_sqlite_no_rompen():
     assert _convertir_numericas(df)["b"].tolist() == [b"\x00\x01", b"\xff"]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "BUG 3: las fechas (datetime64) no son numéricas, pero pd.to_numeric "
-    "las convierte en enteros (microsegundos desde 1970). Afecta a Excel."))
 def test_C_fechas_no_se_convierten_en_enteros():
     df = pd.DataFrame({"f": pd.to_datetime(["2024-01-01", "2024-06-30"])})
     assert pd.api.types.is_datetime64_any_dtype(_convertir_numericas(df)["f"])
 
 
-@pytest.mark.xfail(strict=True, reason="BUG 3: igual con duraciones")
 def test_C_duraciones_no_se_convierten_en_enteros():
     df = pd.DataFrame({"t": pd.to_timedelta([1, 2], unit="h")})
     assert pd.api.types.is_timedelta64_dtype(_convertir_numericas(df)["t"])
@@ -481,10 +478,6 @@ def test_L7_parser_error(tmp_path, contenido):
     assert isinstance(info.value.__cause__, pd.errors.ParserError)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "BUG 7: si el Sniffer falla en un CSV con ';' (basta una fila con un "
-    "campo de más o de menos) se usa ',' por defecto y todo el archivo se "
-    "lee como UNA columna de texto, sin dar error."))
 @pytest.mark.parametrize("contenido", [
     "a;b\n1;2\n3;4;5;6\n",          # una fila con campos de más
     "a;b;c\n1;2;3\n4;5\n6;7;8\n",   # una fila con un campo de menos
@@ -520,10 +513,6 @@ def test_L_finales_de_linea(tmp_path, fin_de_linea):
     assert _leer_csv(escribir(tmp_path / "a.csv", texto)).shape == (2, 2)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "BUG 1: si una fila tiene UN campo más que el encabezado, pandas usa la "
-    "primera columna como índice y desplaza los datos sin dar error. "
-    "Solución: comprobar que el índice es el normal (RangeIndex)."))
 def test_L_fila_con_un_campo_de_mas_no_desplaza_datos(tmp_path):
     ruta = escribir(tmp_path / "a.csv", "a,b\n1,2,3\n")
     try:
@@ -533,10 +522,29 @@ def test_L_fila_con_un_campo_de_mas_no_desplaza_datos(tmp_path):
     assert df["a"].tolist() == [1]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "BUG 2: un CSV de UNA columna guardado por Excel en español "
-    "('precio\\n1,5') se lee como 2 campos: precio=5 y el 1 va al índice. "
-    "Mismo origen que el BUG 1."))
+def test_L_campo_de_mas_con_indice_desde_cero(tmp_path):
+    """pandas 3 compacta el índice 0, 1... en un RangeIndex, así que no
+    basta con mirar el tipo del índice para detectar el desplazamiento."""
+    ruta = escribir(tmp_path / "a.csv", "id,v\n0,a,x\n1,b,y\n")
+    with pytest.raises(ErrorImportacion, match="más campos"):
+        _leer_csv(ruta)
+
+
+def test_L_indice_implicito_con_csv_error(monkeypatch):
+    """Si el módulo csv no puede leer las filas, se deja decidir a pandas."""
+    def falla(*args, **kwargs):
+        raise csv.Error("forzado")
+
+    monkeypatch.setattr(csv, "reader", falla)
+    assert importador._indice_implicito("a,b\n1,2,3\n", ",") is False
+
+
+def test_L_separador_al_final_de_cada_linea(tmp_path):
+    df = _leer_csv(escribir(tmp_path / "a.csv", "id,v\n0,a,\n1,b,\n"))
+    assert df["id"].tolist() == [0, 1]
+    assert df["v"].tolist() == ["a", "b"]
+
+
 def test_L_una_columna_con_coma_decimal(tmp_path):
     ruta = escribir(tmp_path / "a.csv", "precio\n1,5\n2,5\n")
     try:
@@ -546,17 +554,11 @@ def test_L_una_columna_con_coma_decimal(tmp_path):
     assert df["precio"].tolist() == [1.5, 2.5]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "BUG 4: un CSV con encabezado y filas sin ningún valor (',,') devuelve "
-    "filas de NaN en lugar de dar el error 'no contiene datos'."))
 def test_L_filas_sin_valores(tmp_path):
     with pytest.raises(ErrorImportacion, match="no contiene datos"):
         importar_datos(escribir(tmp_path / "a.csv", "a,b\n,\n,\n"))
 
 
-@pytest.mark.xfail(strict=True, raises=PermissionError, reason=(
-    "BUG 6: si no hay permiso de lectura, en CSV se escapa PermissionError "
-    "(en Excel y SQLite sí se envuelve en ErrorImportacion)."))
 def test_L_sin_permiso_de_lectura(tmp_path, monkeypatch):
     ruta = escribir(tmp_path / "a.csv", "a,b\n1,2\n")
 
@@ -648,7 +650,6 @@ def test_E_LIMITACION_xlsx_renombrado_a_xls_se_acepta(tmp_path, datos):
     assert len(_leer_excel(ruta)) == 3
 
 
-@pytest.mark.xfail(strict=True, reason="BUG 3: fechas de Excel -> enteros")
 def test_E_fechas_de_excel(tmp_path):
     ruta = tmp_path / "a.xlsx"
     pd.DataFrame({"fecha": pd.to_datetime(["2024-01-01"]),
