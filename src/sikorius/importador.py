@@ -32,7 +32,12 @@ def importar_datos(ruta_archivo) -> pd.DataFrame:
         o tiene más de una.
     """
 
-    ruta = Path(ruta_archivo)
+    # La GUI puede pasar None si se cancela el diálogo de selección
+    try:
+        ruta = Path(ruta_archivo)
+    except TypeError as e:
+        raise ErrorImportacion(
+            f"Ruta de archivo no válida: {ruta_archivo!r}") from e
 
     # Comprobar que el archivo existe
     if not ruta.is_file():
@@ -50,7 +55,9 @@ def importar_datos(ruta_archivo) -> pd.DataFrame:
     else:
         raise ErrorImportacion(f"Extensión no soportada '{extension}'")
 
-    if df.empty:
+    # Un archivo cuyas filas no tienen ningún valor (',,') tampoco tiene
+    # datos, aunque el DataFrame no esté vacío
+    if df.dropna(how="all").empty:
         raise ErrorImportacion(f"El archivo no contiene datos: {ruta.name}")
 
     return _convertir_numericas(df)
@@ -59,7 +66,10 @@ def importar_datos(ruta_archivo) -> pd.DataFrame:
 def _convertir_numericas(df) -> pd.DataFrame:
     """Convierte a número las columnas de texto cuyos valores son números."""
     for columna in df.columns:
-        if not pd.api.types.is_numeric_dtype(df[columna]):
+        # Solo columnas de texto: pd.to_numeric también convertiría en
+        # enteros las fechas y las duraciones
+        if (pd.api.types.is_object_dtype(df[columna])
+                or pd.api.types.is_string_dtype(df[columna])):
             try:
                 df[columna] = pd.to_numeric(df[columna])
             except (ValueError, TypeError):
@@ -69,7 +79,12 @@ def _convertir_numericas(df) -> pd.DataFrame:
 
 def _leer_texto(ruta) -> str:
     """Lee el archivo como texto en UTF-8 o, si falla, en Windows-1252."""
-    datos = ruta.read_bytes()
+    try:
+        datos = ruta.read_bytes()
+    except OSError as e:
+        # Sin permiso de lectura o bloqueado por otro programa
+        raise ErrorImportacion(
+            f"No se puede leer el archivo: {ruta.name}") from e
     if b"\x00" in datos:
         raise ErrorImportacion(
             f"El archivo está dañado o no es CSV válido: {ruta.name}")
@@ -93,13 +108,60 @@ def _leer_csv(ruta) -> pd.DataFrame:
     decimal = "," if separador == ";" else "."
 
     try:
-        return pd.read_csv(StringIO(texto), sep=separador, decimal=decimal)
+        df, campos_de_mas = _leer_tabla(texto, separador, decimal)
+        if separador == "," and len(df.columns) == 1:
+            encabezado = str(df.columns[0])
+            if "\t" in encabezado:
+                # El Sniffer falla si las filas tienen distinto número de
+                # campos; el encabezado delata el separador real
+                df, campos_de_mas = _leer_tabla(texto, "\t", ".")
+            elif ";" in encabezado or campos_de_mas:
+                # Lo mismo con ';', o un CSV de una columna guardado por
+                # Excel en español, donde la coma de '1,5' es decimal
+                df, campos_de_mas = _leer_tabla(texto, ";", ",")
     except pd.errors.EmptyDataError as e:
         raise ErrorImportacion(
             f"El archivo no contiene datos: {ruta.name}") from e
     except pd.errors.ParserError as e:
         raise ErrorImportacion(
             f"El archivo está dañado o no es CSV válido: {ruta.name}") from e
+
+    if campos_de_mas:
+        raise ErrorImportacion(
+            f"Hay filas con más campos que el encabezado: {ruta.name}")
+    return df
+
+
+def _leer_tabla(texto, separador, decimal) -> tuple[pd.DataFrame, bool]:
+    """Lee el CSV e indica si alguna fila tiene datos de más.
+
+    Si la primera fila de datos tiene un campo más que el encabezado,
+    pandas toma la primera columna como índice y desplaza los datos sin
+    avisar; la última columna leída es entonces el campo de más. Si ese
+    campo está vacío (separador al final de cada línea) no se pierde nada
+    y se relee con index_col=False, que no desplaza los datos.
+    """
+    df = pd.read_csv(StringIO(texto), sep=separador, decimal=decimal)
+    if not _indice_implicito(texto, separador):
+        return df, False
+    if df.iloc[:, -1].notna().any():
+        return df, True
+    df = pd.read_csv(StringIO(texto), sep=separador, decimal=decimal,
+                     index_col=False)
+    return df, False
+
+
+def _indice_implicito(texto, separador) -> bool:
+    """Indica si la primera fila de datos tiene un campo más que el
+    encabezado, que es cuando pandas usa la primera columna como índice."""
+    try:
+        filas = csv.reader(StringIO(texto, newline=""), delimiter=separador)
+        no_vacias = (fila for fila in filas if fila)
+        encabezado = next(no_vacias, [])
+        primera = next(no_vacias, [])
+    except csv.Error:
+        return False   # pandas decidirá si el archivo es válido
+    return len(primera) == len(encabezado) + 1
 
 
 def _leer_excel(ruta) -> pd.DataFrame:
