@@ -19,10 +19,14 @@ class PanelSeparacion:
     Solo está disponible cuando hay una selección de columnas confirmada en
     el estado. Hay que llamar a ``actualizar`` cada vez que cambie la
     selección o el dataset, para habilitar o deshabilitar el panel.
+
+    ``al_separar`` (opcional) se llama tras cada separación correcta, para
+    que los pasos siguientes (preprocesado) se actualicen.
     """
 
-    def __init__(self, estado):
+    def __init__(self, estado, al_separar=None):
         self.estado = estado
+        self.al_separar = al_separar
 
         self.aviso = ui.label("").classes("text-sm text-gray-500")
         with ui.row().classes("w-full items-start"):
@@ -90,6 +94,8 @@ class PanelSeparacion:
             "Datos separados correctamente. Entrenamiento: " + str(len(entrenamiento))
             + " filas | Test: " + str(len(test)) + " filas",
             type="positive", multi_line=True)
+        if self.al_separar is not None:
+            self.al_separar()
 
 
 def _formatear(numero):
