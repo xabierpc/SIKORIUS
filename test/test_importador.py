@@ -10,8 +10,7 @@ pasará y pytest avisará con XPASS(strict); en ese momento hay que quitar el
 marcador ``xfail``.
 
 Ejecución con cobertura de ramas:
-    uv run --with pytest-cov pytest --cov=sikorius.importador --cov-branch \
-        --cov-report=term-missing
+     uv run pytest test/test_importador.py
 """
 
 import ast
