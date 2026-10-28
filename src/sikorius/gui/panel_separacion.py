@@ -100,4 +100,6 @@ class PanelSeparacion:
 
 def _formatear(numero):
     """80.0 -> "80", 87.5 -> "87.5"."""
-    return str(int(numero)) if float(numero).is_integer() else str(round(numero, 2))
+    if float(numero).is_integer():
+        return str(int(numero))
+    return str(round(numero, 2))
