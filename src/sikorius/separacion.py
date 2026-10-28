@@ -5,6 +5,7 @@ escribe el usuario, llama a estas funciones y muestra el resultado o el error.
 """
 
 import math
+from fractions import Fraction
 
 import numpy as np
 
@@ -71,6 +72,9 @@ def calcular_tamanos(num_filas, porcentaje_test):
 
     El número de filas de test se redondea hacia arriba, como hace
     'train_test_split' de scikit-learn: 20 % de 101 filas -> 21 de test.
+    La cuenta se hace con fracciones exactas para que los errores de los
+    decimales en coma flotante no sumen una fila de más (por ejemplo, 64.4 %
+    de 250 filas son 161 de test exactas, no 162).
 
     Raises:
         ErrorSeparacion: Si hay menos de 5 filas o algún conjunto queda vacío.
@@ -79,10 +83,14 @@ def calcular_tamanos(num_filas, porcentaje_test):
         raise ErrorSeparacion(
             "El dataset tiene " + str(num_filas) + " filas; se necesitan al menos "
             + str(FILAS_MINIMAS) + " para separarlo en entrenamiento y test.")
-    filas_test = math.ceil(num_filas * porcentaje_test / 100)
+    porcentaje_exacto = Fraction(repr(float(porcentaje_test)))
+    filas_test = math.ceil(num_filas * porcentaje_exacto / 100)
     filas_entrenamiento = num_filas - filas_test
     if filas_test == 0 or filas_entrenamiento == 0:
-        vacio = "test" if filas_test == 0 else "entrenamiento"
+        if filas_test == 0:
+            vacio = "test"
+        else:
+            vacio = "entrenamiento"
         raise ErrorSeparacion(
             "Con un " + _formatear(porcentaje_test) + " % de test y "
             + str(num_filas) + " filas, el conjunto de " + vacio
@@ -124,4 +132,6 @@ def separar_datos(df, porcentaje_test=PORCENTAJE_TEST_DEFECTO, semilla=SEMILLA_D
 
 def _formatear(numero):
     """20.0 -> "20", 12.5 -> "12.5"."""
-    return str(int(numero)) if float(numero).is_integer() else str(numero)
+    if float(numero).is_integer():
+        return str(int(numero))
+    return str(numero)
