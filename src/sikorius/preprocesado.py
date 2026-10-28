@@ -21,10 +21,22 @@ ESTRATEGIAS = (ELIMINAR, MEDIA, MEDIANA, CONSTANTE)
  
 class ErrorPreprocesado(Exception):
     """Error producido al aplicar el preprocesado."""
- 
- 
-class ColumnasNoEncontradasError(ValueError):
-    """Se lanza cuando alguna columna seleccionada no existe en el DataFrame."""
+
+
+class AvisoPreprocesado(ErrorPreprocesado):
+    """El preprocesado se puede hacer, pero el resultado no sería válido.
+
+    Por ejemplo, eliminar filas dejaría vacío el conjunto de entrenamiento o
+    el de test. Como es un ``ErrorPreprocesado``, tampoco se aplica nada.
+    """
+
+
+class ColumnasNoEncontradasError(ErrorPreprocesado, ValueError):
+    """Se lanza cuando alguna columna seleccionada no existe en el DataFrame.
+
+    Hereda de ``ErrorPreprocesado`` para que la interfaz también la capture
+    y muestre el mensaje en lugar de fallar.
+    """
 
 
 def _comprobar_columnas(df, columnas):
@@ -178,7 +190,15 @@ def columnas_seleccionadas(estado):
         Lista con las features y, al final, el target.
     """
     seleccion = estado.seleccion
-    return list(seleccion["features"]) + [seleccion["target"]]
+    nombres = list(seleccion["features"]) + [seleccion["target"]]
+    # El selector guarda los nombres como texto; si el dataset tiene
+    # cabeceras que no son texto (p. ej. 2020 en un Excel), se usan las
+    # columnas reales para que pandas las encuentre.
+    df = estado.entrenamiento if estado.entrenamiento is not None else estado.datos
+    if df is None:
+        return nombres
+    reales = {str(c): c for c in df.columns}
+    return [reales.get(nombre, nombre) for nombre in nombres]
  
  
 def _resumen(filas_eliminadas, valores_rellenados):
@@ -204,8 +224,11 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
         "valores_rellenados" de cada conjunto.
  
     Raises:
-        ErrorPreprocesado: Si la estrategia no es válida o, con
-            "constante", el valor no es numérico.
+        ErrorPreprocesado: Si la estrategia no es válida, con "constante"
+            el valor no es numérico, o con "media"/"mediana" alguna columna
+            no tiene ningún valor en entrenamiento con el que calcularla.
+        AvisoPreprocesado: Si eliminar las filas dejaría vacío el conjunto
+            de entrenamiento o el de test.
     """
     columnas = list(columnas)
     if estrategia not in ESTRATEGIAS:
@@ -220,6 +243,7 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
     if estrategia == ELIMINAR:
         train_proc = train_proc.dropna(subset=columnas)
         test_proc = test_proc.dropna(subset=columnas)
+        _comprobar_no_vacios(train_proc, test_proc)
         resumen = {
             "train": _resumen(len(train) - len(train_proc), 0),
             "test": _resumen(len(test) - len(test_proc), 0),
@@ -233,6 +257,9 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
         valores = train[columnas].mean().to_dict()
     else:
         valores = train[columnas].median().to_dict()
+
+    if estrategia in (MEDIA, MEDIANA):
+        _comprobar_valores_relleno(valores, estrategia)
  
     train_proc = train_proc.fillna(valores)
     test_proc = test_proc.fillna(valores)
@@ -245,6 +272,34 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
     return train_proc, test_proc, resumen
  
  
+def _comprobar_no_vacios(train_proc, test_proc):
+    """Lanza un aviso si eliminar filas deja vacío algún conjunto."""
+    vacios = []
+    if len(train_proc) == 0:
+        vacios.append("entrenamiento")
+    if len(test_proc) == 0:
+        vacios.append("test")
+    if vacios:
+        raise AvisoPreprocesado(
+            "Eliminar las filas con valores inexistentes dejaría vacío el "
+            "conjunto de " + " y el de ".join(vacios) + ". No se ha aplicado "
+            "el cambio: elige otra estrategia.")
+
+
+def _comprobar_valores_relleno(valores, estrategia):
+    """Lanza un error si la media/mediana de alguna columna es NaN.
+
+    Pasa cuando la columna no tiene ningún valor en entrenamiento: rellenar
+    con NaN no haría nada y quedarían valores inexistentes.
+    """
+    sin_valor = [str(c) for c, v in valores.items() if pd.isna(v)]
+    if sin_valor:
+        raise ErrorPreprocesado(
+            "No se puede calcular la " + estrategia + " de "
+            + ", ".join(sin_valor) + " porque no tiene ningún valor en el "
+            "conjunto de entrenamiento. Elige otra estrategia.")
+
+
 def _nulos(df, columnas):
     """Número total de valores inexistentes en las columnas indicadas."""
     return sum(detectar_nulos(df, columnas).values())
@@ -263,8 +318,9 @@ def aplicar_al_estado(estado, estrategia, constante=None):
  
     Raises:
         ErrorPreprocesado: Si no hay selección confirmada ni separación en
-            entrenamiento y test, o si la estrategia no es válida. En ese
-            caso el estado no se modifica.
+            entrenamiento y test, o si ``aplicar_preprocesado`` falla (ver
+            sus errores). En ese caso el estado no se modifica, así que se
+            puede volver a intentar con otras opciones.
     """
     if not estado.hay_seleccion():
         raise ErrorPreprocesado("Confirma primero la selección de columnas.")
