@@ -1,8 +1,16 @@
 """
 Elimina las filas con valores inexistentes o los rellena (media, mediana o
 valor constante) en los conjuntos de entrenamiento y test, y guarda el
-resultado en el estado de la aplicación.
+resultado en el estado de la aplicación. También detecta los valores
+inexistentes de las columnas seleccionadas.
+
+Toda la lógica es independiente de la interfaz gráfica.
 """
+
+import math
+
+import numpy as np
+import pandas as pd
  
 ELIMINAR = "eliminar"
 MEDIA = "media"
@@ -15,19 +23,151 @@ class ErrorPreprocesado(Exception):
     """Error producido al aplicar el preprocesado."""
  
  
-def quedan_nulos(df, columnas):
-    """Indica si queda algún valor inexistente en las columnas indicadas.
- 
+class ColumnasNoEncontradasError(ValueError):
+    """Se lanza cuando alguna columna seleccionada no existe en el DataFrame."""
+
+
+def _comprobar_columnas(df, columnas):
+    faltan = [c for c in columnas if c not in df.columns]
+    if faltan:
+        raise ColumnasNoEncontradasError(
+            "Columnas no encontradas: " + ", ".join(map(str, faltan)))
+
+
+def normalizar_espacios_vacios(df: pd.DataFrame, columnas: list) -> pd.DataFrame:
+    """Convierte en NaN las celdas vacías o con solo espacios.
+
+    Args:
+        df: DataFrame a revisar (no se modifica).
+        columnas: Lista de nombres de columnas.
+
+    Returns:
+        Copia del DataFrame con esas celdas como NaN.
+
+    Raises:
+        ColumnasNoEncontradasError: Si alguna columna no existe.
+    """
+    _comprobar_columnas(df, columnas)
+    copia = df.copy()
+    for columna in columnas:
+        for indice in copia.index:
+            valor = copia.at[indice, columna]
+            if isinstance(valor, str) and valor.strip() == "":
+                copia.at[indice, columna] = np.nan
+    return copia
+
+
+def detectar_nulos(df: pd.DataFrame, columnas: list) -> dict:
+    """Cuenta los valores inexistentes (NaN o celdas vacías) de cada columna.
+
     Args:
         df: DataFrame a revisar.
         columnas: Lista de nombres de columnas.
- 
+
+    Returns:
+        Diccionario {columna: número de valores inexistentes}.
+
+    Raises:
+        ColumnasNoEncontradasError: Si alguna columna no existe.
+    """
+    _comprobar_columnas(df, columnas)
+    num_nulos = {}
+    for i in columnas:
+        contador = 0
+        for j in df[i]:
+            if (isinstance(j, str) and j.strip() == "") or pd.isna(j):
+                contador += 1
+        num_nulos[i] = contador
+    return num_nulos
+
+
+def quedan_nulos(df, columnas):
+    """Indica si queda algún valor inexistente en las columnas indicadas.
+
+    Args:
+        df: DataFrame a revisar.
+        columnas: Lista de nombres de columnas.
+
     Returns:
         True si hay al menos un valor inexistente, False en caso contrario.
     """
-    return bool(df[list(columnas)].isna().any().any())
- 
- 
+    return any(n > 0 for n in detectar_nulos(df, list(columnas)).values())
+
+
+def detectar_nulos_conjuntos(train, test, columnas):
+    """Detecta los valores inexistentes de train y test por separado.
+
+    Args:
+        train: DataFrame de entrenamiento.
+        test: DataFrame de test.
+        columnas: Columnas seleccionadas (entrada y salida).
+
+    Returns:
+        Diccionario {"train": {columna: n}, "test": {columna: n}}.
+    """
+    columnas = list(columnas)
+    return {
+        "train": detectar_nulos(train, columnas),
+        "test": detectar_nulos(test, columnas),
+    }
+
+
+def hay_nulos(deteccion):
+    """Indica si la detección encontró algún valor inexistente.
+
+    Args:
+        deteccion: Diccionario devuelto por ``detectar_nulos_conjuntos``.
+
+    Returns:
+        True si hay al menos un valor inexistente en train o en test.
+    """
+    return any(n > 0 for conjunto in deteccion.values() for n in conjunto.values())
+
+
+def detectar_en_estado(estado):
+    """Detecta los valores inexistentes de los conjuntos guardados en el estado.
+
+    Si ya se aplicó un preprocesado, revisa los conjuntos preprocesados.
+
+    Args:
+        estado: Estado de la aplicación.
+
+    Returns:
+        El diccionario de ``detectar_nulos_conjuntos``, o None si aún no hay
+        selección de columnas o separación en entrenamiento y test.
+    """
+    if not estado.hay_seleccion() or not estado.hay_separacion():
+        return None
+    if estado.preprocesado is not None:
+        train = estado.preprocesado["entrenamiento"]
+        test = estado.preprocesado["test"]
+    else:
+        train, test = estado.entrenamiento, estado.test
+    return detectar_nulos_conjuntos(train, test, columnas_seleccionadas(estado))
+
+
+def interpretar_constante(valor):
+    """Convierte el valor constante escrito por el usuario en un número.
+
+    Admite números y textos como "3", "2.5" o "2,5".
+
+    Raises:
+        ErrorPreprocesado: Si no es un número válido.
+    """
+    mensaje = "El valor constante debe ser un número."
+    if valor is None or isinstance(valor, bool):
+        raise ErrorPreprocesado(mensaje)
+    if isinstance(valor, str):
+        valor = valor.strip().replace(",", ".")
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        raise ErrorPreprocesado(mensaje) from None
+    if math.isnan(numero) or math.isinf(numero):
+        raise ErrorPreprocesado(mensaje)
+    return numero
+
+
 def columnas_seleccionadas(estado):
     """Devuelve las columnas de entrada seguidas de la de salida.
  
@@ -64,12 +204,16 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
         "valores_rellenados" de cada conjunto.
  
     Raises:
-        ErrorPreprocesado: Si la estrategia no es válida.
+        ErrorPreprocesado: Si la estrategia no es válida o, con
+            "constante", el valor no es numérico.
     """
     columnas = list(columnas)
     if estrategia not in ESTRATEGIAS:
         raise ErrorPreprocesado(f"Estrategia no válida: {estrategia}")
  
+    # Las celdas vacías pasan a NaN para tratarlas igual que el resto
+    train = normalizar_espacios_vacios(train, columnas)
+    test = normalizar_espacios_vacios(test, columnas)
     train_proc = train.copy()
     test_proc = test.copy()
  
@@ -83,6 +227,7 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
         return train_proc, test_proc, resumen
  
     if estrategia == CONSTANTE:
+        constante = interpretar_constante(constante)
         valores = {c: constante for c in columnas}
     elif estrategia == MEDIA:
         valores = train[columnas].mean().to_dict()
@@ -102,7 +247,7 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
  
 def _nulos(df, columnas):
     """Número total de valores inexistentes en las columnas indicadas."""
-    return int(df[columnas].isna().sum().sum())
+    return sum(detectar_nulos(df, columnas).values())
  
  
 def aplicar_al_estado(estado, estrategia, constante=None):
