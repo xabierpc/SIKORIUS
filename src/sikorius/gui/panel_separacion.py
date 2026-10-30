@@ -29,17 +29,24 @@ class PanelSeparacion:
         self.al_separar = al_separar
 
         self.aviso = ui.label("").classes("text-sm text-gray-500")
-        with ui.row().classes("w-full items-start"):
+
+        # Todo en una sola fila para ocupar poco alto: los campos a la
+        # izquierda, los porcentajes y el resultado en medio y el botón
+        # pegado a la derecha (ui.space empuja el botón hasta el borde).
+        with ui.row().classes("w-full items-center gap-4"):
             self.entrada_porcentaje = ui.input(
                 "Porcentaje de test (%)", value=str(PORCENTAJE_TEST_DEFECTO),
                 on_change=self._mostrar_entrenamiento,
-            ).classes("w-48")
+            ).props("dense").classes("w-44")
             self.entrada_semilla = ui.input(
-                "Semilla", value=str(SEMILLA_DEFECTO)).classes("w-48")
-        self.etiqueta_entrenamiento = ui.label("").classes("text-sm")
-        self.boton_separar = ui.button("Separar datos", icon="call_split",
-                                       on_click=self.separar)
-        self.etiqueta_resultado = ui.label("").classes("text-sm")
+                "Semilla", value=str(SEMILLA_DEFECTO)) \
+                .props("dense").classes("w-44")
+            with ui.column().classes("gap-0"):
+                self.etiqueta_entrenamiento = ui.label("").classes("text-sm")
+                self.etiqueta_resultado = ui.label("").classes("text-sm")
+            ui.space()
+            self.boton_separar = ui.button("Separar datos", icon="call_split",
+                                           on_click=self.separar)
 
         self._mostrar_entrenamiento()
         self.actualizar()
@@ -59,12 +66,14 @@ class PanelSeparacion:
         resultado de la separación actual, si la hay."""
         if self.estado.hay_seleccion():
             self.aviso.set_text("")
+            self.aviso.set_visibility(False)  # oculto no deja hueco en la tarjeta
             self.entrada_porcentaje.enable()
             self.entrada_semilla.enable()
             self.boton_separar.enable()
         else:
             self.aviso.set_text(
                 "Confirma primero la selección de columnas para poder separar los datos.")
+            self.aviso.set_visibility(True)
             self.entrada_porcentaje.disable()
             self.entrada_semilla.disable()
             self.boton_separar.disable()

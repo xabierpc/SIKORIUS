@@ -1,9 +1,13 @@
 """Selección de las columnas de entrada y salida del modelo (historia #11).
 
-Contiene los selectores de columnas y el panel que los junta con el tipo de
-regresión y el botón de confirmar. El panel no lee archivos: recibe el
-DataFrame ya cargado por el módulo de importación (historia #14) y guarda
-la selección confirmada en el estado de la aplicación.
+Contiene los selectores de columnas y el panel que los junta con el botón
+de confirmar. En la aplicación principal el usuario elige una o varias
+columnas de entrada; el modo simple de ``SelectorFeatures`` se conserva solo
+porque lo usa la demo ``sikorius.datos_entrada_salida``.
+
+El panel no lee archivos: recibe el DataFrame ya cargado por el módulo de
+importación (historia #14) y guarda la selección confirmada en el estado de
+la aplicación.
 """
 
 from nicegui import ui
@@ -148,7 +152,7 @@ class SelectorTarget:
 
 
 class PanelSeleccionColumnas:
-    """Tipo de regresión + features + target + botón de confirmar.
+    """Features + target + botón de confirmar.
 
     Trabaja sobre el estado de la aplicación: lee ``estado.datos`` para
     validar y, si la selección es correcta, la guarda con
@@ -162,15 +166,7 @@ class PanelSeleccionColumnas:
         self.estado = estado
         self.al_cambiar = al_cambiar
 
-        self.tipo = ui.radio(
-            {
-                SelectorFeatures.SIMPLE: "Regresión simple",
-                SelectorFeatures.MULTIPLE: "Regresión múltiple",
-            },
-            value=SelectorFeatures.MULTIPLE,
-        ).props("inline")
-
-        self.features = SelectorFeatures(tipo_regresion=self.tipo.value)
+        self.features = SelectorFeatures()
         self.target = SelectorTarget(
             al_abrir=lambda: self.target.excluir(self.features.obtener_seleccion()))
 
@@ -178,7 +174,6 @@ class PanelSeleccionColumnas:
                                          on_click=self.confirmar)
         self.etiqueta_seleccion = ui.label("").classes("text-sm text-gray-500")
 
-        self.tipo.on_value_change(self._al_cambiar_tipo)
         self._actualizar_boton()
 
     def _actualizar_boton(self):
@@ -190,12 +185,6 @@ class PanelSeleccionColumnas:
     def _avisar_cambio(self):
         if self.al_cambiar is not None:
             self.al_cambiar()
-
-    def _al_cambiar_tipo(self, evento):
-        self.features.cambiar_tipo_regresion(evento.value)
-        self.estado.borrar_seleccion()
-        self.etiqueta_seleccion.set_text("")
-        self._avisar_cambio()
 
     def cargar_columnas(self, df):
         """Muestra las columnas del dataset nuevo y limpia la selección anterior."""
@@ -217,7 +206,13 @@ class PanelSeleccionColumnas:
         except ErrorSeleccion as error:
             ui.notify(str(error), type="negative", multi_line=True)
             return
-        self.estado.guardar_seleccion(features, objetivo, self.tipo.value)
+        # El tipo de regresión ya no lo elige el usuario: se deduce del número
+        # de columnas de entrada (una -> simple, varias -> múltiple).
+        if len(features) == 1:
+            tipo_regresion = "simple"
+        else:
+            tipo_regresion = "multiple"
+        self.estado.guardar_seleccion(features, objetivo, tipo_regresion)
         texto = "Entrada: " + ", ".join(features) + " | Salida: " + objetivo
         self.etiqueta_seleccion.set_text(texto)
         ui.notify("Selección confirmada. " + texto, type="positive", multi_line=True)
