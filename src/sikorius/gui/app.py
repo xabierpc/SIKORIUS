@@ -12,6 +12,10 @@ from sikorius.gui.selector_columnas import PanelSeleccionColumnas
 from sikorius.gui.tabla_datos import TablaDatos
 from sikorius.importador import ErrorImportacion
 
+# Quasar pone en mayúsculas el texto de todos los botones. Con "no-caps" se
+# muestran tal cual se escriben: solo la primera letra en mayúscula.
+ui.button.default_props("no-caps")
+
 
 def carpeta_inicial():
     """Carpeta del último archivo cargado o, si no hay, la carpeta personal."""
@@ -29,18 +33,17 @@ def pagina_principal():
     with ui.card().classes("w-full"):
         ui.label("Dataset").classes("text-lg font-semibold")
         with ui.row().classes("w-full items-center no-wrap"):
-            boton_cargar = ui.button("Cargar dataset", icon="folder_open") \
-                .props("size=lg")
+            boton_cargar = ui.button("Cargar dataset", icon="folder_open")
             with ui.column().classes("gap-0 min-w-0"):
-                ui.label("Ruta del archivo cargado:").classes("text-sm text-gray-500")
+                ui.label("Ruta:").classes("text-sm text-gray-500")
                 etiqueta_ruta = ui.label("Ningún archivo cargado") \
                     .classes("font-mono break-all")
-        etiqueta_resumen = ui.label("").classes("text-sm text-gray-500")
 
     # --- Tabla con los datos ---
     with ui.card().classes("w-full"):
         ui.label("Datos").classes("text-lg font-semibold")
         tabla = TablaDatos()
+        etiqueta_resumen = ui.label("").classes("text-sm text-gray-500")
 
     # --- Selección de columnas de entrada y salida (historia #11) ---
     with ui.card().classes("w-full"):
