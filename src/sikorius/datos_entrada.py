@@ -3,7 +3,7 @@ from pathlib import Path
 
 from nicegui import ui
 
-from importador import ErrorImportacion, importar_datos
+from sikorius.importador import ErrorImportacion, importar_datos
 
 EXTENSIONES_ADMITIDAS = ".csv,.xlsx,.xls,.sqlite,.db"
 
