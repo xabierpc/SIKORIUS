@@ -36,8 +36,7 @@ def validar_seleccion(df, features, target):
         raise ErrorSeleccion("La columna '" + target + "' no puede ser entrada y salida a la vez.")
 
     no_numericas = [
-        c for c in list(features) + [target]
-        if not pd.api.types.is_numeric_dtype(df[reales[c]])
+        c for c in list(features) + [target] if not pd.api.types.is_numeric_dtype(df[reales[c]])
     ]
     if no_numericas:
         raise ErrorSeleccion(

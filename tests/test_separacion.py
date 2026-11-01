@@ -20,23 +20,30 @@ from nicegui import ui
 
 from sikorius.estado import EstadoApp
 from sikorius.nucleo.separacion import (
-    FILAS_MINIMAS, PORCENTAJE_TEST_DEFECTO, SEMILLA_DEFECTO, ErrorSeparacion,
-    calcular_tamanos, interpretar_porcentaje, interpretar_semilla,
+    FILAS_MINIMAS,
+    PORCENTAJE_TEST_DEFECTO,
+    SEMILLA_DEFECTO,
+    ErrorSeparacion,
+    calcular_tamanos,
+    interpretar_porcentaje,
+    interpretar_semilla,
     separar_datos,
 )
-
 
 # =============================================================================
 # Utilidades
 # =============================================================================
 
+
 def crear_df(num_filas):
     """Dataset con una columna 'id' única por fila, una feature y un target."""
-    return pd.DataFrame({
-        "id": list(range(num_filas)),
-        "x": np.arange(num_filas, dtype=float) * 1.5,
-        "y": np.arange(num_filas, dtype=float) * 3.0 + 1.0,
-    })
+    return pd.DataFrame(
+        {
+            "id": list(range(num_filas)),
+            "x": np.arange(num_filas, dtype=float) * 1.5,
+            "y": np.arange(num_filas, dtype=float) * 3.0 + 1.0,
+        }
+    )
 
 
 def ids(df):
@@ -54,7 +61,7 @@ def filas_test_esperadas(num_filas, porcentaje_texto):
     decimales = 0
     if len(partes) == 2:
         decimales = int(partes[1].ljust(2, "0"))
-    centesimas = entero * 100 + decimales      # porcentaje * 100
+    centesimas = entero * 100 + decimales  # porcentaje * 100
     numerador = num_filas * centesimas
     denominador = 10000
     resultado = numerador // denominador
@@ -91,26 +98,63 @@ class Avisos:
 # interpretar_porcentaje
 # =============================================================================
 
+
 def test_valores_por_defecto():
     assert PORCENTAJE_TEST_DEFECTO == 20
     assert SEMILLA_DEFECTO == 42
     assert FILAS_MINIMAS == 5
 
 
-@pytest.mark.parametrize("valor, esperado", [
-    (1, 1.0), (99, 99.0), ("1", 1.0), ("99", 99.0), ("20", 20.0),
-    ("12.5", 12.5), ("12,5", 12.5), ("  30  ", 30.0), (50.0, 50.0),
-    ("1e1", 10.0), (np.int64(25), 25.0), (np.float64(33.3), 33.3),
-])
+@pytest.mark.parametrize(
+    "valor, esperado",
+    [
+        (1, 1.0),
+        (99, 99.0),
+        ("1", 1.0),
+        ("99", 99.0),
+        ("20", 20.0),
+        ("12.5", 12.5),
+        ("12,5", 12.5),
+        ("  30  ", 30.0),
+        (50.0, 50.0),
+        ("1e1", 10.0),
+        (np.int64(25), 25.0),
+        (np.float64(33.3), 33.3),
+    ],
+)
 def test_porcentaje_valido(valor, esperado):
     assert interpretar_porcentaje(valor) == esperado
 
 
-@pytest.mark.parametrize("valor", [
-    0, 100, "0", "100", -5, "-1", 0.99, 99.01, "99.5", 1000,
-    "abc", "", "   ", None, "nan", "inf", "-inf", float("nan"),
-    True, False, [20], "20%", "1,2,3", "12.5.1",
-])
+@pytest.mark.parametrize(
+    "valor",
+    [
+        0,
+        100,
+        "0",
+        "100",
+        -5,
+        "-1",
+        0.99,
+        99.01,
+        "99.5",
+        1000,
+        "abc",
+        "",
+        "   ",
+        None,
+        "nan",
+        "inf",
+        "-inf",
+        float("nan"),
+        True,
+        False,
+        [20],
+        "20%",
+        "1,2,3",
+        "12.5.1",
+    ],
+)
 def test_porcentaje_no_valido(valor):
     with pytest.raises(ErrorSeparacion, match="entre 1 y 99"):
         interpretar_porcentaje(valor)
@@ -120,20 +164,47 @@ def test_porcentaje_no_valido(valor):
 # interpretar_semilla
 # =============================================================================
 
-@pytest.mark.parametrize("valor, esperado", [
-    (0, 0), (42, 42), ("42", 42), (" 7 ", 7), ("+3", 3), (5.0, 5),
-    (np.int64(9), 9), (2 ** 40, 2 ** 40), (str(2 ** 63), 2 ** 63),
-])
+
+@pytest.mark.parametrize(
+    "valor, esperado",
+    [
+        (0, 0),
+        (42, 42),
+        ("42", 42),
+        (" 7 ", 7),
+        ("+3", 3),
+        (5.0, 5),
+        (np.int64(9), 9),
+        (2**40, 2**40),
+        (str(2**63), 2**63),
+    ],
+)
 def test_semilla_valida(valor, esperado):
     resultado = interpretar_semilla(valor)
     assert resultado == esperado
     assert isinstance(resultado, int)
 
 
-@pytest.mark.parametrize("valor", [
-    "4.5", 4.5, "4.0", "-1", -1, "", "   ", None, "abc", "1e3",
-    True, False, float("nan"), float("inf"), [1],
-])
+@pytest.mark.parametrize(
+    "valor",
+    [
+        "4.5",
+        4.5,
+        "4.0",
+        "-1",
+        -1,
+        "",
+        "   ",
+        None,
+        "abc",
+        "1e3",
+        True,
+        False,
+        float("nan"),
+        float("inf"),
+        [1],
+    ],
+)
 def test_semilla_no_valida(valor):
     with pytest.raises(ErrorSeparacion, match="entero"):
         interpretar_semilla(valor)
@@ -143,17 +214,21 @@ def test_semilla_no_valida(valor):
 # calcular_tamanos
 # =============================================================================
 
-@pytest.mark.parametrize("num_filas, porcentaje, esperado", [
-    (100, 20, (80, 20)),
-    (101, 20, (80, 21)),      # se redondea hacia arriba, como scikit-learn
-    (5, 20, (4, 1)),
-    (5, 1, (4, 1)),           # 0.05 filas -> 1 fila de test
-    (100, 99, (1, 99)),
-    (1000, 12.3, (877, 123)),
-    (250, 64.4, (89, 161)),   # antes salía 162 por un error de coma flotante
-    (375, 8.8, (342, 33)),
-    (625, 1.12, (618, 7)),
-])
+
+@pytest.mark.parametrize(
+    "num_filas, porcentaje, esperado",
+    [
+        (100, 20, (80, 20)),
+        (101, 20, (80, 21)),  # se redondea hacia arriba, como scikit-learn
+        (5, 20, (4, 1)),
+        (5, 1, (4, 1)),  # 0.05 filas -> 1 fila de test
+        (100, 99, (1, 99)),
+        (1000, 12.3, (877, 123)),
+        (250, 64.4, (89, 161)),  # antes salía 162 por un error de coma flotante
+        (375, 8.8, (342, 33)),
+        (625, 1.12, (618, 7)),
+    ],
+)
 def test_tamanos(num_filas, porcentaje, esperado):
     assert calcular_tamanos(num_filas, porcentaje) == esperado
 
@@ -218,16 +293,27 @@ def test_redondeo_exacto_con_decimales():
 # separar_datos
 # =============================================================================
 
+
 def test_por_defecto_80_20():
     entrenamiento, test = separar_datos(crear_df(100))
     assert len(entrenamiento) == 80
     assert len(test) == 20
 
 
-@pytest.mark.parametrize("num_filas, porcentaje", [
-    (5, 1), (5, 20), (10, 50), (100, 1), (100, 30), (100, 98),
-    (101, 33.3), (1000, 12.3), (250, 64.4),
-])
+@pytest.mark.parametrize(
+    "num_filas, porcentaje",
+    [
+        (5, 1),
+        (5, 20),
+        (10, 50),
+        (100, 1),
+        (100, 30),
+        (100, 98),
+        (101, 33.3),
+        (1000, 12.3),
+        (250, 64.4),
+    ],
+)
 def test_tamanos_corresponden_al_porcentaje(num_filas, porcentaje):
     entrenamiento, test = separar_datos(crear_df(num_filas), porcentaje, 7)
     esperado_entrenamiento, esperado_test = calcular_tamanos(num_filas, porcentaje)
@@ -325,10 +411,17 @@ def test_dataset_grande():
     assert ids(entrenamiento) & ids(test) == set()
 
 
-@pytest.mark.parametrize("porcentaje, semilla, texto", [
-    (0, 42, "entre 1 y 99"), (100, 42, "entre 1 y 99"), ("abc", 42, "entre 1 y 99"),
-    (20, "4.5", "entero"), (20, "abc", "entero"), (20, -1, "entero"),
-])
+@pytest.mark.parametrize(
+    "porcentaje, semilla, texto",
+    [
+        (0, 42, "entre 1 y 99"),
+        (100, 42, "entre 1 y 99"),
+        ("abc", 42, "entre 1 y 99"),
+        (20, "4.5", "entero"),
+        (20, "abc", "entero"),
+        (20, -1, "entero"),
+    ],
+)
 def test_errores_de_parametros(porcentaje, semilla, texto):
     with pytest.raises(ErrorSeparacion, match=texto):
         separar_datos(crear_df(50), porcentaje, semilla)
@@ -348,6 +441,7 @@ def test_error_conjunto_vacio():
 # =============================================================================
 # EstadoApp: orden del flujo de trabajo
 # =============================================================================
+
 
 def test_estado_inicial_sin_separacion():
     estado = EstadoApp()
@@ -402,8 +496,7 @@ def test_borrar_seleccion_borra_separacion(estado_con_seleccion):
     assert not estado.hay_separacion()
 
 
-def test_cargar_nuevo_dataset_obliga_a_repetir_separacion(estado_con_seleccion,
-                                                         tmp_path):
+def test_cargar_nuevo_dataset_obliga_a_repetir_separacion(estado_con_seleccion, tmp_path):
     estado = estado_con_seleccion
     estado.guardar_separacion(*separar_datos(estado.datos, 20, 1), 20, 1)
     estado.modelo = "modelo"
@@ -428,8 +521,10 @@ def test_hay_separacion_necesita_los_dos_conjuntos():
 # PanelSeparacion (GUI sin servidor)
 # =============================================================================
 
+
 def crear_panel(estado, monkeypatch, al_separar=None):
     from sikorius.gui.paneles.panel_separacion import PanelSeparacion
+
     avisos = Avisos(monkeypatch)
     panel = PanelSeparacion(estado, al_separar=al_separar)
     return panel, avisos
@@ -468,15 +563,24 @@ def test_panel_se_habilita_al_confirmar_seleccion(monkeypatch):
     assert panel.aviso.text == ""
 
 
-@pytest.mark.parametrize("texto, esperado", [
-    ("20", "Entrenamiento: 80 %"), ("1", "Entrenamiento: 99 %"),
-    ("99", "Entrenamiento: 1 %"), ("12.5", "Entrenamiento: 87.5 %"),
-    ("12,5", "Entrenamiento: 87.5 %"), ("33.33", "Entrenamiento: 66.67 %"),
-    ("0", "Entrenamiento: -"), ("100", "Entrenamiento: -"),
-    ("abc", "Entrenamiento: -"), ("", "Entrenamiento: -"),
-])
-def test_panel_entrenamiento_es_el_complementario(estado_con_seleccion,
-                                                  monkeypatch, texto, esperado):
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [
+        ("20", "Entrenamiento: 80 %"),
+        ("1", "Entrenamiento: 99 %"),
+        ("99", "Entrenamiento: 1 %"),
+        ("12.5", "Entrenamiento: 87.5 %"),
+        ("12,5", "Entrenamiento: 87.5 %"),
+        ("33.33", "Entrenamiento: 66.67 %"),
+        ("0", "Entrenamiento: -"),
+        ("100", "Entrenamiento: -"),
+        ("abc", "Entrenamiento: -"),
+        ("", "Entrenamiento: -"),
+    ],
+)
+def test_panel_entrenamiento_es_el_complementario(
+    estado_con_seleccion, monkeypatch, texto, esperado
+):
     panel, _ = crear_panel(estado_con_seleccion, monkeypatch)
     panel.entrada_porcentaje.set_value(texto)
     assert panel.etiqueta_entrenamiento.text == esperado
@@ -484,8 +588,9 @@ def test_panel_entrenamiento_es_el_complementario(estado_con_seleccion,
 
 def test_panel_separar_correcto(estado_con_seleccion, monkeypatch):
     llamadas = []
-    panel, avisos = crear_panel(estado_con_seleccion, monkeypatch,
-                                al_separar=lambda: llamadas.append(1))
+    panel, avisos = crear_panel(
+        estado_con_seleccion, monkeypatch, al_separar=lambda: llamadas.append(1)
+    )
     panel.separar()
     estado = estado_con_seleccion
     assert estado.hay_separacion()
@@ -516,8 +621,9 @@ def test_panel_separar_con_otros_valores(estado_con_seleccion, monkeypatch):
 @pytest.mark.parametrize("porcentaje", ["0", "100", "abc", "", "-5", "150"])
 def test_panel_porcentaje_no_valido(estado_con_seleccion, monkeypatch, porcentaje):
     llamadas = []
-    panel, avisos = crear_panel(estado_con_seleccion, monkeypatch,
-                                al_separar=lambda: llamadas.append(1))
+    panel, avisos = crear_panel(
+        estado_con_seleccion, monkeypatch, al_separar=lambda: llamadas.append(1)
+    )
     panel.entrada_porcentaje.set_value(porcentaje)
     panel.separar()
     mensaje, tipo = avisos.ultimo()
@@ -571,8 +677,7 @@ def test_panel_error_conserva_separacion_anterior(estado_con_seleccion, monkeypa
     assert estado_con_seleccion.test is test_anterior
 
 
-def test_panel_repetir_separacion_descarta_preprocesado(estado_con_seleccion,
-                                                        monkeypatch):
+def test_panel_repetir_separacion_descarta_preprocesado(estado_con_seleccion, monkeypatch):
     panel, _ = crear_panel(estado_con_seleccion, monkeypatch)
     panel.separar()
     estado_con_seleccion.preprocesado = {"algo": 1}
@@ -584,8 +689,7 @@ def test_panel_repetir_separacion_descarta_preprocesado(estado_con_seleccion,
     assert estado_con_seleccion.separacion["semilla"] == 1
 
 
-def test_panel_cambio_de_seleccion_borra_resultado(estado_con_seleccion,
-                                                   monkeypatch):
+def test_panel_cambio_de_seleccion_borra_resultado(estado_con_seleccion, monkeypatch):
     panel, _ = crear_panel(estado_con_seleccion, monkeypatch)
     panel.separar()
     assert panel.etiqueta_resultado.text != ""
@@ -606,7 +710,9 @@ def test_panel_misma_entrada_misma_separacion(estado_con_seleccion, monkeypatch)
 def test_panel_no_contiene_logica_de_separacion():
     """La GUI llama a separar_datos; no baraja filas por su cuenta."""
     import inspect
+
     import sikorius.gui.paneles.panel_separacion as panel
+
     codigo = inspect.getsource(panel)
     assert "separar_datos(" in codigo
     assert "permutation" not in codigo

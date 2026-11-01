@@ -20,9 +20,7 @@ Ejecución:
     uv run pytest test/test_salida.py -v
 """
 
-import ast
 import asyncio
-import builtins
 import inspect
 import sqlite3
 from pathlib import Path
@@ -32,7 +30,6 @@ import pytest
 from nicegui import ui
 
 import sikorius.datos_entrada_salida as modulo
-from sikorius.nucleo.importador import ErrorImportacion
 
 # =============================================================================
 # Utilidades (antes estaban en conftest.py; ahora cada archivo lleva las suyas)
@@ -46,12 +43,14 @@ COLUMNAS = ["superficie", "habitaciones", "barrio", "precio"]
 @pytest.fixture
 def datos():
     """Dataset pequeño con tres columnas numéricas y una de texto (barrio)."""
-    return pd.DataFrame({
-        "superficie": [60.0, 95.0, 110.0],
-        "habitaciones": [2, 3, 4],
-        "barrio": ["Elviña", "Os Mallos", "Riazor"],
-        "precio": [121000, 189500, 265000],
-    })
+    return pd.DataFrame(
+        {
+            "superficie": [60.0, 95.0, 110.0],
+            "habitaciones": [2, 3, 4],
+            "barrio": ["Elviña", "Os Mallos", "Riazor"],
+            "precio": [121000, 189500, 265000],
+        }
+    )
 
 
 class ArchivoSubido:
@@ -101,8 +100,7 @@ def ejecutar(corrutina):
 
 def oyentes_al_desplegar(selector):
     """Manejadores del evento de abrir el desplegable de un ui.select."""
-    return [e for e in selector._event_listeners.values()
-            if e.type in ("popup-show", "popupShow")]
+    return [e for e in selector._event_listeners.values() if e.type in ("popup-show", "popupShow")]
 
 
 def desplegar(selector):
@@ -158,8 +156,7 @@ class Pagina:
 
     def _ultimo(self, prefijo):
         """Último ui.select creado cuya etiqueta empieza por el prefijo."""
-        return [s for s in self.selects
-                if str(s.props.get("label", "")).startswith(prefijo)][-1]
+        return [s for s in self.selects if str(s.props.get("label", "")).startswith(prefijo)][-1]
 
     @property
     def features(self):
@@ -204,6 +201,7 @@ importar_archivo_subido = modulo.importar_archivo_subido
 # Estructura de SelectorTarget
 # =============================================================================
 
+
 def test_metodos_publicos():
     for metodo in ["cargar_columnas", "excluir", "obtener_seleccion"]:
         assert callable(getattr(SelectorTarget, metodo, None)), metodo
@@ -222,6 +220,7 @@ def test_docstring_de_selector_target_empieza_bien():
 # =============================================================================
 # SelectorTarget
 # =============================================================================
+
 
 def test_target_empieza_vacio_y_deshabilitado():
     target = SelectorTarget()
@@ -275,7 +274,7 @@ def test_target_excluir_quita_opciones(datos):
     target.cargar_columnas(datos)
     target.excluir(["superficie", "habitaciones"])
     assert target.selector.options == ["barrio", "precio"]
-    assert target.columnas == COLUMNAS     # las columnas no se pierden
+    assert target.columnas == COLUMNAS  # las columnas no se pierden
 
 
 def test_target_excluir_la_columna_elegida_la_deselecciona(datos):
@@ -326,8 +325,7 @@ def test_target_excluir_antes_de_cargar():
     assert target.selector.options == []
 
 
-@pytest.mark.parametrize("columnas", [("superficie",), {"superficie"},
-                                      iter(["superficie"])])
+@pytest.mark.parametrize("columnas", [("superficie",), {"superficie"}, iter(["superficie"])])
 def test_target_excluir_acepta_cualquier_iterable(datos, columnas):
     target = SelectorTarget()
     target.cargar_columnas(datos)
@@ -353,7 +351,7 @@ def test_target_sin_al_abrir_no_registra_evento():
 def test_target_al_abrir_se_llama_al_desplegar(datos):
     llamadas = []
     target = SelectorTarget(al_abrir=lambda: llamadas.append(1))
-    target.cargar_columnas(datos)   # se reconstruye el selector
+    target.cargar_columnas(datos)  # se reconstruye el selector
     desplegar(target.selector)
     assert llamadas == [1]
 
@@ -361,6 +359,7 @@ def test_target_al_abrir_se_llama_al_desplegar(datos):
 # =============================================================================
 # pagina_principal: columna de salida y confirmación
 # =============================================================================
+
 
 def test_confirmar_sin_elegir_nada(pagina_con_datos):
     texto, kw = pagina_con_datos.confirmar()
@@ -382,8 +381,7 @@ def test_confirmar_seleccion_correcta_multiple(pagina_con_datos):
     pagina.target.set_value("precio")
     texto, kw = pagina.confirmar()
     assert kw["type"] == "positive"
-    assert texto == ("Selección confirmada. Entrada: superficie, "
-                     "habitaciones | Salida: precio")
+    assert texto == ("Selección confirmada. Entrada: superficie, habitaciones | Salida: precio")
 
 
 def test_al_abrir_target_se_excluyen_las_features(pagina_con_datos):
@@ -412,10 +410,13 @@ def test_al_reabrir_target_se_quita_si_ya_es_feature(pagina_con_datos):
     assert pagina.target.value is None
 
 
-@pytest.mark.parametrize("features, target", [
-    (["barrio"], "precio"),
-    (["superficie"], "barrio"),
-])
+@pytest.mark.parametrize(
+    "features, target",
+    [
+        (["barrio"], "precio"),
+        (["superficie"], "barrio"),
+    ],
+)
 def test_confirmar_columna_no_numerica(pagina_con_datos, features, target):
     pagina = pagina_con_datos
     pagina.features.set_value(features)

@@ -168,10 +168,12 @@ class PanelSeleccionColumnas:
 
         self.features = SelectorFeatures()
         self.target = SelectorTarget(
-            al_abrir=lambda: self.target.excluir(self.features.obtener_seleccion()))
+            al_abrir=lambda: self.target.excluir(self.features.obtener_seleccion())
+        )
 
-        self.boton_confirmar = ui.button("Confirmar selección", icon="check",
-                                         on_click=self.confirmar)
+        self.boton_confirmar = ui.button(
+            "Confirmar selección", icon="check", on_click=self.confirmar
+        )
         self.etiqueta_seleccion = ui.label("").classes("text-sm text-gray-500")
 
         self._actualizar_boton()
