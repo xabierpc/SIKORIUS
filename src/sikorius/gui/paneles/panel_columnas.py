@@ -12,7 +12,7 @@ la aplicación.
 
 from nicegui import ui
 
-from sikorius.validacion import ErrorSeleccion, validar_seleccion
+from sikorius.nucleo.columnas import ErrorSeleccion, validar_seleccion
 
 
 class SelectorFeatures:

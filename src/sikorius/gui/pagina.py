@@ -5,12 +5,12 @@ from pathlib import Path
 from nicegui import ui
 
 from sikorius.estado import estado
-from sikorius.gui.selector_archivos import seleccionar_archivo
-from sikorius.gui.panel_preprocesado import PanelPreprocesado
-from sikorius.gui.panel_separacion import PanelSeparacion
-from sikorius.gui.selector_columnas import PanelSeleccionColumnas
-from sikorius.gui.tabla_datos import TablaDatos
-from sikorius.importador import ErrorImportacion
+from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
+from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
+from sikorius.gui.paneles.panel_separacion import PanelSeparacion
+from sikorius.gui.paneles.panel_columnas import PanelSeleccionColumnas
+from sikorius.gui.componentes.tabla_datos import TablaDatos
+from sikorius.nucleo.importador import ErrorImportacion
 
 # Quasar pone en mayúsculas el texto de todos los botones. Con "no-caps" se
 # muestran tal cual se escriben: solo la primera letra en mayúscula.
@@ -94,11 +94,3 @@ def pagina_principal():
         refrescar()
 
 
-def ejecutar():
-    """Arranca la interfaz gráfica en el navegador."""
-    ui.run(title="SIKORIUS", reload=False)
-
-
-# Para arrancar la GUI: uv run python -m sikorius.gui.app
-if __name__ in {"__main__", "__mp_main__"}:
-    ejecutar()

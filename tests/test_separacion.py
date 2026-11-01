@@ -19,7 +19,7 @@ import pytest
 from nicegui import ui
 
 from sikorius.estado import EstadoApp
-from sikorius.separacion import (
+from sikorius.nucleo.separacion import (
     FILAS_MINIMAS, PORCENTAJE_TEST_DEFECTO, SEMILLA_DEFECTO, ErrorSeparacion,
     calcular_tamanos, interpretar_porcentaje, interpretar_semilla,
     separar_datos,
@@ -429,7 +429,7 @@ def test_hay_separacion_necesita_los_dos_conjuntos():
 # =============================================================================
 
 def crear_panel(estado, monkeypatch, al_separar=None):
-    from sikorius.gui.panel_separacion import PanelSeparacion
+    from sikorius.gui.paneles.panel_separacion import PanelSeparacion
     avisos = Avisos(monkeypatch)
     panel = PanelSeparacion(estado, al_separar=al_separar)
     return panel, avisos
@@ -606,7 +606,7 @@ def test_panel_misma_entrada_misma_separacion(estado_con_seleccion, monkeypatch)
 def test_panel_no_contiene_logica_de_separacion():
     """La GUI llama a separar_datos; no baraja filas por su cuenta."""
     import inspect
-    import sikorius.gui.panel_separacion as panel
+    import sikorius.gui.paneles.panel_separacion as panel
     codigo = inspect.getsource(panel)
     assert "separar_datos(" in codigo
     assert "permutation" not in codigo

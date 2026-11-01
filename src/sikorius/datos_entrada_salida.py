@@ -1,7 +1,7 @@
 """Demo independiente de la selección de columnas (historia #11).
 
-Los selectores están en ``sikorius.gui.selector_columnas`` y son los mismos
-que usa la aplicación principal (``sikorius.gui.app``). Esta demo carga el
+Los selectores están en ``sikorius.gui.paneles.panel_columnas`` y son los mismos
+que usa la aplicación principal (``sikorius.gui.pagina``). Esta demo carga el
 dataset con ``ui.upload`` en vez de con el explorador de archivos.
 
 Para arrancarla: uv run python -m sikorius.datos_entrada_salida
@@ -12,9 +12,9 @@ from pathlib import Path
 
 from nicegui import ui
 
-from sikorius.gui.selector_columnas import SelectorFeatures, SelectorTarget
-from sikorius.importador import ErrorImportacion, importar_datos
-from sikorius.validacion import ErrorSeleccion, validar_seleccion
+from sikorius.gui.paneles.panel_columnas import SelectorFeatures, SelectorTarget
+from sikorius.nucleo.importador import ErrorImportacion, importar_datos
+from sikorius.nucleo.columnas import ErrorSeleccion, validar_seleccion
 
 EXTENSIONES_ADMITIDAS = ".csv,.xlsx,.xls,.sqlite,.db"
 

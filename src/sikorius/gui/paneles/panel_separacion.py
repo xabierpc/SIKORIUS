@@ -1,13 +1,13 @@
 """Separación del dataset en entrenamiento y test.
 
 El panel solo recoge el porcentaje de test y la semilla, llama a
-``sikorius.separacion.separar_datos`` y guarda el resultado en el estado de
+``sikorius.nucleo.separacion.separar_datos`` y guarda el resultado en el estado de
 la aplicación. Toda la lógica de la separación está fuera de la GUI.
 """
 
 from nicegui import ui
 
-from sikorius.separacion import (
+from sikorius.nucleo.separacion import (
     PORCENTAJE_TEST_DEFECTO, SEMILLA_DEFECTO, ErrorSeparacion,
     interpretar_porcentaje, interpretar_semilla, separar_datos,
 )

@@ -10,7 +10,7 @@ a medida que se termina cada una:
     Tarea 2 -> sikorius/gui/selector_archivos.py (es_archivo_permitido,
                                                   listar_carpeta)
     Tarea 3 -> sikorius/gui/tabla_datos.py       (dataframe_a_tabla)
-    Tarea 6 -> sikorius/gui/app.py               (carpeta_inicial)
+    Tarea 6 -> sikorius/gui/pagina.py               (carpeta_inicial)
 
 Las tareas 4 y 5 (la tabla y el diálogo en pantalla) se comprueban a mano
 con la lista de la tarea 8, porque necesitan el navegador.
@@ -218,7 +218,7 @@ def test_tarea1_usa_el_modulo_de_importacion(tmp_path, monkeypatch):
 @pytest.mark.parametrize("contenido", ["", "solo,cabecera\n"])
 def test_tarea1_error_conserva_estado_anterior(tmp_path, contenido):
     from sikorius.estado import EstadoApp
-    from sikorius.importador import ErrorImportacion
+    from sikorius.nucleo.importador import ErrorImportacion
 
     bueno = crear_csv(tmp_path / "bueno.csv", "a\n1\n")
     malo = crear_csv(tmp_path / "malo.csv", contenido)
@@ -234,7 +234,7 @@ def test_tarea1_error_conserva_estado_anterior(tmp_path, contenido):
 
 def test_tarea1_error_sin_datos_previos(tmp_path):
     from sikorius.estado import EstadoApp
-    from sikorius.importador import ErrorImportacion
+    from sikorius.nucleo.importador import ErrorImportacion
 
     estado = EstadoApp()
 
@@ -248,7 +248,7 @@ def test_tarea1_error_sin_datos_previos(tmp_path):
 def test_tarea1_error_trae_mensaje_del_importador(tmp_path):
     """El mensaje que verá el usuario es el del módulo de importación."""
     from sikorius.estado import EstadoApp
-    from sikorius.importador import ErrorImportacion
+    from sikorius.nucleo.importador import ErrorImportacion
 
     archivo = crear_sqlite(tmp_path / "dos_tablas.db", [
         "CREATE TABLE a (x INTEGER)",
@@ -270,7 +270,7 @@ def test_tarea1_error_trae_mensaje_del_importador(tmp_path):
     "DATOS.CSV", "Datos.Xlsx", "con espacios ñ.db", "a.b.csv",
 ])
 def test_tarea2_extensiones_permitidas(nombre):
-    from sikorius.gui.selector_archivos import es_archivo_permitido
+    from sikorius.gui.componentes.explorador_archivos import es_archivo_permitido
 
     assert es_archivo_permitido(nombre)
 
@@ -280,20 +280,20 @@ def test_tarea2_extensiones_permitidas(nombre):
     "datos.xlsm", "datos.sqlite3",
 ])
 def test_tarea2_extensiones_no_permitidas(nombre):
-    from sikorius.gui.selector_archivos import es_archivo_permitido
+    from sikorius.gui.componentes.explorador_archivos import es_archivo_permitido
 
     assert not es_archivo_permitido(nombre)
 
 
 def test_tarea2_acepta_path_y_str():
-    from sikorius.gui.selector_archivos import es_archivo_permitido
+    from sikorius.gui.componentes.explorador_archivos import es_archivo_permitido
 
     assert es_archivo_permitido(Path("/una/carpeta/datos.csv"))
     assert es_archivo_permitido("/una/carpeta/datos.csv")
 
 
 def test_tarea2_listar_solo_compatibles_y_ordenado(tmp_path):
-    from sikorius.gui.selector_archivos import listar_carpeta
+    from sikorius.gui.componentes.explorador_archivos import listar_carpeta
 
     crear_csv(tmp_path / "b.csv", "x\n1\n")
     (tmp_path / "a.xlsx").write_bytes(b"")
@@ -311,7 +311,7 @@ def test_tarea2_listar_solo_compatibles_y_ordenado(tmp_path):
 
 
 def test_tarea2_listar_devuelve_path(tmp_path):
-    from sikorius.gui.selector_archivos import listar_carpeta
+    from sikorius.gui.componentes.explorador_archivos import listar_carpeta
 
     crear_csv(tmp_path / "datos.csv", "x\n1\n")
 
@@ -323,13 +323,13 @@ def test_tarea2_listar_devuelve_path(tmp_path):
 
 
 def test_tarea2_listar_carpeta_vacia(tmp_path):
-    from sikorius.gui.selector_archivos import listar_carpeta
+    from sikorius.gui.componentes.explorador_archivos import listar_carpeta
 
     assert listar_carpeta(tmp_path) == []
 
 
 def test_tarea2_listar_acepta_str(tmp_path):
-    from sikorius.gui.selector_archivos import listar_carpeta
+    from sikorius.gui.componentes.explorador_archivos import listar_carpeta
 
     crear_csv(tmp_path / "datos.csv", "x\n1\n")
 
@@ -337,7 +337,7 @@ def test_tarea2_listar_acepta_str(tmp_path):
 
 
 def test_tarea2_listar_ignora_enlaces_rotos(tmp_path):
-    from sikorius.gui.selector_archivos import listar_carpeta
+    from sikorius.gui.componentes.explorador_archivos import listar_carpeta
 
     crear_csv(tmp_path / "bueno.csv", "x\n1\n")
     try:
@@ -349,7 +349,7 @@ def test_tarea2_listar_ignora_enlaces_rotos(tmp_path):
 
 
 def test_tarea2_listar_carpeta_con_enie(carpeta_rara):
-    from sikorius.gui.selector_archivos import listar_carpeta
+    from sikorius.gui.componentes.explorador_archivos import listar_carpeta
 
     crear_csv(carpeta_rara / "pisos ñ.csv", "x\n1\n")
 
@@ -377,7 +377,7 @@ def etiquetas_de(columnas):
 
 
 def test_tarea3_devuelve_tupla_de_dos_listas():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     resultado = dataframe_a_tabla(pd.DataFrame({"a": [1]}))
 
@@ -388,7 +388,7 @@ def test_tarea3_devuelve_tupla_de_dos_listas():
 
 
 def test_tarea3_encabezados_son_los_nombres_de_columna():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     df = pd.DataFrame({"superficie": [60.5, 95.0], "precio": [121000, 189500]})
 
@@ -398,7 +398,7 @@ def test_tarea3_encabezados_son_los_nombres_de_columna():
 
 
 def test_tarea3_formato_de_cada_columna():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     columnas, filas = dataframe_a_tabla(pd.DataFrame({"a": [1], "b": [2]}))
 
@@ -411,7 +411,7 @@ def test_tarea3_formato_de_cada_columna():
 
 
 def test_tarea3_todas_las_filas_y_valores():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     df = pd.DataFrame({"x": list(range(500)), "y": list(range(500, 1000))})
 
@@ -425,7 +425,7 @@ def test_tarea3_todas_las_filas_y_valores():
 
 
 def test_tarea3_todas_las_columnas():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     datos = {}
     for i in range(40):
@@ -440,7 +440,7 @@ def test_tarea3_todas_las_columnas():
 
 
 def test_tarea3_nombres_con_puntos_y_no_texto():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     df = pd.DataFrame({"precio.m2": [1], 2026: [2]})
 
@@ -454,7 +454,7 @@ def test_tarea3_nombres_con_puntos_y_no_texto():
 
 
 def test_tarea3_columnas_con_nombre_repetido():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     df = pd.DataFrame([[1, 2]], columns=["a", "a"])
 
@@ -466,7 +466,7 @@ def test_tarea3_columnas_con_nombre_repetido():
 
 
 def test_tarea3_valores_vacios_son_none():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     df = pd.DataFrame({"a": [1.0, np.nan], "b": ["x", None]})
 
@@ -478,7 +478,7 @@ def test_tarea3_valores_vacios_son_none():
 
 
 def test_tarea3_ids_de_fila_unicos_aunque_el_indice_se_repita():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     df = pd.DataFrame({"a": [5, 5, 5]}, index=[7, 7, 7])
 
@@ -491,7 +491,7 @@ def test_tarea3_ids_de_fila_unicos_aunque_el_indice_se_repita():
 
 
 def test_tarea3_no_modifica_el_dataframe():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     df = pd.DataFrame({"a": [1.0, np.nan]})
     copia = df.copy()
@@ -502,7 +502,7 @@ def test_tarea3_no_modifica_el_dataframe():
 
 
 def test_tarea3_dataframe_vacio():
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
 
     columnas, filas = dataframe_a_tabla(pd.DataFrame())
 
@@ -512,8 +512,8 @@ def test_tarea3_dataframe_vacio():
 
 def test_tarea3_con_datos_del_importador(carpeta_rara):
     """Lo que devuelve el importador se puede pasar tal cual a la tabla."""
-    from sikorius.gui.tabla_datos import dataframe_a_tabla
-    from sikorius.importador import importar_datos
+    from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
+    from sikorius.nucleo.importador import importar_datos
 
     archivo = crear_csv(carpeta_rara / "pisos.csv",
                         "barrio;superficie\nElviña;60,5\nRiazor;\n")
@@ -531,14 +531,14 @@ def test_tarea3_con_datos_del_importador(carpeta_rara):
 # =============================================================================
 
 def test_tarea6_sin_datos_empieza_en_carpeta_personal(estado_limpio):
-    from sikorius.gui.app import carpeta_inicial
+    from sikorius.gui.pagina import carpeta_inicial
 
     assert Path(carpeta_inicial()) == Path.home()
 
 
 def test_tarea6_no_depende_de_la_carpeta_de_ejecucion(estado_limpio, tmp_path,
                                                       monkeypatch):
-    from sikorius.gui.app import carpeta_inicial
+    from sikorius.gui.pagina import carpeta_inicial
 
     monkeypatch.chdir(tmp_path)
 
@@ -548,7 +548,7 @@ def test_tarea6_no_depende_de_la_carpeta_de_ejecucion(estado_limpio, tmp_path,
 
 def test_tarea6_despues_de_cargar_empieza_en_su_carpeta(estado_limpio,
                                                        carpeta_rara):
-    from sikorius.gui.app import carpeta_inicial
+    from sikorius.gui.pagina import carpeta_inicial
 
     archivo = crear_csv(carpeta_rara / "datos.csv", "x\n1\n")
     estado_limpio.cargar(archivo)

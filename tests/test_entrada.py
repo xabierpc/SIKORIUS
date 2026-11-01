@@ -34,7 +34,7 @@ import pytest
 from nicegui import ui
 
 import sikorius.datos_entrada_salida as modulo
-from sikorius.importador import ErrorImportacion
+from sikorius.nucleo.importador import ErrorImportacion
 
 # =============================================================================
 # Utilidades (antes estaban en conftest.py; ahora cada archivo lleva las suyas)
@@ -251,8 +251,8 @@ def test_extensiones_admitidas_coinciden_con_el_importador(tmp_path):
 
 
 def test_usa_el_importador_y_la_validacion_del_proyecto():
-    assert modulo.importar_datos.__module__ == "sikorius.importador"
-    assert modulo.validar_seleccion.__module__ == "sikorius.validacion"
+    assert modulo.importar_datos.__module__ == "sikorius.nucleo.importador"
+    assert modulo.validar_seleccion.__module__ == "sikorius.nucleo.columnas"
 
 
 def test_no_lee_archivos_por_su_cuenta():

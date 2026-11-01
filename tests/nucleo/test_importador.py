@@ -24,8 +24,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-import sikorius.importador as importador
-from sikorius.importador import (
+import sikorius.nucleo.importador as importador
+from sikorius.nucleo.importador import (
     ErrorImportacion,
     _convertir_numericas,
     _leer_csv,

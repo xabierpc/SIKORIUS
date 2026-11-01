@@ -32,7 +32,7 @@ import pytest
 from nicegui import ui
 
 import sikorius.datos_entrada_salida as modulo
-from sikorius.importador import ErrorImportacion
+from sikorius.nucleo.importador import ErrorImportacion
 
 # =============================================================================
 # Utilidades (antes estaban en conftest.py; ahora cada archivo lleva las suyas)

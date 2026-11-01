@@ -8,7 +8,7 @@ importación; aquí solo se guarda el resultado.
 
 from pathlib import Path
 
-from sikorius.importador import importar_datos
+from sikorius.nucleo.importador import importar_datos
 
 
 class EstadoApp:

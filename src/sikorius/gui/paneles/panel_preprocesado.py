@@ -4,14 +4,14 @@ El panel muestra los valores inexistentes detectados en las columnas
 seleccionadas (por separado en entrenamiento y test), deja elegir la
 estrategia de tratamiento y la aplica con el botón "Aplicar preprocesado".
 
-Toda la detección y el tratamiento están en ``sikorius.preprocesado``;
+Toda la detección y el tratamiento están en ``sikorius.nucleo.preprocesado``;
 aquí solo se leen los controles y se muestra el resultado.
 """
 
 from nicegui import ui
 
-from sikorius.gui.boton_preprocesado import crear_boton_preprocesado
-from sikorius.preprocesado import (
+from sikorius.gui.paneles.boton_preprocesado import crear_boton_preprocesado
+from sikorius.nucleo.preprocesado import (
     CONSTANTE, ELIMINAR, MEDIA, MEDIANA, columnas_seleccionadas,
     detectar_en_estado, hay_nulos,
 )

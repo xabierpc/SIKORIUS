@@ -22,9 +22,9 @@ import pandas as pd
 import pytest
 from nicegui import ui
 
-import sikorius.gui.boton_preprocesado as modulo_boton
+import sikorius.gui.paneles.boton_preprocesado as modulo_boton
 from sikorius.estado import EstadoApp
-from sikorius.preprocesado import (
+from sikorius.nucleo.preprocesado import (
     CONSTANTE, ELIMINAR, ESTRATEGIAS, MEDIA, MEDIANA, AvisoPreprocesado,
     ColumnasNoEncontradasError, ErrorPreprocesado, aplicar_al_estado,
     aplicar_preprocesado, columnas_seleccionadas, detectar_en_estado,
@@ -630,7 +630,7 @@ def test_texto_resumen_con_resultado_real():
 
 def crear_boton(estado, monkeypatch, estrategia, constante=None,
                 al_aplicar=None):
-    from sikorius.gui.boton_preprocesado import crear_boton_preprocesado
+    from sikorius.gui.paneles.boton_preprocesado import crear_boton_preprocesado
     monkeypatch.setattr(modulo_boton, "estado", estado)
     avisos = Avisos(monkeypatch)
     botones = Botones(monkeypatch)
@@ -673,7 +673,7 @@ def test_boton_sin_al_aplicar(estado_con_nulos, monkeypatch):
 
 def test_boton_lee_los_controles_al_pulsar(estado_con_nulos, monkeypatch):
     """La estrategia y la constante se leen al pulsar, no al crear el botón."""
-    from sikorius.gui.boton_preprocesado import crear_boton_preprocesado
+    from sikorius.gui.paneles.boton_preprocesado import crear_boton_preprocesado
     monkeypatch.setattr(modulo_boton, "estado", estado_con_nulos)
     Avisos(monkeypatch)
     botones = Botones(monkeypatch)
@@ -728,7 +728,7 @@ def test_boton_aviso_conjunto_vacio(monkeypatch):
 
 
 def test_boton_se_puede_reintentar_tras_un_error(estado_con_nulos, monkeypatch):
-    from sikorius.gui.boton_preprocesado import crear_boton_preprocesado
+    from sikorius.gui.paneles.boton_preprocesado import crear_boton_preprocesado
     monkeypatch.setattr(modulo_boton, "estado", estado_con_nulos)
     avisos = Avisos(monkeypatch)
     botones = Botones(monkeypatch)
@@ -757,7 +757,7 @@ def test_boton_no_contiene_logica_de_preprocesado():
 # =============================================================================
 
 def crear_panel(estado, monkeypatch, al_aplicar=None):
-    from sikorius.gui.panel_preprocesado import PanelPreprocesado
+    from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
     monkeypatch.setattr(modulo_boton, "estado", estado)
     avisos = Avisos(monkeypatch)
     botones = Botones(monkeypatch)
@@ -875,7 +875,7 @@ def test_panel_actualizar_tras_borrar_seleccion(estado_con_nulos, monkeypatch):
 
 
 def test_panel_no_contiene_logica_de_preprocesado():
-    import sikorius.gui.panel_preprocesado as panel
+    import sikorius.gui.paneles.panel_preprocesado as panel
     codigo = inspect.getsource(panel)
     assert "detectar_en_estado(" in codigo
     for prohibido in ("fillna", "dropna", "isna", "mean(", "median("):

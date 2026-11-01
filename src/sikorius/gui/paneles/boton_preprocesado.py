@@ -1,7 +1,7 @@
 from nicegui import ui
 
 from sikorius.estado import estado
-from sikorius.preprocesado import (
+from sikorius.nucleo.preprocesado import (
     AvisoPreprocesado,
     ErrorPreprocesado,
     aplicar_al_estado,
