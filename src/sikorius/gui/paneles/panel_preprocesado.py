@@ -12,8 +12,13 @@ from nicegui import ui
 
 from sikorius.gui.paneles.boton_preprocesado import crear_boton_preprocesado
 from sikorius.nucleo.preprocesado import (
-    CONSTANTE, ELIMINAR, MEDIA, MEDIANA, columnas_seleccionadas,
-    detectar_en_estado, hay_nulos,
+    CONSTANTE,
+    ELIMINAR,
+    MEDIA,
+    MEDIANA,
+    columnas_seleccionadas,
+    detectar_en_estado,
+    hay_nulos,
 )
 
 OPCIONES_ESTRATEGIA = {
@@ -39,8 +44,7 @@ class PanelPreprocesado:
         self.aviso = ui.label("").classes("text-sm")
         self.tabla = ui.table(
             columns=[
-                {"name": "columna", "label": "Columna", "field": "columna",
-                 "align": "left"},
+                {"name": "columna", "label": "Columna", "field": "columna", "align": "left"},
                 {"name": "train", "label": "Entrenamiento", "field": "train"},
                 {"name": "test", "label": "Test", "field": "test"},
             ],
@@ -82,7 +86,8 @@ class PanelPreprocesado:
         if deteccion is None:
             self.aviso.set_text(
                 "Separa primero los datos en entrenamiento y test para "
-                "detectar los valores inexistentes.")
+                "detectar los valores inexistentes."
+            )
             self.aviso.classes(replace="text-sm text-gray-500")
             self.tabla.rows = []
             self.tabla.update()
@@ -92,8 +97,7 @@ class PanelPreprocesado:
 
         columnas = columnas_seleccionadas(self.estado)
         self.tabla.rows = [
-            {"columna": c, "train": deteccion["train"][c],
-             "test": deteccion["test"][c]}
+            {"columna": c, "train": deteccion["train"][c], "test": deteccion["test"][c]}
             for c in columnas
         ]
         self.tabla.update()
@@ -104,13 +108,17 @@ class PanelPreprocesado:
             total_test = sum(deteccion["test"].values())
             self.aviso.set_text(
                 "Se han detectado valores inexistentes. Entrenamiento: "
-                + str(total_train) + " | Test: " + str(total_test)
-                + ". Elige cómo tratarlos.")
+                + str(total_train)
+                + " | Test: "
+                + str(total_test)
+                + ". Elige cómo tratarlos."
+            )
             self.aviso.classes(replace="text-sm text-orange-700")
             self.controles.set_visibility(True)
         else:
             self.aviso.set_text(
                 "No hay valores inexistentes en las columnas seleccionadas. "
-                "Puedes continuar sin preprocesar.")
+                "Puedes continuar sin preprocesar."
+            )
             self.aviso.classes(replace="text-sm text-green-700")
             self.controles.set_visibility(False)

@@ -21,13 +21,15 @@ def dataframe_a_tabla(df):
     for i, nombre in enumerate(df.columns):
         campo = "c" + str(i)
         campos.append(campo)
-        columnas.append({
-            "name": campo,
-            "label": str(nombre),
-            "field": campo,
-            "align": "left",
-            "sortable": True,
-        })
+        columnas.append(
+            {
+                "name": campo,
+                "label": str(nombre),
+                "field": campo,
+                "align": "left",
+                "sortable": True,
+            }
+        )
 
     valores = df.astype(object).where(pd.notna(df), None)
     filas = []
@@ -50,14 +52,17 @@ class TablaDatos:
     """
 
     def __init__(self):
-        self.tabla = ui.table(
-            columns=[],
-            rows=[],
-            row_key="_id",
-            pagination={"rowsPerPage": 0},
-        ).props("virtual-scroll flat bordered dense hide-pagination") \
-            .classes("w-full") \
+        self.tabla = (
+            ui.table(
+                columns=[],
+                rows=[],
+                row_key="_id",
+                pagination={"rowsPerPage": 0},
+            )
+            .props("virtual-scroll flat bordered dense hide-pagination")
+            .classes("w-full")
             .style("height: 60vh")
+        )
         self.tabla.add_slot(
             "no-data",
             '<div class="w-full text-center text-gray-500">'

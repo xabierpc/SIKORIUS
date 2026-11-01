@@ -6,10 +6,10 @@ from nicegui import ui
 
 from sikorius.estado import estado
 from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
+from sikorius.gui.componentes.tabla_datos import TablaDatos
+from sikorius.gui.paneles.panel_columnas import PanelSeleccionColumnas
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
-from sikorius.gui.paneles.panel_columnas import PanelSeleccionColumnas
-from sikorius.gui.componentes.tabla_datos import TablaDatos
 from sikorius.nucleo.importador import ErrorImportacion
 
 # Quasar pone en mayúsculas el texto de todos los botones. Con "no-caps" se
@@ -36,8 +36,7 @@ def pagina_principal():
             boton_cargar = ui.button("Cargar dataset", icon="folder_open")
             with ui.column().classes("gap-0 min-w-0"):
                 ui.label("Ruta:").classes("text-sm text-gray-500")
-                etiqueta_ruta = ui.label("Ningún archivo cargado") \
-                    .classes("font-mono break-all")
+                etiqueta_ruta = ui.label("Ningún archivo cargado").classes("font-mono break-all")
 
     # --- Tabla con los datos ---
     with ui.card().classes("w-full"):
@@ -49,14 +48,16 @@ def pagina_principal():
     with ui.card().classes("w-full"):
         ui.label("Columnas del modelo").classes("text-lg font-semibold")
         panel_columnas = PanelSeleccionColumnas(
-            estado, al_cambiar=lambda: (panel_separacion.actualizar(),
-                                        panel_preprocesado.actualizar()))
+            estado,
+            al_cambiar=lambda: (panel_separacion.actualizar(), panel_preprocesado.actualizar()),
+        )
 
     # --- Separación en entrenamiento y test ---
     with ui.card().classes("w-full"):
         ui.label("Entrenamiento y test").classes("text-lg font-semibold")
         panel_separacion = PanelSeparacion(
-            estado, al_separar=lambda: panel_preprocesado.actualizar())
+            estado, al_separar=lambda: panel_preprocesado.actualizar()
+        )
 
     # --- Preprocesado: valores inexistentes (historia #26) ---
     with ui.card().classes("w-full"):
@@ -67,8 +68,8 @@ def pagina_principal():
         """Muestra en pantalla los datos guardados en el estado."""
         etiqueta_ruta.set_text(estado.ruta)
         etiqueta_resumen.set_text(
-            str(len(estado.datos)) + " filas y "
-            + str(len(estado.datos.columns)) + " columnas")
+            str(len(estado.datos)) + " filas y " + str(len(estado.datos.columns)) + " columnas"
+        )
         tabla.mostrar(estado.datos)
         panel_columnas.cargar_columnas(estado.datos)
 
@@ -80,8 +81,7 @@ def pagina_principal():
         try:
             estado.cargar(ruta)
         except ErrorImportacion as error:
-            ui.notify(str(error), type="negative", multi_line=True,
-                      close_button="Cerrar")
+            ui.notify(str(error), type="negative", multi_line=True, close_button="Cerrar")
             return
 
         refrescar()
@@ -92,5 +92,3 @@ def pagina_principal():
     # Si se recarga la página, se vuelven a mostrar los datos ya cargados
     if estado.hay_datos():
         refrescar()
-
-

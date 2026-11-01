@@ -9,8 +9,7 @@ from sikorius.nucleo.preprocesado import (
 )
 
 
-def crear_boton_preprocesado(obtener_estrategia, obtener_constante,
-                             al_aplicar=None):
+def crear_boton_preprocesado(obtener_estrategia, obtener_constante, al_aplicar=None):
     """Crea el botón "Aplicar preprocesado".
 
     Args:
@@ -28,18 +27,15 @@ def crear_boton_preprocesado(obtener_estrategia, obtener_constante,
     Returns:
         El botón creado.
     """
+
     def aplicar():
         try:
-            resumen = aplicar_al_estado(
-                estado, obtener_estrategia(), obtener_constante()
-            )
+            resumen = aplicar_al_estado(estado, obtener_estrategia(), obtener_constante())
         except AvisoPreprocesado as aviso:
-            ui.notify(str(aviso), type="warning", multi_line=True,
-                      close_button="Cerrar")
+            ui.notify(str(aviso), type="warning", multi_line=True, close_button="Cerrar")
             return
         except ErrorPreprocesado as error:
-            ui.notify(str(error), type="negative", multi_line=True,
-                      close_button="Cerrar")
+            ui.notify(str(error), type="negative", multi_line=True, close_button="Cerrar")
             return
         ui.notify(texto_resumen(resumen), type="positive", multi_line=True)
         if al_aplicar is not None:

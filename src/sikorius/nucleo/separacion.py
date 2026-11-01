@@ -33,11 +33,9 @@ def interpretar_porcentaje(valor):
     try:
         porcentaje = float(valor)
     except (TypeError, ValueError):
-        raise ErrorSeparacion(
-            "El porcentaje de test debe ser un número entre 1 y 99.") from None
+        raise ErrorSeparacion("El porcentaje de test debe ser un número entre 1 y 99.") from None
     if math.isnan(porcentaje) or not 1 <= porcentaje <= 99:
-        raise ErrorSeparacion(
-            "El porcentaje de test debe ser un número entre 1 y 99.")
+        raise ErrorSeparacion("El porcentaje de test debe ser un número entre 1 y 99.")
     return porcentaje
 
 
@@ -81,8 +79,12 @@ def calcular_tamanos(num_filas, porcentaje_test):
     """
     if num_filas < FILAS_MINIMAS:
         raise ErrorSeparacion(
-            "El dataset tiene " + str(num_filas) + " filas; se necesitan al menos "
-            + str(FILAS_MINIMAS) + " para separarlo en entrenamiento y test.")
+            "El dataset tiene "
+            + str(num_filas)
+            + " filas; se necesitan al menos "
+            + str(FILAS_MINIMAS)
+            + " para separarlo en entrenamiento y test."
+        )
     porcentaje_exacto = Fraction(repr(float(porcentaje_test)))
     filas_test = math.ceil(num_filas * porcentaje_exacto / 100)
     filas_entrenamiento = num_filas - filas_test
@@ -92,9 +94,14 @@ def calcular_tamanos(num_filas, porcentaje_test):
         else:
             vacio = "entrenamiento"
         raise ErrorSeparacion(
-            "Con un " + _formatear(porcentaje_test) + " % de test y "
-            + str(num_filas) + " filas, el conjunto de " + vacio
-            + " quedaría vacío. Elige otro porcentaje.")
+            "Con un "
+            + _formatear(porcentaje_test)
+            + " % de test y "
+            + str(num_filas)
+            + " filas, el conjunto de "
+            + vacio
+            + " quedaría vacío. Elige otro porcentaje."
+        )
     return filas_entrenamiento, filas_test
 
 

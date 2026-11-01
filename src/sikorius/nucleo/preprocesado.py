@@ -11,14 +11,14 @@ import math
 
 import numpy as np
 import pandas as pd
- 
+
 ELIMINAR = "eliminar"
 MEDIA = "media"
 MEDIANA = "mediana"
 CONSTANTE = "constante"
 ESTRATEGIAS = (ELIMINAR, MEDIA, MEDIANA, CONSTANTE)
- 
- 
+
+
 class ErrorPreprocesado(Exception):
     """Error producido al aplicar el preprocesado."""
 
@@ -42,8 +42,7 @@ class ColumnasNoEncontradasError(ErrorPreprocesado, ValueError):
 def _comprobar_columnas(df, columnas):
     faltan = [c for c in columnas if c not in df.columns]
     if faltan:
-        raise ColumnasNoEncontradasError(
-            "Columnas no encontradas: " + ", ".join(map(str, faltan)))
+        raise ColumnasNoEncontradasError("Columnas no encontradas: " + ", ".join(map(str, faltan)))
 
 
 def normalizar_espacios_vacios(df: pd.DataFrame, columnas: list) -> pd.DataFrame:
@@ -182,10 +181,10 @@ def interpretar_constante(valor):
 
 def columnas_seleccionadas(estado):
     """Devuelve las columnas de entrada seguidas de la de salida.
- 
+
     Args:
         estado: Estado de la aplicación, con la selección ya confirmada.
- 
+
     Returns:
         Lista con las features y, al final, el target.
     """
@@ -199,30 +198,30 @@ def columnas_seleccionadas(estado):
         return nombres
     reales = {str(c): c for c in df.columns}
     return [reales.get(nombre, nombre) for nombre in nombres]
- 
- 
+
+
 def _resumen(filas_eliminadas, valores_rellenados):
     return {
         "filas_eliminadas": filas_eliminadas,
         "valores_rellenados": valores_rellenados,
     }
- 
- 
+
+
 def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
     """Trata los valores inexistentes de los conjuntos de train y test.
- 
+
     Args:
         train: DataFrame de entrenamiento.
         test: DataFrame de test.
         columnas: Columnas seleccionadas (entrada y salida).
         estrategia: "eliminar", "media", "mediana" o "constante".
         constante: Número con el que rellenar (solo para "constante").
- 
+
     Returns:
         Tupla (train_proc, test_proc, resumen). El resumen es un diccionario
         {"train": {...}, "test": {...}} con "filas_eliminadas" y
         "valores_rellenados" de cada conjunto.
- 
+
     Raises:
         ErrorPreprocesado: Si la estrategia no es válida, con "constante"
             el valor no es numérico, o con "media"/"mediana" alguna columna
@@ -233,13 +232,13 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
     columnas = list(columnas)
     if estrategia not in ESTRATEGIAS:
         raise ErrorPreprocesado(f"Estrategia no válida: {estrategia}")
- 
+
     # Las celdas vacías pasan a NaN para tratarlas igual que el resto
     train = normalizar_espacios_vacios(train, columnas)
     test = normalizar_espacios_vacios(test, columnas)
     train_proc = train.copy()
     test_proc = test.copy()
- 
+
     if estrategia == ELIMINAR:
         train_proc = train_proc.dropna(subset=columnas)
         test_proc = test_proc.dropna(subset=columnas)
@@ -249,7 +248,7 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
             "test": _resumen(len(test) - len(test_proc), 0),
         }
         return train_proc, test_proc, resumen
- 
+
     if estrategia == CONSTANTE:
         constante = interpretar_constante(constante)
         valores = {c: constante for c in columnas}
@@ -260,18 +259,16 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
 
     if estrategia in (MEDIA, MEDIANA):
         _comprobar_valores_relleno(valores, estrategia)
- 
+
     train_proc = train_proc.fillna(valores)
     test_proc = test_proc.fillna(valores)
     resumen = {
-        "train": _resumen(0, _nulos(train, columnas)
-                          - _nulos(train_proc, columnas)),
-        "test": _resumen(0, _nulos(test, columnas)
-                         - _nulos(test_proc, columnas)),
+        "train": _resumen(0, _nulos(train, columnas) - _nulos(train_proc, columnas)),
+        "test": _resumen(0, _nulos(test, columnas) - _nulos(test_proc, columnas)),
     }
     return train_proc, test_proc, resumen
- 
- 
+
+
 def _comprobar_no_vacios(train_proc, test_proc):
     """Lanza un aviso si eliminar filas deja vacío algún conjunto."""
     vacios = []
@@ -283,7 +280,8 @@ def _comprobar_no_vacios(train_proc, test_proc):
         raise AvisoPreprocesado(
             "Eliminar las filas con valores inexistentes dejaría vacío el "
             "conjunto de " + " y el de ".join(vacios) + ". No se ha aplicado "
-            "el cambio: elige otra estrategia.")
+            "el cambio: elige otra estrategia."
+        )
 
 
 def _comprobar_valores_relleno(valores, estrategia):
@@ -295,27 +293,31 @@ def _comprobar_valores_relleno(valores, estrategia):
     sin_valor = [str(c) for c, v in valores.items() if pd.isna(v)]
     if sin_valor:
         raise ErrorPreprocesado(
-            "No se puede calcular la " + estrategia + " de "
-            + ", ".join(sin_valor) + " porque no tiene ningún valor en el "
-            "conjunto de entrenamiento. Elige otra estrategia.")
+            "No se puede calcular la "
+            + estrategia
+            + " de "
+            + ", ".join(sin_valor)
+            + " porque no tiene ningún valor en el "
+            "conjunto de entrenamiento. Elige otra estrategia."
+        )
 
 
 def _nulos(df, columnas):
     """Número total de valores inexistentes en las columnas indicadas."""
     return sum(detectar_nulos(df, columnas).values())
- 
- 
+
+
 def aplicar_al_estado(estado, estrategia, constante=None):
     """Preprocesa los conjuntos guardados en el estado y guarda el resultado.
- 
+
     Args:
         estado: Estado de la aplicación.
         estrategia: "eliminar", "media", "mediana" o "constante".
         constante: Número con el que rellenar (solo para "constante").
- 
+
     Returns:
         El resumen del preprocesado (ver ``aplicar_preprocesado``).
- 
+
     Raises:
         ErrorPreprocesado: Si no hay selección confirmada ni separación en
             entrenamiento y test, o si ``aplicar_preprocesado`` falla (ver
@@ -340,14 +342,14 @@ def aplicar_al_estado(estado, estrategia, constante=None):
         "resumen": resumen,
     }
     return resumen
- 
- 
+
+
 def modelo_disponible(estado):
     """Indica si se puede crear el modelo con los datos del estado.
 
     Args:
         estado: Estado de la aplicación.
- 
+
     Returns:
         True si se puede crear el modelo, False en caso contrario.
     """
@@ -359,17 +361,15 @@ def modelo_disponible(estado):
         test = estado.preprocesado["test"]
     else:
         entrenamiento, test = estado.entrenamiento, estado.test
-    return not (
-        quedan_nulos(entrenamiento, columnas) or quedan_nulos(test, columnas)
-    )
- 
- 
+    return not (quedan_nulos(entrenamiento, columnas) or quedan_nulos(test, columnas))
+
+
 def texto_resumen(resumen):
     """Redacta el mensaje de éxito a partir del resumen del preprocesado.
- 
+
     Args:
         resumen: Diccionario devuelto por ``aplicar_preprocesado``.
- 
+
     Returns:
         Texto con filas eliminadas y valores rellenados de cada conjunto.
     """

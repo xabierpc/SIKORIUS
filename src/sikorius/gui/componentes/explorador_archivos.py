@@ -10,7 +10,6 @@ from pathlib import Path
 from nicegui import ui
 
 
-
 def es_archivo_permitido(ruta):
     """Indica si la extensión del archivo es de un tipo compatible."""
     return Path(ruta).suffix.lower() in (".csv", ".xlsx", ".xls", ".sqlite", ".db")
@@ -34,9 +33,7 @@ def listar_carpeta(carpeta):
         if ruta.name.startswith("."):
             continue
         try:
-            if ruta.is_dir():
-                entradas.append(ruta)
-            elif ruta.is_file() and es_archivo_permitido(ruta):
+            if ruta.is_dir() or ruta.is_file() and es_archivo_permitido(ruta):
                 entradas.append(ruta)
         except OSError:
             pass  # enlaces rotos o archivos inaccesibles: no se muestran
@@ -60,8 +57,9 @@ async def seleccionar_archivo(carpeta_inicial):
         ui.label("Selecciona un dataset").classes("text-lg font-semibold")
         ui.label("Tipos admitidos: " + tipos).classes("text-sm text-gray-500")
         with ui.row().classes("w-full items-center no-wrap"):
-            ui.button(icon="home", on_click=lambda: mostrar(Path.home())) \
-                .props("flat round dense").tooltip("Carpeta personal")
+            ui.button(icon="home", on_click=lambda: mostrar(Path.home())).props(
+                "flat round dense"
+            ).tooltip("Carpeta personal")
             etiqueta_carpeta = ui.label().classes("text-sm break-all")
         with ui.scroll_area().classes("w-full h-80 border rounded"):
             lista = ui.list().classes("w-full").props("dense separator")
@@ -91,8 +89,7 @@ async def seleccionar_archivo(carpeta_inicial):
             ui.notify("Sin permiso para abrir " + str(carpeta), type="negative")
             return
         except OSError as error:
-            ui.notify("No se puede abrir " + str(carpeta) + ": " + str(error),
-                      type="negative")
+            ui.notify("No se puede abrir " + str(carpeta) + ": " + str(error), type="negative")
             return
 
         etiqueta_carpeta.set_text(str(carpeta))
@@ -107,8 +104,9 @@ async def seleccionar_archivo(carpeta_inicial):
                     anadir_entrada(ruta, "description", ruta.name)
             if len(entradas) == 0:
                 with ui.item():
-                    ui.item_label("No hay carpetas ni archivos compatibles") \
-                        .classes("text-gray-500")
+                    ui.item_label("No hay carpetas ni archivos compatibles").classes(
+                        "text-gray-500"
+                    )
 
     inicio = Path(carpeta_inicial).resolve()
     if not inicio.is_dir():

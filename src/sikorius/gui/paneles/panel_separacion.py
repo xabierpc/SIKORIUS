@@ -8,8 +8,12 @@ la aplicación. Toda la lógica de la separación está fuera de la GUI.
 from nicegui import ui
 
 from sikorius.nucleo.separacion import (
-    PORCENTAJE_TEST_DEFECTO, SEMILLA_DEFECTO, ErrorSeparacion,
-    interpretar_porcentaje, interpretar_semilla, separar_datos,
+    PORCENTAJE_TEST_DEFECTO,
+    SEMILLA_DEFECTO,
+    ErrorSeparacion,
+    interpretar_porcentaje,
+    interpretar_semilla,
+    separar_datos,
 )
 
 
@@ -34,19 +38,25 @@ class PanelSeparacion:
         # izquierda, los porcentajes y el resultado en medio y el botón
         # pegado a la derecha (ui.space empuja el botón hasta el borde).
         with ui.row().classes("w-full items-center gap-4"):
-            self.entrada_porcentaje = ui.input(
-                "Porcentaje de test (%)", value=str(PORCENTAJE_TEST_DEFECTO),
-                on_change=self._mostrar_entrenamiento,
-            ).props("dense").classes("w-44")
-            self.entrada_semilla = ui.input(
-                "Semilla", value=str(SEMILLA_DEFECTO)) \
-                .props("dense").classes("w-44")
+            self.entrada_porcentaje = (
+                ui.input(
+                    "Porcentaje de test (%)",
+                    value=str(PORCENTAJE_TEST_DEFECTO),
+                    on_change=self._mostrar_entrenamiento,
+                )
+                .props("dense")
+                .classes("w-44")
+            )
+            self.entrada_semilla = (
+                ui.input("Semilla", value=str(SEMILLA_DEFECTO)).props("dense").classes("w-44")
+            )
             with ui.column().classes("gap-0"):
                 self.etiqueta_entrenamiento = ui.label("").classes("text-sm")
                 self.etiqueta_resultado = ui.label("").classes("text-sm")
             ui.space()
-            self.boton_separar = ui.button("Separar datos", icon="call_split",
-                                           on_click=self.separar)
+            self.boton_separar = ui.button(
+                "Separar datos", icon="call_split", on_click=self.separar
+            )
 
         self._mostrar_entrenamiento()
         self.actualizar()
@@ -59,7 +69,8 @@ class PanelSeparacion:
             self.etiqueta_entrenamiento.set_text("Entrenamiento: -")
             return
         self.etiqueta_entrenamiento.set_text(
-            "Entrenamiento: " + _formatear(100 - porcentaje) + " %")
+            "Entrenamiento: " + _formatear(100 - porcentaje) + " %"
+        )
 
     def actualizar(self):
         """Habilita el panel solo si hay selección confirmada y muestra el
@@ -72,7 +83,8 @@ class PanelSeparacion:
             self.boton_separar.enable()
         else:
             self.aviso.set_text(
-                "Confirma primero la selección de columnas para poder separar los datos.")
+                "Confirma primero la selección de columnas para poder separar los datos."
+            )
             self.aviso.set_visibility(True)
             self.entrada_porcentaje.disable()
             self.entrada_semilla.disable()
@@ -80,8 +92,12 @@ class PanelSeparacion:
 
         if self.estado.hay_separacion():
             self.etiqueta_resultado.set_text(
-                "Entrenamiento: " + str(len(self.estado.entrenamiento))
-                + " filas | Test: " + str(len(self.estado.test)) + " filas")
+                "Entrenamiento: "
+                + str(len(self.estado.entrenamiento))
+                + " filas | Test: "
+                + str(len(self.estado.test))
+                + " filas"
+            )
         else:
             self.etiqueta_resultado.set_text("")
 
@@ -100,9 +116,14 @@ class PanelSeparacion:
         self.estado.guardar_separacion(entrenamiento, test, porcentaje, semilla)
         self.actualizar()
         ui.notify(
-            "Datos separados correctamente. Entrenamiento: " + str(len(entrenamiento))
-            + " filas | Test: " + str(len(test)) + " filas",
-            type="positive", multi_line=True)
+            "Datos separados correctamente. Entrenamiento: "
+            + str(len(entrenamiento))
+            + " filas | Test: "
+            + str(len(test))
+            + " filas",
+            type="positive",
+            multi_line=True,
+        )
         if self.al_separar is not None:
             self.al_separar()
 

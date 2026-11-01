@@ -25,35 +25,56 @@ from nicegui import ui
 import sikorius.gui.paneles.boton_preprocesado as modulo_boton
 from sikorius.estado import EstadoApp
 from sikorius.nucleo.preprocesado import (
-    CONSTANTE, ELIMINAR, ESTRATEGIAS, MEDIA, MEDIANA, AvisoPreprocesado,
-    ColumnasNoEncontradasError, ErrorPreprocesado, aplicar_al_estado,
-    aplicar_preprocesado, columnas_seleccionadas, detectar_en_estado,
-    detectar_nulos, detectar_nulos_conjuntos, hay_nulos, interpretar_constante,
-    modelo_disponible, normalizar_espacios_vacios, quedan_nulos, texto_resumen,
+    CONSTANTE,
+    ELIMINAR,
+    ESTRATEGIAS,
+    MEDIA,
+    MEDIANA,
+    AvisoPreprocesado,
+    ColumnasNoEncontradasError,
+    ErrorPreprocesado,
+    aplicar_al_estado,
+    aplicar_preprocesado,
+    columnas_seleccionadas,
+    detectar_en_estado,
+    detectar_nulos,
+    detectar_nulos_conjuntos,
+    hay_nulos,
+    interpretar_constante,
+    modelo_disponible,
+    normalizar_espacios_vacios,
+    quedan_nulos,
+    texto_resumen,
 )
-
 
 # =============================================================================
 # Utilidades
 # =============================================================================
 
+
 def crear_train():
     """Entrenamiento con un NaN en 'x', una celda en blanco en 'y' y un NaN
     en 'otra', que no se selecciona nunca."""
-    return pd.DataFrame({
-        "x": [1.0, np.nan, 3.0, 5.0],
-        "y": [10.0, 20.0, "  ", 40.0],
-        "otra": [np.nan, 1.0, 2.0, 3.0],
-    }, index=[10, 11, 12, 13])
+    return pd.DataFrame(
+        {
+            "x": [1.0, np.nan, 3.0, 5.0],
+            "y": [10.0, 20.0, "  ", 40.0],
+            "otra": [np.nan, 1.0, 2.0, 3.0],
+        },
+        index=[10, 11, 12, 13],
+    )
 
 
 def crear_test():
     """Test con un NaN en 'x' y ninguno en 'y'."""
-    return pd.DataFrame({
-        "x": [np.nan, 100.0],
-        "y": [1.0, 2.0],
-        "otra": [np.nan, np.nan],
-    }, index=[20, 21])
+    return pd.DataFrame(
+        {
+            "x": [np.nan, 100.0],
+            "y": [1.0, 2.0],
+            "otra": [np.nan, np.nan],
+        },
+        index=[20, 21],
+    )
 
 
 COLUMNAS = ["x", "y"]
@@ -118,6 +139,7 @@ class Botones:
 # Constantes y errores
 # =============================================================================
 
+
 def test_estrategias_disponibles():
     assert ESTRATEGIAS == ("eliminar", "media", "mediana", "constante")
     assert (ELIMINAR, MEDIA, MEDIANA, CONSTANTE) == ESTRATEGIAS
@@ -133,6 +155,7 @@ def test_jerarquia_de_errores():
 # =============================================================================
 # normalizar_espacios_vacios
 # =============================================================================
+
 
 @pytest.mark.parametrize("vacio", ["", " ", "   ", "\t", "\n", " \t "])
 def test_normalizar_celdas_vacias_pasan_a_nan(vacio):
@@ -172,15 +195,21 @@ def test_normalizar_columna_inexistente():
 # detectar_nulos y relacionadas
 # =============================================================================
 
+
 def test_detectar_cuenta_nan_none_y_vacios():
-    df = pd.DataFrame({
-        "nan": [np.nan, 1.0, np.nan],
-        "none": [None, "a", "b"],
-        "vacios": ["", "  ", "c"],
-        "llena": [1, 2, 3],
-    })
+    df = pd.DataFrame(
+        {
+            "nan": [np.nan, 1.0, np.nan],
+            "none": [None, "a", "b"],
+            "vacios": ["", "  ", "c"],
+            "llena": [1, 2, 3],
+        }
+    )
     assert detectar_nulos(df, list(df.columns)) == {
-        "nan": 2, "none": 1, "vacios": 2, "llena": 0,
+        "nan": 2,
+        "none": 1,
+        "vacios": 2,
+        "llena": 0,
     }
 
 
@@ -204,10 +233,16 @@ def test_detectar_columnas_inexistentes_las_nombra_todas():
     assert "a, b" in str(error.value)
 
 
-@pytest.mark.parametrize("columnas, esperado", [
-    (["x"], True), (["y"], True), (["x", "y"], True),
-    (("x", "y"), True), ([], False),
-])
+@pytest.mark.parametrize(
+    "columnas, esperado",
+    [
+        (["x"], True),
+        (["y"], True),
+        (["x", "y"], True),
+        (("x", "y"), True),
+        ([], False),
+    ],
+)
 def test_quedan_nulos(columnas, esperado):
     assert quedan_nulos(crear_train(), columnas) is esperado
 
@@ -218,20 +253,22 @@ def test_quedan_nulos_sin_valores_inexistentes():
 
 
 def test_detectar_conjuntos_por_separado():
-    deteccion = detectar_nulos_conjuntos(crear_train(), crear_test(),
-                                         ("x", "y"))
+    deteccion = detectar_nulos_conjuntos(crear_train(), crear_test(), ("x", "y"))
     assert deteccion == {
         "train": {"x": 1, "y": 1},
         "test": {"x": 1, "y": 0},
     }
 
 
-@pytest.mark.parametrize("deteccion, esperado", [
-    ({"train": {"x": 0}, "test": {"x": 0}}, False),
-    ({"train": {"x": 1}, "test": {"x": 0}}, True),
-    ({"train": {"x": 0}, "test": {"x": 0, "y": 3}}, True),
-    ({"train": {}, "test": {}}, False),
-])
+@pytest.mark.parametrize(
+    "deteccion, esperado",
+    [
+        ({"train": {"x": 0}, "test": {"x": 0}}, False),
+        ({"train": {"x": 1}, "test": {"x": 0}}, True),
+        ({"train": {"x": 0}, "test": {"x": 0, "y": 3}}, True),
+        ({"train": {}, "test": {}}, False),
+    ],
+)
 def test_hay_nulos(deteccion, esperado):
     assert hay_nulos(deteccion) is esperado
 
@@ -240,21 +277,50 @@ def test_hay_nulos(deteccion, esperado):
 # interpretar_constante
 # =============================================================================
 
-@pytest.mark.parametrize("valor, esperado", [
-    (0, 0.0), (3, 3.0), (-1, -1.0), (2.5, 2.5), ("3", 3.0), ("2.5", 2.5),
-    ("2,5", 2.5), ("  4  ", 4.0), ("-0,75", -0.75), ("1e3", 1000.0),
-    (np.int64(7), 7.0), (np.float64(1.5), 1.5),
-])
+
+@pytest.mark.parametrize(
+    "valor, esperado",
+    [
+        (0, 0.0),
+        (3, 3.0),
+        (-1, -1.0),
+        (2.5, 2.5),
+        ("3", 3.0),
+        ("2.5", 2.5),
+        ("2,5", 2.5),
+        ("  4  ", 4.0),
+        ("-0,75", -0.75),
+        ("1e3", 1000.0),
+        (np.int64(7), 7.0),
+        (np.float64(1.5), 1.5),
+    ],
+)
 def test_constante_valida(valor, esperado):
     resultado = interpretar_constante(valor)
     assert resultado == esperado
     assert isinstance(resultado, float)
 
 
-@pytest.mark.parametrize("valor", [
-    None, True, False, "", "   ", "abc", "2,5,1", "3 €", "nan", "inf",
-    "-inf", float("nan"), float("inf"), [1], {},
-])
+@pytest.mark.parametrize(
+    "valor",
+    [
+        None,
+        True,
+        False,
+        "",
+        "   ",
+        "abc",
+        "2,5,1",
+        "3 €",
+        "nan",
+        "inf",
+        "-inf",
+        float("nan"),
+        float("inf"),
+        [1],
+        {},
+    ],
+)
 def test_constante_no_valida(valor):
     with pytest.raises(ErrorPreprocesado, match="debe ser un número"):
         interpretar_constante(valor)
@@ -263,6 +329,7 @@ def test_constante_no_valida(valor):
 # =============================================================================
 # columnas_seleccionadas
 # =============================================================================
+
 
 def test_columnas_features_y_target_al_final():
     estado = EstadoApp()
@@ -287,8 +354,7 @@ def test_columnas_usa_entrenamiento_si_hay_separacion():
 
 def test_columnas_sin_datos_devuelve_los_nombres():
     estado = EstadoApp()
-    estado.seleccion = {"features": ["a"], "target": "b",
-                        "tipo_regresion": "simple"}
+    estado.seleccion = {"features": ["a"], "target": "b", "tipo_regresion": "simple"}
     assert columnas_seleccionadas(estado) == ["a", "b"]
 
 
@@ -296,10 +362,10 @@ def test_columnas_sin_datos_devuelve_los_nombres():
 # aplicar_preprocesado · eliminar
 # =============================================================================
 
+
 def test_eliminar_quita_filas_con_nulos_en_columnas_seleccionadas():
-    train, test, resumen = aplicar_preprocesado(
-        crear_train(), crear_test(), COLUMNAS, ELIMINAR)
-    assert train.index.tolist() == [10, 13]    # 11 (NaN) y 12 ("  ") fuera
+    train, test, resumen = aplicar_preprocesado(crear_train(), crear_test(), COLUMNAS, ELIMINAR)
+    assert train.index.tolist() == [10, 13]  # 11 (NaN) y 12 ("  ") fuera
     assert test.index.tolist() == [21]
     assert resumen == {
         "train": {"filas_eliminadas": 2, "valores_rellenados": 0},
@@ -309,8 +375,7 @@ def test_eliminar_quita_filas_con_nulos_en_columnas_seleccionadas():
 
 def test_eliminar_ignora_nulos_de_columnas_no_seleccionadas():
     """La fila 10 tiene NaN en 'otra', pero 'otra' no está seleccionada."""
-    train, _, _ = aplicar_preprocesado(
-        crear_train(), crear_test(), COLUMNAS, ELIMINAR)
+    train, _, _ = aplicar_preprocesado(crear_train(), crear_test(), COLUMNAS, ELIMINAR)
     assert 10 in train.index
     assert pd.isna(train.at[10, "otra"])
 
@@ -318,17 +383,20 @@ def test_eliminar_ignora_nulos_de_columnas_no_seleccionadas():
 def test_eliminar_sin_nulos_no_cambia_nada():
     train = pd.DataFrame({"x": [1.0, 2.0], "y": [3.0, 4.0]})
     test = pd.DataFrame({"x": [5.0], "y": [6.0]})
-    train_p, test_p, resumen = aplicar_preprocesado(train, test, COLUMNAS,
-                                                    ELIMINAR)
+    train_p, test_p, resumen = aplicar_preprocesado(train, test, COLUMNAS, ELIMINAR)
     pd.testing.assert_frame_equal(train_p, train)
     pd.testing.assert_frame_equal(test_p, test)
     assert resumen["train"]["filas_eliminadas"] == 0
     assert resumen["test"]["filas_eliminadas"] == 0
 
 
-@pytest.mark.parametrize("vacio, conjunto", [
-    ("train", "entrenamiento"), ("test", "test"),
-])
+@pytest.mark.parametrize(
+    "vacio, conjunto",
+    [
+        ("train", "entrenamiento"),
+        ("test", "test"),
+    ],
+)
 def test_eliminar_dejaria_un_conjunto_vacio(vacio, conjunto):
     lleno = pd.DataFrame({"x": [1.0, 2.0], "y": [3.0, 4.0]})
     sin_datos = pd.DataFrame({"x": [np.nan, 1.0], "y": [1.0, ""]})
@@ -341,8 +409,7 @@ def test_eliminar_dejaria_un_conjunto_vacio(vacio, conjunto):
 
 def test_eliminar_dejaria_los_dos_vacios():
     sin_datos = pd.DataFrame({"x": [np.nan], "y": [1.0]})
-    with pytest.raises(AvisoPreprocesado,
-                       match="entrenamiento y el de test"):
+    with pytest.raises(AvisoPreprocesado, match="entrenamiento y el de test"):
         aplicar_preprocesado(sin_datos, sin_datos, COLUMNAS, ELIMINAR)
 
 
@@ -350,17 +417,17 @@ def test_eliminar_dejaria_los_dos_vacios():
 # aplicar_preprocesado · media, mediana y constante
 # =============================================================================
 
+
 def test_media_se_calcula_solo_con_entrenamiento():
     """El test se rellena con la media de train (x = 3), no con la suya, para
     no filtrar información del conjunto de test al modelo."""
-    train, test, _ = aplicar_preprocesado(
-        crear_train(), crear_test(), COLUMNAS, MEDIA)
+    train, test, _ = aplicar_preprocesado(crear_train(), crear_test(), COLUMNAS, MEDIA)
     media_x = (1.0 + 3.0 + 5.0) / 3
     media_y = (10.0 + 20.0 + 40.0) / 3
     assert train.at[11, "x"] == media_x
     assert train.at[12, "y"] == media_y
     assert test.at[20, "x"] == media_x
-    assert test.at[21, "x"] == 100.0           # los valores reales se conservan
+    assert test.at[21, "x"] == 100.0  # los valores reales se conservan
 
 
 def test_mediana_se_calcula_solo_con_entrenamiento():
@@ -371,12 +438,19 @@ def test_mediana_se_calcula_solo_con_entrenamiento():
     assert test_p.at[0, "x"] == 2.0
 
 
-@pytest.mark.parametrize("constante, esperado", [
-    (0, 0.0), (-3, -3.0), ("2,5", 2.5), (" 7 ", 7.0),
-])
+@pytest.mark.parametrize(
+    "constante, esperado",
+    [
+        (0, 0.0),
+        (-3, -3.0),
+        ("2,5", 2.5),
+        (" 7 ", 7.0),
+    ],
+)
 def test_constante_rellena_con_el_valor(constante, esperado):
     train, test, _ = aplicar_preprocesado(
-        crear_train(), crear_test(), COLUMNAS, CONSTANTE, constante)
+        crear_train(), crear_test(), COLUMNAS, CONSTANTE, constante
+    )
     assert train.at[11, "x"] == esperado
     assert train.at[12, "y"] == esperado
     assert test.at[20, "x"] == esperado
@@ -385,20 +459,20 @@ def test_constante_rellena_con_el_valor(constante, esperado):
 @pytest.mark.parametrize("estrategia", [MEDIA, MEDIANA, CONSTANTE])
 def test_rellenar_resumen_y_sin_nulos(estrategia):
     train, test, resumen = aplicar_preprocesado(
-        crear_train(), crear_test(), COLUMNAS, estrategia, 0)
+        crear_train(), crear_test(), COLUMNAS, estrategia, 0
+    )
     assert resumen == {
         "train": {"filas_eliminadas": 0, "valores_rellenados": 2},
         "test": {"filas_eliminadas": 0, "valores_rellenados": 1},
     }
     assert not quedan_nulos(train, COLUMNAS)
     assert not quedan_nulos(test, COLUMNAS)
-    assert len(train) == 4 and len(test) == 2   # no se quita ninguna fila
+    assert len(train) == 4 and len(test) == 2  # no se quita ninguna fila
 
 
 @pytest.mark.parametrize("estrategia", [MEDIA, MEDIANA, CONSTANTE])
 def test_rellenar_no_toca_columnas_no_seleccionadas(estrategia):
-    train, test, _ = aplicar_preprocesado(
-        crear_train(), crear_test(), COLUMNAS, estrategia, 0)
+    train, test, _ = aplicar_preprocesado(crear_train(), crear_test(), COLUMNAS, estrategia, 0)
     assert pd.isna(train.at[10, "otra"])
     assert test["otra"].isna().all()
 
@@ -417,13 +491,13 @@ def test_rellenar_columna_sin_valores_en_entrenamiento(estrategia):
 @pytest.mark.parametrize("constante", [None, "", "abc", float("nan")])
 def test_constante_no_numerica(constante):
     with pytest.raises(ErrorPreprocesado, match="debe ser un número"):
-        aplicar_preprocesado(crear_train(), crear_test(), COLUMNAS,
-                             CONSTANTE, constante)
+        aplicar_preprocesado(crear_train(), crear_test(), COLUMNAS, CONSTANTE, constante)
 
 
 # =============================================================================
 # aplicar_preprocesado · comunes
 # =============================================================================
+
 
 @pytest.mark.parametrize("estrategia", ["", "borrar", "Media", None, "MEDIA"])
 def test_estrategia_no_valida(estrategia):
@@ -443,20 +517,17 @@ def test_no_modifica_los_conjuntos_originales(estrategia):
 @pytest.mark.parametrize("estrategia", ESTRATEGIAS)
 def test_columna_inexistente(estrategia):
     with pytest.raises(ColumnasNoEncontradasError):
-        aplicar_preprocesado(crear_train(), crear_test(), ["x", "z"],
-                             estrategia, 1)
+        aplicar_preprocesado(crear_train(), crear_test(), ["x", "z"], estrategia, 1)
 
 
 @pytest.mark.parametrize("estrategia", ESTRATEGIAS)
 def test_acepta_columnas_como_tupla(estrategia):
-    train, _, _ = aplicar_preprocesado(crear_train(), crear_test(),
-                                       ("x", "y"), estrategia, 1)
+    train, _, _ = aplicar_preprocesado(crear_train(), crear_test(), ("x", "y"), estrategia, 1)
     assert not quedan_nulos(train, COLUMNAS)
 
 
 def test_conserva_columnas_e_indice():
-    train, test, _ = aplicar_preprocesado(
-        crear_train(), crear_test(), COLUMNAS, MEDIA)
+    train, test, _ = aplicar_preprocesado(crear_train(), crear_test(), COLUMNAS, MEDIA)
     assert list(train.columns) == ["x", "y", "otra"]
     assert train.index.tolist() == [10, 11, 12, 13]
     assert test.index.tolist() == [20, 21]
@@ -466,12 +537,13 @@ def test_conserva_columnas_e_indice():
 # Estado: detectar_en_estado, aplicar_al_estado y modelo_disponible
 # =============================================================================
 
+
 def test_detectar_en_estado_sin_seleccion_ni_separacion():
     estado = EstadoApp()
     estado.datos = crear_train()
     assert detectar_en_estado(estado) is None
     estado.guardar_seleccion(["x"], "y", "simple")
-    assert detectar_en_estado(estado) is None    # falta la separación
+    assert detectar_en_estado(estado) is None  # falta la separación
 
 
 def test_detectar_en_estado_con_separacion(estado_con_nulos):
@@ -508,8 +580,7 @@ def test_aplicar_al_estado_guarda_el_resultado(estado_con_nulos):
     estado = estado_con_nulos
     train_original, test_original = estado.entrenamiento, estado.test
     resumen = aplicar_al_estado(estado, CONSTANTE, "0")
-    assert set(estado.preprocesado) == {"entrenamiento", "test", "estrategia",
-                                        "resumen"}
+    assert set(estado.preprocesado) == {"entrenamiento", "test", "estrategia", "resumen"}
     assert estado.preprocesado["estrategia"] == CONSTANTE
     assert estado.preprocesado["resumen"] == resumen
     assert estado.preprocesado["entrenamiento"].at[11, "x"] == 0.0
@@ -528,11 +599,14 @@ def test_aplicar_al_estado_parte_siempre_de_la_separacion(estado_con_nulos):
     assert len(estado_con_nulos.preprocesado["entrenamiento"]) == 2
 
 
-@pytest.mark.parametrize("estrategia, constante", [
-    (CONSTANTE, "abc"), ("otra", None),
-])
-def test_aplicar_al_estado_error_conserva_lo_anterior(estado_con_nulos,
-                                                      estrategia, constante):
+@pytest.mark.parametrize(
+    "estrategia, constante",
+    [
+        (CONSTANTE, "abc"),
+        ("otra", None),
+    ],
+)
+def test_aplicar_al_estado_error_conserva_lo_anterior(estado_con_nulos, estrategia, constante):
     aplicar_al_estado(estado_con_nulos, MEDIA)
     anterior = estado_con_nulos.preprocesado
     with pytest.raises(ErrorPreprocesado):
@@ -601,6 +675,7 @@ def test_modelo_disponible_ignora_columnas_no_seleccionadas(estado_con_nulos):
 # texto_resumen
 # =============================================================================
 
+
 def test_texto_resumen():
     resumen = {
         "train": {"filas_eliminadas": 3, "valores_rellenados": 0},
@@ -614,8 +689,7 @@ def test_texto_resumen():
 
 
 def test_texto_resumen_con_resultado_real():
-    _, _, resumen = aplicar_preprocesado(crear_train(), crear_test(),
-                                         COLUMNAS, MEDIA)
+    _, _, resumen = aplicar_preprocesado(crear_train(), crear_test(), COLUMNAS, MEDIA)
     texto = texto_resumen(resumen)
     assert "Entrenamiento: 0 filas eliminadas, 2 valores rellenados" in texto
     assert "Test: 0 filas eliminadas, 1 valores rellenados" in texto
@@ -628,9 +702,10 @@ def test_texto_resumen_con_resultado_real():
 # El botón trabaja con la instancia compartida ``sikorius.estado.estado``.
 # Para no ensuciarla entre tests se sustituye por un estado nuevo.
 
-def crear_boton(estado, monkeypatch, estrategia, constante=None,
-                al_aplicar=None):
+
+def crear_boton(estado, monkeypatch, estrategia, constante=None, al_aplicar=None):
     from sikorius.gui.paneles.boton_preprocesado import crear_boton_preprocesado
+
     monkeypatch.setattr(modulo_boton, "estado", estado)
     avisos = Avisos(monkeypatch)
     botones = Botones(monkeypatch)
@@ -655,8 +730,9 @@ def test_boton_no_aplica_nada_hasta_pulsarlo(estado_con_nulos, monkeypatch):
 
 def test_boton_aplicar_correcto(estado_con_nulos, monkeypatch):
     llamadas = []
-    _, botones, avisos = crear_boton(estado_con_nulos, monkeypatch, MEDIA,
-                                     al_aplicar=lambda: llamadas.append(1))
+    _, botones, avisos = crear_boton(
+        estado_con_nulos, monkeypatch, MEDIA, al_aplicar=lambda: llamadas.append(1)
+    )
     botones.pulsar()
     mensaje, tipo = avisos.ultimo()
     assert tipo == "positive"
@@ -674,12 +750,12 @@ def test_boton_sin_al_aplicar(estado_con_nulos, monkeypatch):
 def test_boton_lee_los_controles_al_pulsar(estado_con_nulos, monkeypatch):
     """La estrategia y la constante se leen al pulsar, no al crear el botón."""
     from sikorius.gui.paneles.boton_preprocesado import crear_boton_preprocesado
+
     monkeypatch.setattr(modulo_boton, "estado", estado_con_nulos)
     Avisos(monkeypatch)
     botones = Botones(monkeypatch)
     controles = {"estrategia": MEDIA, "constante": None}
-    crear_boton_preprocesado(lambda: controles["estrategia"],
-                             lambda: controles["constante"])
+    crear_boton_preprocesado(lambda: controles["estrategia"], lambda: controles["constante"])
     controles["estrategia"] = CONSTANTE
     controles["constante"] = "9"
     botones.pulsar()
@@ -690,9 +766,9 @@ def test_boton_lee_los_controles_al_pulsar(estado_con_nulos, monkeypatch):
 @pytest.mark.parametrize("constante", [None, "abc", ""])
 def test_boton_error_constante(estado_con_nulos, monkeypatch, constante):
     llamadas = []
-    _, botones, avisos = crear_boton(estado_con_nulos, monkeypatch, CONSTANTE,
-                                     constante,
-                                     al_aplicar=lambda: llamadas.append(1))
+    _, botones, avisos = crear_boton(
+        estado_con_nulos, monkeypatch, CONSTANTE, constante, al_aplicar=lambda: llamadas.append(1)
+    )
     botones.pulsar()
     mensaje, tipo = avisos.ultimo()
     assert tipo == "negative"
@@ -717,11 +793,12 @@ def test_boton_aviso_conjunto_vacio(monkeypatch):
     test = pd.DataFrame({"x": [np.nan], "y": [1.0]})
     estado = crear_estado(train, test)
     llamadas = []
-    _, botones, avisos = crear_boton(estado, monkeypatch, ELIMINAR,
-                                     al_aplicar=lambda: llamadas.append(1))
+    _, botones, avisos = crear_boton(
+        estado, monkeypatch, ELIMINAR, al_aplicar=lambda: llamadas.append(1)
+    )
     botones.pulsar()
     mensaje, tipo = avisos.ultimo()
-    assert tipo == "warning"                   # aviso, no error
+    assert tipo == "warning"  # aviso, no error
     assert "vacío" in mensaje
     assert estado.preprocesado is None
     assert llamadas == []
@@ -729,12 +806,12 @@ def test_boton_aviso_conjunto_vacio(monkeypatch):
 
 def test_boton_se_puede_reintentar_tras_un_error(estado_con_nulos, monkeypatch):
     from sikorius.gui.paneles.boton_preprocesado import crear_boton_preprocesado
+
     monkeypatch.setattr(modulo_boton, "estado", estado_con_nulos)
     avisos = Avisos(monkeypatch)
     botones = Botones(monkeypatch)
     constante = {"valor": "abc"}
-    boton = crear_boton_preprocesado(lambda: CONSTANTE,
-                                     lambda: constante["valor"])
+    boton = crear_boton_preprocesado(lambda: CONSTANTE, lambda: constante["valor"])
     botones.pulsar()
     assert avisos.ultimo()[1] == "negative"
     assert boton.enabled
@@ -756,8 +833,10 @@ def test_boton_no_contiene_logica_de_preprocesado():
 # PanelPreprocesado (GUI sin servidor)
 # =============================================================================
 
+
 def crear_panel(estado, monkeypatch, al_aplicar=None):
     from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
+
     monkeypatch.setattr(modulo_boton, "estado", estado)
     avisos = Avisos(monkeypatch)
     botones = Botones(monkeypatch)
@@ -807,11 +886,18 @@ def test_panel_estrategia_por_defecto(estado_con_nulos, monkeypatch):
     assert not panel.constante.enabled
 
 
-@pytest.mark.parametrize("estrategia, habilitado", [
-    (CONSTANTE, True), (MEDIA, False), (MEDIANA, False), (ELIMINAR, False),
-])
-def test_panel_constante_solo_con_esa_estrategia(estado_con_nulos, monkeypatch,
-                                                 estrategia, habilitado):
+@pytest.mark.parametrize(
+    "estrategia, habilitado",
+    [
+        (CONSTANTE, True),
+        (MEDIA, False),
+        (MEDIANA, False),
+        (ELIMINAR, False),
+    ],
+)
+def test_panel_constante_solo_con_esa_estrategia(
+    estado_con_nulos, monkeypatch, estrategia, habilitado
+):
     panel, _, _ = crear_panel(estado_con_nulos, monkeypatch)
     panel.estrategia.set_value(estrategia)
     assert panel.constante.enabled is habilitado
@@ -819,16 +905,16 @@ def test_panel_constante_solo_con_esa_estrategia(estado_con_nulos, monkeypatch,
 
 def test_panel_aplicar_actualiza_la_deteccion(estado_con_nulos, monkeypatch):
     llamadas = []
-    panel, botones, avisos = crear_panel(estado_con_nulos, monkeypatch,
-                                         al_aplicar=lambda: llamadas.append(1))
+    panel, botones, avisos = crear_panel(
+        estado_con_nulos, monkeypatch, al_aplicar=lambda: llamadas.append(1)
+    )
     panel.estrategia.set_value(MEDIANA)
     botones.pulsar()
     assert avisos.ultimo()[1] == "positive"
     assert estado_con_nulos.preprocesado["estrategia"] == MEDIANA
     # Tras aplicar ya no quedan nulos: la tabla se pone a 0 y se ocultan
     # los controles
-    assert all(fila["train"] == 0 and fila["test"] == 0
-               for fila in panel.tabla.rows)
+    assert all(fila["train"] == 0 and fila["test"] == 0 for fila in panel.tabla.rows)
     assert not panel.controles.visible
     assert llamadas == [1]
 
@@ -843,9 +929,10 @@ def test_panel_aplicar_constante(estado_con_nulos, monkeypatch):
 
 def test_panel_error_no_cambia_nada(estado_con_nulos, monkeypatch):
     llamadas = []
-    panel, botones, avisos = crear_panel(estado_con_nulos, monkeypatch,
-                                         al_aplicar=lambda: llamadas.append(1))
-    panel.estrategia.set_value(CONSTANTE)     # sin escribir el valor
+    panel, botones, avisos = crear_panel(
+        estado_con_nulos, monkeypatch, al_aplicar=lambda: llamadas.append(1)
+    )
+    panel.estrategia.set_value(CONSTANTE)  # sin escribir el valor
     botones.pulsar()
     assert avisos.ultimo()[1] == "negative"
     assert estado_con_nulos.preprocesado is None
@@ -876,6 +963,7 @@ def test_panel_actualizar_tras_borrar_seleccion(estado_con_nulos, monkeypatch):
 
 def test_panel_no_contiene_logica_de_preprocesado():
     import sikorius.gui.paneles.panel_preprocesado as panel
+
     codigo = inspect.getsource(panel)
     assert "detectar_en_estado(" in codigo
     for prohibido in ("fillna", "dropna", "isna", "mean(", "median("):

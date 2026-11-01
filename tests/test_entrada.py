@@ -48,12 +48,14 @@ COLUMNAS = ["superficie", "habitaciones", "barrio", "precio"]
 @pytest.fixture
 def datos():
     """Dataset pequeño con tres columnas numéricas y una de texto (barrio)."""
-    return pd.DataFrame({
-        "superficie": [60.0, 95.0, 110.0],
-        "habitaciones": [2, 3, 4],
-        "barrio": ["Elviña", "Os Mallos", "Riazor"],
-        "precio": [121000, 189500, 265000],
-    })
+    return pd.DataFrame(
+        {
+            "superficie": [60.0, 95.0, 110.0],
+            "habitaciones": [2, 3, 4],
+            "barrio": ["Elviña", "Os Mallos", "Riazor"],
+            "precio": [121000, 189500, 265000],
+        }
+    )
 
 
 class ArchivoSubido:
@@ -103,8 +105,7 @@ def ejecutar(corrutina):
 
 def oyentes_al_desplegar(selector):
     """Manejadores del evento de abrir el desplegable de un ui.select."""
-    return [e for e in selector._event_listeners.values()
-            if e.type in ("popup-show", "popupShow")]
+    return [e for e in selector._event_listeners.values() if e.type in ("popup-show", "popupShow")]
 
 
 def desplegar(selector):
@@ -160,8 +161,7 @@ class Pagina:
 
     def _ultimo(self, prefijo):
         """Último ui.select creado cuya etiqueta empieza por el prefijo."""
-        return [s for s in self.selects
-                if str(s.props.get("label", "")).startswith(prefijo)][-1]
+        return [s for s in self.selects if str(s.props.get("label", "")).startswith(prefijo)][-1]
 
     @property
     def features(self):
@@ -206,6 +206,7 @@ importar_archivo_subido = modulo.importar_archivo_subido
 # Estructura del archivo
 # =============================================================================
 
+
 def test_el_archivo_existe():
     assert RUTA_MODULO.is_file()
 
@@ -214,17 +215,22 @@ def test_el_archivo_compila():
     compile(RUTA_MODULO.read_text(encoding="utf-8"), str(RUTA_MODULO), "exec")
 
 
-@pytest.mark.parametrize("nombre", [
-    "SelectorFeatures", "SelectorTarget", "importar_archivo_subido",
-    "pagina_principal", "EXTENSIONES_ADMITIDAS",
-])
+@pytest.mark.parametrize(
+    "nombre",
+    [
+        "SelectorFeatures",
+        "SelectorTarget",
+        "importar_archivo_subido",
+        "pagina_principal",
+        "EXTENSIONES_ADMITIDAS",
+    ],
+)
 def test_existen_clases_y_funciones(nombre):
     assert hasattr(modulo, nombre)
 
 
 def test_metodos_publicos():
-    for metodo in ["cambiar_tipo_regresion", "cargar_columnas",
-                   "obtener_seleccion"]:
+    for metodo in ["cambiar_tipo_regresion", "cargar_columnas", "obtener_seleccion"]:
         assert callable(getattr(SelectorFeatures, metodo, None)), metodo
         assert getattr(SelectorFeatures, metodo).__doc__, metodo
 
@@ -265,25 +271,33 @@ def test_el_codigo_de_la_pagina_no_usa_variables_sin_definir():
     """Comprobación estática: toda variable usada dentro de la página está
     definida (ayuda a detectar errores de nombres al editar)."""
     arbol = ast.parse(RUTA_MODULO.read_text(encoding="utf-8"))
-    pagina = next(n for n in arbol.body if isinstance(n, ast.FunctionDef)
-                  and n.name == "pagina_principal")
-    definidas = set(dir(modulo)) | set(dir(builtins)) | {
-        n.id for n in ast.walk(pagina)
-        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
-    definidas |= {n.name for n in ast.walk(pagina)
-                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
-    definidas |= {a.arg for n in ast.walk(pagina) if isinstance(n, ast.arguments)
-                  for a in n.args}
-    definidas |= {n.name for n in ast.walk(pagina)
-                  if isinstance(n, ast.ExceptHandler) and n.name}
-    usadas = {n.id for n in ast.walk(pagina)
-              if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+    pagina = next(
+        n for n in arbol.body if isinstance(n, ast.FunctionDef) and n.name == "pagina_principal"
+    )
+    definidas = (
+        set(dir(modulo))
+        | set(dir(builtins))
+        | {
+            n.id
+            for n in ast.walk(pagina)
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)
+        }
+    )
+    definidas |= {
+        n.name for n in ast.walk(pagina) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    definidas |= {a.arg for n in ast.walk(pagina) if isinstance(n, ast.arguments) for a in n.args}
+    definidas |= {n.name for n in ast.walk(pagina) if isinstance(n, ast.ExceptHandler) and n.name}
+    usadas = {
+        n.id for n in ast.walk(pagina) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+    }
     assert usadas <= definidas, usadas - definidas
 
 
 # =============================================================================
 # SelectorFeatures
 # =============================================================================
+
 
 def test_features_por_defecto_es_multiple_y_vacio():
     selector = SelectorFeatures()
@@ -392,19 +406,20 @@ def test_features_cargar_el_mismo_dataset_tambien_limpia(datos):
     assert selector.obtener_seleccion() == []
 
 
-@pytest.mark.parametrize("de, a", [
-    (SelectorFeatures.MULTIPLE, SelectorFeatures.SIMPLE),
-    (SelectorFeatures.SIMPLE, SelectorFeatures.MULTIPLE),
-])
+@pytest.mark.parametrize(
+    "de, a",
+    [
+        (SelectorFeatures.MULTIPLE, SelectorFeatures.SIMPLE),
+        (SelectorFeatures.SIMPLE, SelectorFeatures.MULTIPLE),
+    ],
+)
 def test_features_cambiar_tipo_limpia_y_conserva_columnas(datos, de, a):
     selector = SelectorFeatures(de)
     selector.cargar_columnas(datos)
-    selector.selector.set_value(
-        ["superficie"] if de == SelectorFeatures.MULTIPLE else "superficie")
+    selector.selector.set_value(["superficie"] if de == SelectorFeatures.MULTIPLE else "superficie")
     selector.cambiar_tipo_regresion(a)
     assert selector.tipo_regresion == a
-    assert selector.selector.props.get("multiple", False) == (
-        a == SelectorFeatures.MULTIPLE)
+    assert selector.selector.props.get("multiple", False) == (a == SelectorFeatures.MULTIPLE)
     assert selector.selector.options == COLUMNAS
     assert selector.selector.enabled
     assert selector.obtener_seleccion() == []
@@ -438,10 +453,14 @@ def test_features_constructor_con_tipo_no_valido(tipo):
         SelectorFeatures(tipo)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "FALLO E2 (limitación conocida): columnas que solo se distinguen por el "
-    "tipo del nombre (1 y '1') salen repetidas en el selector y no se "
-    "pueden elegir por separado, porque todo se pasa a texto."))
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "FALLO E2 (limitación conocida): columnas que solo se distinguen por el "
+        "tipo del nombre (1 y '1') salen repetidas en el selector y no se "
+        "pueden elegir por separado, porque todo se pasa a texto."
+    ),
+)
 def test_features_columnas_que_solo_difieren_en_el_tipo():
     selector = SelectorFeatures()
     selector.cargar_columnas(pd.DataFrame([[1, 2]], columns=[1, "1"]))
@@ -451,6 +470,7 @@ def test_features_columnas_que_solo_difieren_en_el_tipo():
 # =============================================================================
 # importar_archivo_subido
 # =============================================================================
+
 
 @pytest.mark.parametrize("extension", [".csv", ".xlsx", ".sqlite", ".db"])
 def test_subir_cada_formato(tmp_path, datos, extension):
@@ -479,10 +499,15 @@ def test_subir_con_extension_en_mayusculas(datos):
     assert len(ejecutar(importar_archivo_subido(archivo))) == 3
 
 
-@pytest.mark.parametrize("nombre", [
-    "../../fuera.csv", "carpeta/sub/datos.csv", "C:/Windows/datos.csv",
-    "..\\..\\fuera.csv",
-])
+@pytest.mark.parametrize(
+    "nombre",
+    [
+        "../../fuera.csv",
+        "carpeta/sub/datos.csv",
+        "C:/Windows/datos.csv",
+        "..\\..\\fuera.csv",
+    ],
+)
 def test_subir_nombre_con_ruta_no_sale_de_la_carpeta_temporal(datos, nombre):
     archivo = ArchivoSubido(nombre, bytes_csv(datos))
     ejecutar(importar_archivo_subido(archivo))
@@ -491,14 +516,17 @@ def test_subir_nombre_con_ruta_no_sale_de_la_carpeta_temporal(datos, nombre):
     assert archivo.guardado_en.parent.name.startswith("tmp")
 
 
-@pytest.mark.parametrize("nombre, contenido, mensaje", [
-    ("vacio.csv", b"", "no contiene datos"),
-    ("datos.txt", b"a,b\n1,2\n", "no soportada"),
-    ("sin_extension", b"a,b\n1,2\n", "no soportada"),
-    ("roto.xlsx", b"esto no es un excel", "dañado"),
-    ("roto.db", b"basura" * 100, "dañado"),
-    ("binario.csv", b"\x00\x01", "dañado"),
-])
+@pytest.mark.parametrize(
+    "nombre, contenido, mensaje",
+    [
+        ("vacio.csv", b"", "no contiene datos"),
+        ("datos.txt", b"a,b\n1,2\n", "no soportada"),
+        ("sin_extension", b"a,b\n1,2\n", "no soportada"),
+        ("roto.xlsx", b"esto no es un excel", "dañado"),
+        ("roto.db", b"basura" * 100, "dañado"),
+        ("binario.csv", b"\x00\x01", "dañado"),
+    ],
+)
 def test_subir_archivo_no_valido(nombre, contenido, mensaje):
     archivo = ArchivoSubido(nombre, contenido)
     with pytest.raises(ErrorImportacion, match=mensaje):
@@ -524,6 +552,7 @@ def test_subir_error_al_guardar_se_propaga():
 # pagina_principal: subida del dataset y columnas de entrada
 # =============================================================================
 
+
 def test_pagina_elementos(pagina):
     assert "Confirmar selección" in pagina.botones
     assert pagina.radio.value == SelectorFeatures.MULTIPLE
@@ -542,13 +571,17 @@ def test_subir_dataset_rellena_los_dos_selectores(pagina_con_datos):
     assert kw["type"] == "positive"
 
 
-@pytest.mark.parametrize("nombre, contenido, mensaje", [
-    ("vacio.csv", b"", "no contiene datos"),
-    ("datos.txt", b"a\n1\n", "no soportada"),
-    ("roto.xlsx", b"texto", "dañado"),
-])
+@pytest.mark.parametrize(
+    "nombre, contenido, mensaje",
+    [
+        ("vacio.csv", b"", "no contiene datos"),
+        ("datos.txt", b"a\n1\n", "no soportada"),
+        ("roto.xlsx", b"texto", "dañado"),
+    ],
+)
 def test_subir_dataset_erroneo_avisa_y_conserva_lo_anterior(
-        pagina_con_datos, nombre, contenido, mensaje):
+    pagina_con_datos, nombre, contenido, mensaje
+):
     pagina = pagina_con_datos
     pagina.features.set_value(["superficie"])
     pagina.subir(nombre, contenido)

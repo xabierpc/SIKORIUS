@@ -13,8 +13,8 @@ from pathlib import Path
 from nicegui import ui
 
 from sikorius.gui.paneles.panel_columnas import SelectorFeatures, SelectorTarget
-from sikorius.nucleo.importador import ErrorImportacion, importar_datos
 from sikorius.nucleo.columnas import ErrorSeleccion, validar_seleccion
+from sikorius.nucleo.importador import ErrorImportacion, importar_datos
 
 EXTENSIONES_ADMITIDAS = ".csv,.xlsx,.xls,.sqlite,.db"
 
@@ -39,7 +39,10 @@ def pagina_principal():
         ui.label("Selector de features").classes("text-xl font-bold")
 
         tipo = ui.radio(
-            {SelectorFeatures.SIMPLE: "Regresión simple", SelectorFeatures.MULTIPLE: "Regresión múltiple"},
+            {
+                SelectorFeatures.SIMPLE: "Regresión simple",
+                SelectorFeatures.MULTIPLE: "Regresión múltiple",
+            },
             value=SelectorFeatures.MULTIPLE,
         ).props("inline")
 
@@ -59,16 +62,24 @@ def pagina_principal():
             estado["df"] = df
             estado["seleccion"] = None
             ui.notify(
-                "Dataset cargado: " + str(len(df)) + " filas, " + str(len(df.columns)) + " columnas",
+                "Dataset cargado: "
+                + str(len(df))
+                + " filas, "
+                + str(len(df.columns))
+                + " columnas",
                 type="positive",
             )
             subida.reset()
 
-        subida = ui.upload(
-            label="Cargar datos (CSV, Excel o SQLite)",
-            on_upload=al_subir,
-            auto_upload=True,
-        ).props("accept=" + EXTENSIONES_ADMITIDAS).classes("w-full")
+        subida = (
+            ui.upload(
+                label="Cargar datos (CSV, Excel o SQLite)",
+                on_upload=al_subir,
+                auto_upload=True,
+            )
+            .props("accept=" + EXTENSIONES_ADMITIDAS)
+            .classes("w-full")
+        )
 
         selector = SelectorFeatures(tipo_regresion=tipo.value)
         target = SelectorTarget(al_abrir=lambda: target.excluir(selector.obtener_seleccion()))
