@@ -10,6 +10,7 @@ from fractions import Fraction
 import numpy as np
 
 from sikorius.nucleo.errores import ErrorSeparacion
+from sikorius.nucleo.texto import formatear_numero
 
 PORCENTAJE_TEST_DEFECTO = 20
 SEMILLA_DEFECTO = 42
@@ -140,10 +141,3 @@ def separar_datos(
     test = df.iloc[np.sort(orden[:filas_test])].copy()
     entrenamiento = df.iloc[np.sort(orden[filas_test:])].copy()
     return entrenamiento, test
-
-
-def formatear_numero(numero):
-    """20.0 -> "20", 12.5 -> "12.5"."""
-    if float(numero).is_integer():
-        return str(int(numero))
-    return str(numero)
