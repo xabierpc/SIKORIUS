@@ -3,14 +3,15 @@
 Cada bloque prueba una de las tareas del plan, así que se pueden ir pasando
 a medida que se termina cada una:
 
-    uv run pytest test/test_carga_gui.py -v              # todos
-    uv run pytest test/test_carga_gui.py -v -k tarea1    # solo una tarea
+    uv run pytest tests/gui/test_carga_gui.py -v              # todos
+    uv run pytest tests/gui/test_carga_gui.py -v -k tarea2    # una tarea
 
-    Tarea 1 -> sikorius/estado.py               (EstadoApp)
     Tarea 2 -> sikorius/gui/selector_archivos.py (es_archivo_permitido,
                                                   listar_carpeta)
     Tarea 3 -> sikorius/gui/tabla_datos.py       (dataframe_a_tabla)
     Tarea 6 -> sikorius/gui/pagina.py               (carpeta_inicial)
+
+Los tests de la tarea 1 (EstadoApp) están en tests/test_estado.py.
 
 Las tareas 4 y 5 (la tabla y el diálogo en pantalla) se comprueban a mano
 con la lista de la tarea 8, porque necesitan el navegador.
@@ -75,199 +76,6 @@ def estado_limpio():
     yield estado
     estado.datos = None
     estado.ruta = None
-
-
-# =============================================================================
-# Tarea 1 · estado.py
-# =============================================================================
-
-
-def test_tarea1_estado_inicial_vacio():
-    from sikorius.estado import EstadoApp
-
-    estado = EstadoApp()
-
-    assert estado.datos is None
-    assert estado.ruta is None
-    assert estado.hay_datos() is False
-
-
-def test_tarea1_existe_instancia_compartida():
-    from sikorius.estado import EstadoApp, estado
-
-    assert isinstance(estado, EstadoApp)
-
-
-def test_tarea1_cargar_csv_devuelve_y_guarda_datos(tmp_path):
-    from sikorius.estado import EstadoApp
-
-    archivo = crear_csv(
-        tmp_path / "pisos.csv", "superficie,precio\n60.5,121000\n95,189500\n"
-    )
-    estado = EstadoApp()
-
-    df = estado.cargar(archivo)
-
-    assert isinstance(df, pd.DataFrame)
-    assert estado.datos is df
-    assert estado.hay_datos() is True
-    assert list(df.columns) == ["superficie", "precio"]
-    assert len(df) == 2
-
-
-def test_tarea1_ruta_guardada_es_str_absoluto(tmp_path):
-    from sikorius.estado import EstadoApp
-
-    archivo = crear_csv(tmp_path / "datos.csv", "x\n1\n")
-    estado = EstadoApp()
-
-    estado.cargar(archivo)
-
-    assert isinstance(estado.ruta, str)
-    assert Path(estado.ruta).is_absolute()
-    assert estado.ruta == str(archivo.resolve())
-
-
-def test_tarea1_ruta_relativa_se_guarda_absoluta(tmp_path, monkeypatch):
-    from sikorius.estado import EstadoApp
-
-    crear_csv(tmp_path / "datos.csv", "x\n1\n")
-    monkeypatch.chdir(tmp_path)
-    estado = EstadoApp()
-
-    estado.cargar("datos.csv")
-
-    assert estado.ruta == str((tmp_path / "datos.csv").resolve())
-
-
-def test_tarea1_funciona_con_espacios_tildes_y_enie(carpeta_rara):
-    from sikorius.estado import EstadoApp
-
-    archivo = crear_csv(
-        carpeta_rara / "pisos ñ á.csv",
-        "barrio,precio\nElviña,121000\nRiazor,265000\n",
-    )
-    estado = EstadoApp()
-
-    df = estado.cargar(str(archivo))
-
-    assert list(df["barrio"]) == ["Elviña", "Riazor"]
-    assert estado.ruta == str(archivo.resolve())
-
-
-def test_tarea1_funciona_desde_cualquier_carpeta(tmp_path, monkeypatch):
-    from sikorius.estado import EstadoApp
-
-    archivo = crear_csv(tmp_path / "datos" / "pisos.csv", "x\n1\n")
-    otra = tmp_path / "otra carpeta"
-    otra.mkdir()
-    monkeypatch.chdir(otra)
-    estado = EstadoApp()
-
-    estado.cargar(archivo)
-
-    assert estado.ruta == str(archivo.resolve())
-
-
-def test_tarea1_cargar_sqlite(carpeta_rara):
-    from sikorius.estado import EstadoApp
-
-    archivo = crear_sqlite(
-        carpeta_rara / "base ñ.db",
-        [
-            "CREATE TABLE pisos (superficie REAL, precio INTEGER)",
-            "INSERT INTO pisos VALUES (60.5, 121000)",
-        ],
-    )
-    estado = EstadoApp()
-
-    df = estado.cargar(archivo)
-
-    assert list(df.columns) == ["superficie", "precio"]
-
-
-def test_tarea1_nuevo_archivo_sustituye_al_anterior(tmp_path):
-    from sikorius.estado import EstadoApp
-
-    primero = crear_csv(tmp_path / "uno.csv", "a\n1\n")
-    segundo = crear_csv(tmp_path / "dos.csv", "b,c\n2,3\n4,5\n")
-    estado = EstadoApp()
-
-    estado.cargar(primero)
-    estado.cargar(segundo)
-
-    assert list(estado.datos.columns) == ["b", "c"]
-    assert estado.ruta == str(segundo.resolve())
-
-
-def test_tarea1_usa_el_modulo_de_importacion(tmp_path, monkeypatch):
-    """La lectura no se reimplementa: estado.cargar llama a importar_datos."""
-    import sikorius.estado as modulo_estado
-    from sikorius.estado import EstadoApp
-
-    llamadas = []
-    falso = pd.DataFrame({"a": [1]})
-
-    def importar_falso(ruta):
-        llamadas.append(ruta)
-        return falso
-
-    monkeypatch.setattr(modulo_estado, "importar_datos", importar_falso)
-    archivo = crear_csv(tmp_path / "datos.csv", "x\n1\n")
-    estado = EstadoApp()
-
-    df = estado.cargar(archivo)
-
-    assert len(llamadas) == 1
-    assert df is falso
-
-
-@pytest.mark.parametrize("contenido", ["", "solo,cabecera\n"])
-def test_tarea1_error_conserva_estado_anterior(tmp_path, contenido):
-    from sikorius.estado import EstadoApp
-    from sikorius.nucleo.importador import ErrorImportacion
-
-    bueno = crear_csv(tmp_path / "bueno.csv", "a\n1\n")
-    malo = crear_csv(tmp_path / "malo.csv", contenido)
-    estado = EstadoApp()
-    df_bueno = estado.cargar(bueno)
-
-    with pytest.raises(ErrorImportacion):
-        estado.cargar(malo)
-
-    assert estado.datos is df_bueno
-    assert estado.ruta == str(bueno.resolve())
-
-
-def test_tarea1_error_sin_datos_previos(tmp_path):
-    from sikorius.estado import EstadoApp
-    from sikorius.nucleo.importador import ErrorImportacion
-
-    estado = EstadoApp()
-
-    with pytest.raises(ErrorImportacion):
-        estado.cargar(tmp_path / "no_existe.csv")
-
-    assert estado.hay_datos() is False
-    assert estado.ruta is None
-
-
-def test_tarea1_error_trae_mensaje_del_importador(tmp_path):
-    """El mensaje que verá el usuario es el del módulo de importación."""
-    from sikorius.estado import EstadoApp
-    from sikorius.nucleo.importador import ErrorImportacion
-
-    archivo = crear_sqlite(
-        tmp_path / "dos_tablas.db",
-        [
-            "CREATE TABLE a (x INTEGER)",
-            "CREATE TABLE b (y INTEGER)",
-        ],
-    )
-    estado = EstadoApp()
-
-    with pytest.raises(ErrorImportacion, match="más de una tabla"):
-        estado.cargar(archivo)
 
 
 # =============================================================================
