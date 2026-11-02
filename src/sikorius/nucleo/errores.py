@@ -1,13 +1,16 @@
+"""Errores esperados de SIKORIUS: la GUI muestra su mensaje tal cual."""
+
+
 class ErrorSikorius(Exception):
-    """Error en el codigo"""
+    """Base de todos los errores que se explican al usuario."""
 
 
 class ErrorImportacion(ErrorSikorius):
-    """Error producido al importar un archivo de datos"""
+    """No se puede importar el archivo de datos."""
 
 
 class ErrorSeleccion(ErrorSikorius):
-    """Selección de columnas no válida para un modelo de regresión lineal."""
+    """Selección de columnas no válida para una regresión lineal."""
 
 
 class ErrorSeparacion(ErrorSikorius):
@@ -15,16 +18,12 @@ class ErrorSeparacion(ErrorSikorius):
 
 
 class ErrorPreprocesado(ErrorSikorius):
-    """Error producido al aplicar el preprocesado."""
+    """No se puede aplicar el preprocesado."""
 
 
 class AvisoPreprocesado(ErrorPreprocesado):
-    """El preprocesado se puede hacer, pero el resultado no sería válido."""
+    """El preprocesado se podría hacer, pero el resultado no sería válido."""
 
 
 class ColumnasNoEncontradasError(ErrorPreprocesado, ValueError):
-    """Se lanza cuando alguna columna seleccionada no existe en el DataFrame.
-
-    Hereda de ``ErrorPreprocesado`` para que la interfaz también la capture
-    y muestre el mensaje en lugar de fallar.
-    """
+    """Alguna columna seleccionada no existe en el DataFrame."""
