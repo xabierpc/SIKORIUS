@@ -9,13 +9,12 @@ from fractions import Fraction
 
 import numpy as np
 
+from sikorius.nucleo.errores import ErrorSeparacion
+from sikorius.nucleo.texto import formatear_numero
+
 PORCENTAJE_TEST_DEFECTO = 20
 SEMILLA_DEFECTO = 42
 FILAS_MINIMAS = 5
-
-
-class ErrorSeparacion(Exception):
-    """Parámetros o dataset no válidos para separar en entrenamiento y test."""
 
 
 def interpretar_porcentaje(valor):
@@ -99,7 +98,7 @@ def calcular_tamanos(num_filas, porcentaje_test):
             vacio = "entrenamiento"
         raise ErrorSeparacion(
             "Con un "
-            + _formatear(porcentaje_test)
+            + formatear_numero(porcentaje_test)
             + " % de test y "
             + str(num_filas)
             + " filas, el conjunto de "
@@ -142,10 +141,3 @@ def separar_datos(
     test = df.iloc[np.sort(orden[:filas_test])].copy()
     entrenamiento = df.iloc[np.sort(orden[filas_test:])].copy()
     return entrenamiento, test
-
-
-def _formatear(numero):
-    """20.0 -> "20", 12.5 -> "12.5"."""
-    if float(numero).is_integer():
-        return str(int(numero))
-    return str(numero)

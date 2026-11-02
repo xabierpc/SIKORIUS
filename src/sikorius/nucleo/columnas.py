@@ -1,8 +1,27 @@
+"""Validación de las columnas de entrada y salida del modelo.
+
+Los selectores de la interfaz trabajan con los nombres de las columnas en
+texto; aquí se traducen a las columnas reales del DataFrame, que pueden no
+ser texto (por ejemplo, 2020 en la cabecera de un Excel).
+"""
+
 import pandas as pd
 
+from sikorius.nucleo.errores import ErrorSeleccion
 
-class ErrorSeleccion(Exception):
-    """Selección de columnas no válida para un modelo de regresión lineal."""
+
+def resolver_columnas(df, nombres):
+    """Traduce los nombres en texto del selector a las columnas reales.
+
+    Un nombre que no corresponde a ninguna columna se devuelve tal cual.
+    """
+    reales = {}
+    for columna in df.columns:
+        reales[str(columna)] = columna
+    resultado = []
+    for nombre in nombres:
+        resultado.append(reales.get(nombre, nombre))
+    return resultado
 
 
 def validar_seleccion(df, features, target):
@@ -25,14 +44,18 @@ def validar_seleccion(df, features, target):
     if faltan:
         raise ErrorSeleccion("Falta seleccionar " + " y ".join(faltan) + ".")
 
-    # El selector trabaja con nombres en texto: se asocian a las columnas
-    # reales
-    reales = {str(c): c for c in df.columns}
+    nombres = list(features) + [target]
+    reales = resolver_columnas(df, nombres)
 
-    inexistentes = [c for c in list(features) + [target] if c not in reales]
+    inexistentes = []
+    for nombre, real in zip(nombres, reales, strict=True):
+        if real not in df.columns:
+            inexistentes.append(nombre)
     if inexistentes:
         raise ErrorSeleccion(
-            "Columnas que no existen en el dataset: " + ", ".join(inexistentes)
+            "Columnas que no existen en el dataset: "
+            + ", ".join(inexistentes)
+            + "."
         )
 
     if target in features:
@@ -42,11 +65,10 @@ def validar_seleccion(df, features, target):
             + "' no puede ser entrada y salida a la vez."
         )
 
-    no_numericas = [
-        c
-        for c in list(features) + [target]
-        if not pd.api.types.is_numeric_dtype(df[reales[c]])
-    ]
+    no_numericas = []
+    for nombre, real in zip(nombres, reales, strict=True):
+        if not pd.api.types.is_numeric_dtype(df[real]):
+            no_numericas.append(nombre)
     if no_numericas:
         raise ErrorSeleccion(
             "Estas columnas no son numéricas y no se pueden usar en una "
