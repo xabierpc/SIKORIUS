@@ -2,9 +2,13 @@
 
 Solo muestra carpetas y archivos con las extensiones que admite el módulo de
 importación. Como el servidor de NiceGUI corre en el propio equipo, la ruta
-que devuelve es la ruta real del archivo en el disco.
+que devuelve es la ruta real del archivo en el disco. En Windows muestra
+además un botón por cada unidad de disco (C:, D:...) para poder cambiar de
+una a otra.
 """
 
+import os
+import string
 from pathlib import Path
 
 from nicegui import ui
@@ -19,6 +23,32 @@ def es_archivo_permitido(ruta):
         ".sqlite",
         ".db",
     )
+
+
+def _es_windows():
+    """Indica si la aplicación se está ejecutando en Windows."""
+    return os.name == "nt"
+
+
+def unidades_disponibles():
+    """Devuelve las unidades de disco de Windows que existen (C:\\, D:\\...).
+
+    En Linux y macOS devuelve una lista vacía: todo cuelga de "/" y se llega
+    a cualquier carpeta subiendo con "..".
+    """
+    if not _es_windows():
+        return []
+    unidades = []
+    for letra in string.ascii_uppercase:
+        raiz = Path(letra + ":\\")
+        if raiz.exists():
+            unidades.append(raiz)
+    return unidades
+
+
+def nombre_unidad(unidad):
+    """Texto del botón de una unidad: "C:\\" -> "C:"."""
+    return str(unidad)[:2]
 
 
 def _clave_orden(ruta):
@@ -59,6 +89,11 @@ async def seleccionar_archivo(carpeta_inicial):
     """
     tipos = ", ".join((".csv", ".xlsx", ".xls", ".sqlite", ".db"))
 
+    # Cada botón necesita su propia función: una lambda escrita dentro del
+    # bucle de las unidades se quedaría con la última unidad para todos
+    def ir_a(carpeta):
+        return lambda: mostrar(carpeta)
+
     with ui.dialog() as dialogo, ui.card().classes("w-[650px] max-w-full"):
         ui.label("Selecciona un dataset").classes("text-lg font-semibold")
         ui.label("Tipos admitidos: " + tipos).classes("text-sm text-gray-500")
@@ -66,6 +101,10 @@ async def seleccionar_archivo(carpeta_inicial):
             ui.button(
                 icon="home", on_click=lambda: mostrar(Path.home())
             ).props("flat round dense").tooltip("Carpeta personal")
+            for unidad in unidades_disponibles():
+                ui.button(nombre_unidad(unidad), on_click=ir_a(unidad)).props(
+                    "flat dense no-caps"
+                ).tooltip("Unidad " + nombre_unidad(unidad))
             etiqueta_carpeta = ui.label().classes("text-sm break-all")
         with ui.scroll_area().classes("w-full h-80 border rounded"):
             lista = ui.list().classes("w-full").props("dense separator")
