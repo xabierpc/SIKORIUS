@@ -1593,6 +1593,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "nicegui" },
+    { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "xlrd" },
@@ -1608,6 +1609,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "nicegui", specifier = ">=3.18.0" },
+    { name = "numpy", specifier = ">=2.5.4" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=3.0.6" },
     { name = "xlrd", specifier = ">=2.0.2" },

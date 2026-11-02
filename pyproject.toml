@@ -12,6 +12,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "nicegui>=3.18.0",
+    "numpy>=2.5.4",
     "openpyxl>=3.1.5",
     "pandas>=3.0.6",
     "xlrd>=2.0.2",
@@ -45,11 +46,12 @@ show_missing = true
 skip_covered = true
 
 [tool.ruff]
-line-length = 100
+line-length = 79
 target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
-# UP031/UP032 proponen f-strings y SIM108 ternarios: van contra el estilo del proyecto
-ignore = ["UP031", "UP032", "SIM108"]
+# UP031/UP032 proponen f-strings, SIM108 ternarios y SIM105 contextlib.suppress:
+# van contra el estilo del proyecto (bloques explícitos)
+ignore = ["UP031", "UP032", "SIM108", "SIM105"]
