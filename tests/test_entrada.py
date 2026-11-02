@@ -105,11 +105,16 @@ def ejecutar(corrutina):
 
 def oyentes_al_desplegar(selector):
     """Manejadores del evento de abrir el desplegable de un ui.select."""
-    return [e for e in selector._event_listeners.values() if e.type in ("popup-show", "popupShow")]
+    return [
+        e
+        for e in selector._event_listeners.values()
+        if e.type in ("popup-show", "popupShow")
+    ]
 
 
 def desplegar(selector):
-    """Simula que el usuario abre el desplegable (lanza el último manejador)."""
+    """Simula que el usuario abre el desplegable (lanza el último
+    manejador)."""
     manejador = oyentes_al_desplegar(selector)[-1].handler
     if inspect.signature(manejador).parameters:
         manejador(None)
@@ -131,7 +136,9 @@ class Pagina:
         self.subida = None
         self.radio = None
         self.selects = []
-        reales = {n: getattr(ui, n) for n in ("button", "upload", "radio", "select")}
+        reales = {
+            n: getattr(ui, n) for n in ("button", "upload", "radio", "select")
+        }
 
         def button(texto, on_click=None, **kw):
             self.botones[texto] = on_click
@@ -155,13 +162,21 @@ class Pagina:
         monkeypatch.setattr(ui, "upload", upload)
         monkeypatch.setattr(ui, "radio", radio)
         monkeypatch.setattr(ui, "select", select)
-        monkeypatch.setattr(ui, "notify", lambda m, **kw: self.avisos.append((m, kw)))
-        monkeypatch.setattr(ui.upload, "reset", lambda self: None, raising=False)
+        monkeypatch.setattr(
+            ui, "notify", lambda m, **kw: self.avisos.append((m, kw))
+        )
+        monkeypatch.setattr(
+            ui.upload, "reset", lambda self: None, raising=False
+        )
         modulo.pagina_principal()
 
     def _ultimo(self, prefijo):
         """Último ui.select creado cuya etiqueta empieza por el prefijo."""
-        return [s for s in self.selects if str(s.props.get("label", "")).startswith(prefijo)][-1]
+        return [
+            s
+            for s in self.selects
+            if str(s.props.get("label", "")).startswith(prefijo)
+        ][-1]
 
     @property
     def features(self):
@@ -230,7 +245,11 @@ def test_existen_clases_y_funciones(nombre):
 
 
 def test_metodos_publicos():
-    for metodo in ["cambiar_tipo_regresion", "cargar_columnas", "obtener_seleccion"]:
+    for metodo in [
+        "cambiar_tipo_regresion",
+        "cargar_columnas",
+        "obtener_seleccion",
+    ]:
         assert callable(getattr(SelectorFeatures, metodo, None)), metodo
         assert getattr(SelectorFeatures, metodo).__doc__, metodo
 
@@ -263,7 +282,13 @@ def test_usa_el_importador_y_la_validacion_del_proyecto():
 
 def test_no_lee_archivos_por_su_cuenta():
     codigo = RUTA_MODULO.read_text(encoding="utf-8")
-    for prohibido in ("read_csv", "read_excel", "read_sql", "sqlite3", "print("):
+    for prohibido in (
+        "read_csv",
+        "read_excel",
+        "read_sql",
+        "sqlite3",
+        "print(",
+    ):
         assert prohibido not in codigo, prohibido
 
 
@@ -272,7 +297,9 @@ def test_el_codigo_de_la_pagina_no_usa_variables_sin_definir():
     definida (ayuda a detectar errores de nombres al editar)."""
     arbol = ast.parse(RUTA_MODULO.read_text(encoding="utf-8"))
     pagina = next(
-        n for n in arbol.body if isinstance(n, ast.FunctionDef) and n.name == "pagina_principal"
+        n
+        for n in arbol.body
+        if isinstance(n, ast.FunctionDef) and n.name == "pagina_principal"
     )
     definidas = (
         set(dir(modulo))
@@ -284,12 +311,25 @@ def test_el_codigo_de_la_pagina_no_usa_variables_sin_definir():
         }
     )
     definidas |= {
-        n.name for n in ast.walk(pagina) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        n.name
+        for n in ast.walk(pagina)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    definidas |= {a.arg for n in ast.walk(pagina) if isinstance(n, ast.arguments) for a in n.args}
-    definidas |= {n.name for n in ast.walk(pagina) if isinstance(n, ast.ExceptHandler) and n.name}
+    definidas |= {
+        a.arg
+        for n in ast.walk(pagina)
+        if isinstance(n, ast.arguments)
+        for a in n.args
+    }
+    definidas |= {
+        n.name
+        for n in ast.walk(pagina)
+        if isinstance(n, ast.ExceptHandler) and n.name
+    }
     usadas = {
-        n.id for n in ast.walk(pagina) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+        n.id
+        for n in ast.walk(pagina)
+        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
     }
     assert usadas <= definidas, usadas - definidas
 
@@ -349,7 +389,9 @@ def test_features_cargar_dataset_sin_columnas_deshabilita(datos):
 
 def test_features_nombres_de_columna_que_no_son_texto():
     selector = SelectorFeatures()
-    selector.cargar_columnas(pd.DataFrame([[1, 2, 3]], columns=[2024, 1.5, "x"]))
+    selector.cargar_columnas(
+        pd.DataFrame([[1, 2, 3]], columns=[2024, 1.5, "x"])
+    )
     assert selector.columnas == ["2024", "1.5", "x"]
 
 
@@ -416,10 +458,14 @@ def test_features_cargar_el_mismo_dataset_tambien_limpia(datos):
 def test_features_cambiar_tipo_limpia_y_conserva_columnas(datos, de, a):
     selector = SelectorFeatures(de)
     selector.cargar_columnas(datos)
-    selector.selector.set_value(["superficie"] if de == SelectorFeatures.MULTIPLE else "superficie")
+    selector.selector.set_value(
+        ["superficie"] if de == SelectorFeatures.MULTIPLE else "superficie"
+    )
     selector.cambiar_tipo_regresion(a)
     assert selector.tipo_regresion == a
-    assert selector.selector.props.get("multiple", False) == (a == SelectorFeatures.MULTIPLE)
+    assert selector.selector.props.get("multiple", False) == (
+        a == SelectorFeatures.MULTIPLE
+    )
     assert selector.selector.options == COLUMNAS
     assert selector.selector.enabled
     assert selector.obtener_seleccion() == []
@@ -456,7 +502,8 @@ def test_features_constructor_con_tipo_no_valido(tipo):
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "FALLO E2 (limitación conocida): columnas que solo se distinguen por el "
+        "FALLO E2 (limitación conocida): columnas que solo se distinguen "
+        "por el "
         "tipo del nombre (1 y '1') salen repetidas en el selector y no se "
         "pueden elegir por separado, porque todo se pasa a texto."
     ),

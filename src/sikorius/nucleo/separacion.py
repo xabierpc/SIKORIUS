@@ -33,9 +33,13 @@ def interpretar_porcentaje(valor):
     try:
         porcentaje = float(valor)
     except (TypeError, ValueError):
-        raise ErrorSeparacion("El porcentaje de test debe ser un número entre 1 y 99.") from None
+        raise ErrorSeparacion(
+            "El porcentaje de test debe ser un número entre 1 y 99."
+        ) from None
     if math.isnan(porcentaje) or not 1 <= porcentaje <= 99:
-        raise ErrorSeparacion("El porcentaje de test debe ser un número entre 1 y 99.")
+        raise ErrorSeparacion(
+            "El porcentaje de test debe ser un número entre 1 y 99."
+        )
     return porcentaje
 
 
@@ -105,8 +109,11 @@ def calcular_tamanos(num_filas, porcentaje_test):
     return filas_entrenamiento, filas_test
 
 
-def separar_datos(df, porcentaje_test=PORCENTAJE_TEST_DEFECTO, semilla=SEMILLA_DEFECTO):
-    """Separa el dataset en entrenamiento y test de forma aleatoria y reproducible.
+def separar_datos(
+    df, porcentaje_test=PORCENTAJE_TEST_DEFECTO, semilla=SEMILLA_DEFECTO
+):
+    """Separa el dataset en entrenamiento y test de forma aleatoria y
+    reproducible.
 
     Con el mismo dataset, el mismo porcentaje y la misma semilla devuelve
     siempre los mismos conjuntos. Las filas se reparten sin repetirse: cada

@@ -42,10 +42,14 @@ class ColumnasNoEncontradasError(ErrorPreprocesado, ValueError):
 def _comprobar_columnas(df, columnas):
     faltan = [c for c in columnas if c not in df.columns]
     if faltan:
-        raise ColumnasNoEncontradasError("Columnas no encontradas: " + ", ".join(map(str, faltan)))
+        raise ColumnasNoEncontradasError(
+            "Columnas no encontradas: " + ", ".join(map(str, faltan))
+        )
 
 
-def normalizar_espacios_vacios(df: pd.DataFrame, columnas: list) -> pd.DataFrame:
+def normalizar_espacios_vacios(
+    df: pd.DataFrame, columnas: list
+) -> pd.DataFrame:
     """Convierte en NaN las celdas vacías o con solo espacios.
 
     Args:
@@ -132,11 +136,14 @@ def hay_nulos(deteccion):
     Returns:
         True si hay al menos un valor inexistente en train o en test.
     """
-    return any(n > 0 for conjunto in deteccion.values() for n in conjunto.values())
+    return any(
+        n > 0 for conjunto in deteccion.values() for n in conjunto.values()
+    )
 
 
 def detectar_en_estado(estado):
-    """Detecta los valores inexistentes de los conjuntos guardados en el estado.
+    """Detecta los valores inexistentes de los conjuntos guardados en el
+    estado.
 
     Si ya se aplicó un preprocesado, revisa los conjuntos preprocesados.
 
@@ -154,7 +161,9 @@ def detectar_en_estado(estado):
         test = estado.preprocesado["test"]
     else:
         train, test = estado.entrenamiento, estado.test
-    return detectar_nulos_conjuntos(train, test, columnas_seleccionadas(estado))
+    return detectar_nulos_conjuntos(
+        train, test, columnas_seleccionadas(estado)
+    )
 
 
 def interpretar_constante(valor):
@@ -193,7 +202,11 @@ def columnas_seleccionadas(estado):
     # El selector guarda los nombres como texto; si el dataset tiene
     # cabeceras que no son texto (p. ej. 2020 en un Excel), se usan las
     # columnas reales para que pandas las encuentre.
-    df = estado.entrenamiento if estado.entrenamiento is not None else estado.datos
+    df = (
+        estado.entrenamiento
+        if estado.entrenamiento is not None
+        else estado.datos
+    )
     if df is None:
         return nombres
     reales = {str(c): c for c in df.columns}
@@ -263,8 +276,12 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
     train_proc = train_proc.fillna(valores)
     test_proc = test_proc.fillna(valores)
     resumen = {
-        "train": _resumen(0, _nulos(train, columnas) - _nulos(train_proc, columnas)),
-        "test": _resumen(0, _nulos(test, columnas) - _nulos(test_proc, columnas)),
+        "train": _resumen(
+            0, _nulos(train, columnas) - _nulos(train_proc, columnas)
+        ),
+        "test": _resumen(
+            0, _nulos(test, columnas) - _nulos(test_proc, columnas)
+        ),
     }
     return train_proc, test_proc, resumen
 
@@ -361,7 +378,9 @@ def modelo_disponible(estado):
         test = estado.preprocesado["test"]
     else:
         entrenamiento, test = estado.entrenamiento, estado.test
-    return not (quedan_nulos(entrenamiento, columnas) or quedan_nulos(test, columnas))
+    return not (
+        quedan_nulos(entrenamiento, columnas) or quedan_nulos(test, columnas)
+    )
 
 
 def texto_resumen(resumen):

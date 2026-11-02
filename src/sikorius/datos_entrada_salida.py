@@ -1,8 +1,8 @@
 """Demo independiente de la selección de columnas (historia #11).
 
-Los selectores están en ``sikorius.gui.paneles.panel_columnas`` y son los mismos
-que usa la aplicación principal (``sikorius.gui.pagina``). Esta demo carga el
-dataset con ``ui.upload`` en vez de con el explorador de archivos.
+Los selectores están en ``sikorius.gui.paneles.panel_columnas`` y son los
+mismos que usa la aplicación principal (``sikorius.gui.pagina``). Esta demo
+carga el dataset con ``ui.upload`` en vez de con el explorador de archivos.
 
 Para arrancarla: uv run python -m sikorius.datos_entrada_salida
 """
@@ -12,7 +12,10 @@ from pathlib import Path
 
 from nicegui import ui
 
-from sikorius.gui.paneles.panel_columnas import SelectorFeatures, SelectorTarget
+from sikorius.gui.paneles.panel_columnas import (
+    SelectorFeatures,
+    SelectorTarget,
+)
 from sikorius.nucleo.columnas import ErrorSeleccion, validar_seleccion
 from sikorius.nucleo.importador import ErrorImportacion, importar_datos
 
@@ -55,7 +58,10 @@ def pagina_principal():
                 ui.notify(str(error), type="negative")
                 return
             except Exception as error:
-                ui.notify("Error inesperado al importar: " + str(error), type="negative")
+                ui.notify(
+                    "Error inesperado al importar: " + str(error),
+                    type="negative",
+                )
                 return
             selector.cargar_columnas(df)
             target.cargar_columnas(df)
@@ -82,7 +88,9 @@ def pagina_principal():
         )
 
         selector = SelectorFeatures(tipo_regresion=tipo.value)
-        target = SelectorTarget(al_abrir=lambda: target.excluir(selector.obtener_seleccion()))
+        target = SelectorTarget(
+            al_abrir=lambda: target.excluir(selector.obtener_seleccion())
+        )
 
         def confirmar():
             if estado["df"] is None:
@@ -97,7 +105,10 @@ def pagina_principal():
                 return
             estado["seleccion"] = {"features": features, "target": objetivo}
             ui.notify(
-                "Selección confirmada. Entrada: " + ", ".join(features) + " | Salida: " + objetivo,
+                "Selección confirmada. Entrada: "
+                + ", ".join(features)
+                + " | Salida: "
+                + objetivo,
                 type="positive",
                 multi_line=True,
             )

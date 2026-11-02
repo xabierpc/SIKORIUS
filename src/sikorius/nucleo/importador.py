@@ -36,7 +36,9 @@ def importar_datos(ruta_archivo) -> pd.DataFrame:
     try:
         ruta = Path(ruta_archivo)
     except TypeError as e:
-        raise ErrorImportacion(f"Ruta de archivo no válida: {ruta_archivo!r}") from e
+        raise ErrorImportacion(
+            f"Ruta de archivo no válida: {ruta_archivo!r}"
+        ) from e
 
     # Comprobar que el archivo existe
     if not ruta.is_file():
@@ -67,7 +69,9 @@ def _convertir_numericas(df) -> pd.DataFrame:
     for columna in df.columns:
         # Solo columnas de texto: pd.to_numeric también convertiría en
         # enteros las fechas y las duraciones
-        if pd.api.types.is_object_dtype(df[columna]) or pd.api.types.is_string_dtype(df[columna]):
+        if pd.api.types.is_object_dtype(
+            df[columna]
+        ) or pd.api.types.is_string_dtype(df[columna]):
             try:
                 df[columna] = pd.to_numeric(df[columna])
             except (ValueError, TypeError):
@@ -81,9 +85,13 @@ def _leer_texto(ruta) -> str:
         datos = ruta.read_bytes()
     except OSError as e:
         # Sin permiso de lectura o bloqueado por otro programa
-        raise ErrorImportacion(f"No se puede leer el archivo: {ruta.name}") from e
+        raise ErrorImportacion(
+            f"No se puede leer el archivo: {ruta.name}"
+        ) from e
     if b"\x00" in datos:
-        raise ErrorImportacion(f"El archivo está dañado o no es CSV válido: {ruta.name}")
+        raise ErrorImportacion(
+            f"El archivo está dañado o no es CSV válido: {ruta.name}"
+        )
     try:
         return datos.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -97,7 +105,9 @@ def _leer_csv(ruta) -> pd.DataFrame:
 
     # Detecta el separador (',' o ';'); con ';' el decimal suele ser ','
     try:
-        separador = csv.Sniffer().sniff(texto[:5000], delimiters=",;\t").delimiter
+        separador = (
+            csv.Sniffer().sniff(texto[:5000], delimiters=",;\t").delimiter
+        )
     except csv.Error:
         separador = ","
     decimal = "," if separador == ";" else "."
@@ -115,12 +125,18 @@ def _leer_csv(ruta) -> pd.DataFrame:
                 # Excel en español, donde la coma de '1,5' es decimal
                 df, campos_de_mas = _leer_tabla(texto, ";", ",")
     except pd.errors.EmptyDataError as e:
-        raise ErrorImportacion(f"El archivo no contiene datos: {ruta.name}") from e
+        raise ErrorImportacion(
+            f"El archivo no contiene datos: {ruta.name}"
+        ) from e
     except pd.errors.ParserError as e:
-        raise ErrorImportacion(f"El archivo está dañado o no es CSV válido: {ruta.name}") from e
+        raise ErrorImportacion(
+            f"El archivo está dañado o no es CSV válido: {ruta.name}"
+        ) from e
 
     if campos_de_mas:
-        raise ErrorImportacion(f"Hay filas con más campos que el encabezado: {ruta.name}")
+        raise ErrorImportacion(
+            f"Hay filas con más campos que el encabezado: {ruta.name}"
+        )
     return df
 
 
@@ -138,7 +154,9 @@ def _leer_tabla(texto, separador, decimal) -> tuple[pd.DataFrame, bool]:
         return df, False
     if df.iloc[:, -1].notna().any():
         return df, True
-    df = pd.read_csv(StringIO(texto), sep=separador, decimal=decimal, index_col=False)
+    df = pd.read_csv(
+        StringIO(texto), sep=separador, decimal=decimal, index_col=False
+    )
     return df, False
 
 
@@ -160,7 +178,9 @@ def _leer_excel(ruta) -> pd.DataFrame:
         return pd.read_excel(ruta)
     except ImportError as e:
         # Falta una dependencia (xlrd u openpyxl): no es culpa del archivo
-        raise ErrorImportacion(f"Falta la librería para leer archivos {ruta.suffix}: {e}") from e
+        raise ErrorImportacion(
+            f"Falta la librería para leer archivos {ruta.suffix}: {e}"
+        ) from e
     except Exception as e:
         raise ErrorImportacion(
             f"El archivo está dañado o no es un excel válido: {ruta.name}"
@@ -178,9 +198,13 @@ def _leer_sqlite(ruta) -> pd.DataFrame:
             ).fetchall()
 
             if len(tablas) == 0:
-                raise ErrorImportacion(f"La base de datos no contiene ninguna tabla: {ruta.name}")
+                raise ErrorImportacion(
+                    f"La base de datos no contiene ninguna tabla: {ruta.name}"
+                )
             if len(tablas) > 1:
-                raise ErrorImportacion(f"La base de datos contiene más de una tabla: {ruta.name}")
+                raise ErrorImportacion(
+                    f"La base de datos contiene más de una tabla: {ruta.name}"
+                )
 
             nombre = tablas[0][0].replace('"', '""')
             return pd.read_sql_query(f'SELECT * FROM "{nombre}"', conexion)
@@ -188,7 +212,10 @@ def _leer_sqlite(ruta) -> pd.DataFrame:
             conexion.close()
     except sqlite3.DatabaseError as e:
         raise ErrorImportacion(
-            f"El archivo está dañado o no es una base de datos válida: {ruta.name}"
+            "El archivo está dañado o no es una base de datos válida: "
+            + ruta.name
         ) from e
     except pd.errors.DatabaseError as e:
-        raise ErrorImportacion(f"No se pudo leer la tabla de la base de datos: {ruta.name}") from e
+        raise ErrorImportacion(
+            f"No se pudo leer la tabla de la base de datos: {ruta.name}"
+        ) from e

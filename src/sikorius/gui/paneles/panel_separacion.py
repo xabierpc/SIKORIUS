@@ -1,8 +1,8 @@
 """Separación del dataset en entrenamiento y test.
 
 El panel solo recoge el porcentaje de test y la semilla, llama a
-``sikorius.nucleo.separacion.separar_datos`` y guarda el resultado en el estado de
-la aplicación. Toda la lógica de la separación está fuera de la GUI.
+``sikorius.nucleo.separacion.separar_datos`` y guarda el resultado en el
+estado de la aplicación. Toda la lógica de la separación está fuera de la GUI.
 """
 
 from nicegui import ui
@@ -48,7 +48,9 @@ class PanelSeparacion:
                 .classes("w-44")
             )
             self.entrada_semilla = (
-                ui.input("Semilla", value=str(SEMILLA_DEFECTO)).props("dense").classes("w-44")
+                ui.input("Semilla", value=str(SEMILLA_DEFECTO))
+                .props("dense")
+                .classes("w-44")
             )
             with ui.column().classes("gap-0"):
                 self.etiqueta_entrenamiento = ui.label("").classes("text-sm")
@@ -62,7 +64,8 @@ class PanelSeparacion:
         self.actualizar()
 
     def _mostrar_entrenamiento(self, _evento=None):
-        """Muestra el porcentaje de entrenamiento (complementario del de test)."""
+        """Muestra el porcentaje de entrenamiento (complementario del de
+        test)."""
         try:
             porcentaje = interpretar_porcentaje(self.entrada_porcentaje.value)
         except ErrorSeparacion:
@@ -77,13 +80,16 @@ class PanelSeparacion:
         resultado de la separación actual, si la hay."""
         if self.estado.hay_seleccion():
             self.aviso.set_text("")
-            self.aviso.set_visibility(False)  # oculto no deja hueco en la tarjeta
+            self.aviso.set_visibility(
+                False
+            )  # oculto no deja hueco en la tarjeta
             self.entrada_porcentaje.enable()
             self.entrada_semilla.enable()
             self.boton_separar.enable()
         else:
             self.aviso.set_text(
-                "Confirma primero la selección de columnas para poder separar los datos."
+                "Confirma primero la selección de columnas para poder "
+                "separar los datos."
             )
             self.aviso.set_visibility(True)
             self.entrada_porcentaje.disable()
@@ -102,18 +108,25 @@ class PanelSeparacion:
             self.etiqueta_resultado.set_text("")
 
     def separar(self):
-        """Separa el dataset con los valores del formulario y guarda el resultado."""
+        """Separa el dataset con los valores del formulario y guarda el
+        resultado."""
         if not self.estado.hay_seleccion():
-            ui.notify("Confirma primero la selección de columnas.", type="negative")
+            ui.notify(
+                "Confirma primero la selección de columnas.", type="negative"
+            )
             return
         try:
             porcentaje = interpretar_porcentaje(self.entrada_porcentaje.value)
             semilla = interpretar_semilla(self.entrada_semilla.value)
-            entrenamiento, test = separar_datos(self.estado.datos, porcentaje, semilla)
+            entrenamiento, test = separar_datos(
+                self.estado.datos, porcentaje, semilla
+            )
         except ErrorSeparacion as error:
             ui.notify(str(error), type="negative", multi_line=True)
             return
-        self.estado.guardar_separacion(entrenamiento, test, porcentaje, semilla)
+        self.estado.guardar_separacion(
+            entrenamiento, test, porcentaje, semilla
+        )
         self.actualizar()
         ui.notify(
             "Datos separados correctamente. Entrenamiento: "

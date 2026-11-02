@@ -3,11 +3,14 @@
     uv run pytest test/test_separacion.py -v
 
 Bloques:
-    - interpretar_porcentaje: valores válidos, límites (0, 1, 99, 100) y errores.
+    - interpretar_porcentaje: valores válidos, límites (0, 1, 99, 100) y
+      errores.
     - interpretar_semilla: enteros válidos y errores.
     - calcular_tamanos: tamaños, redondeo exacto y conjuntos vacíos.
-    - separar_datos: tamaños, sin filas repetidas, reproducibilidad, aleatoriedad.
-    - EstadoApp: orden del flujo (selección -> separación -> preprocesado/modelo).
+    - separar_datos: tamaños, sin filas repetidas, reproducibilidad,
+      aleatoriedad.
+    - EstadoApp: orden del flujo (selección -> separación ->
+      preprocesado/modelo).
     - PanelSeparacion: el panel de la GUI, sin servidor.
 """
 
@@ -224,7 +227,11 @@ def test_semilla_no_valida(valor):
         (5, 1, (4, 1)),  # 0.05 filas -> 1 fila de test
         (100, 99, (1, 99)),
         (1000, 12.3, (877, 123)),
-        (250, 64.4, (89, 161)),  # antes salía 162 por un error de coma flotante
+        (
+            250,
+            64.4,
+            (89, 161),
+        ),  # antes salía 162 por un error de coma flotante
         (375, 8.8, (342, 33)),
         (625, 1.12, (618, 7)),
     ],
@@ -260,7 +267,8 @@ def test_mensaje_con_porcentaje_decimal():
 
 
 def test_conjuntos_nunca_vacios_y_suman_el_total():
-    """Fuerza muchas combinaciones: o hay error o los dos conjuntos tienen filas."""
+    """Fuerza muchas combinaciones: o hay error o los dos conjuntos tienen
+    filas."""
     for num_filas in range(5, 120):
         for porcentaje in range(1, 100):
             try:
@@ -276,9 +284,27 @@ def test_conjuntos_nunca_vacios_y_suman_el_total():
 def test_redondeo_exacto_con_decimales():
     """Compara con una cuenta hecha solo con enteros para miles de casos."""
     fallos = []
-    for num_filas in [5, 7, 13, 99, 100, 101, 250, 375, 500, 625, 750, 1000, 1999]:
+    for num_filas in [
+        5,
+        7,
+        13,
+        99,
+        100,
+        101,
+        250,
+        375,
+        500,
+        625,
+        750,
+        1000,
+        1999,
+    ]:
         for centesimas in range(100, 9901, 7):
-            texto = str(centesimas // 100) + "." + str(centesimas % 100).rjust(2, "0")
+            texto = (
+                str(centesimas // 100)
+                + "."
+                + str(centesimas % 100).rjust(2, "0")
+            )
             porcentaje = interpretar_porcentaje(texto)
             esperado = filas_test_esperadas(num_filas, texto)
             if esperado >= num_filas:
@@ -316,7 +342,9 @@ def test_por_defecto_80_20():
 )
 def test_tamanos_corresponden_al_porcentaje(num_filas, porcentaje):
     entrenamiento, test = separar_datos(crear_df(num_filas), porcentaje, 7)
-    esperado_entrenamiento, esperado_test = calcular_tamanos(num_filas, porcentaje)
+    esperado_entrenamiento, esperado_test = calcular_tamanos(
+        num_filas, porcentaje
+    )
     assert len(test) == esperado_test
     assert len(entrenamiento) == esperado_entrenamiento
 
@@ -400,7 +428,9 @@ def test_admite_valores_inexistentes_en_los_datos():
     df.loc[7, "y"] = None
     entrenamiento, test = separar_datos(df, 20, 0)
     assert len(entrenamiento) + len(test) == 20
-    total = int(entrenamiento.isna().sum().sum()) + int(test.isna().sum().sum())
+    total = int(entrenamiento.isna().sum().sum()) + int(
+        test.isna().sum().sum()
+    )
     assert total == 2
 
 
@@ -464,7 +494,9 @@ def test_guardar_separacion(estado_con_seleccion):
     assert estado.separacion == {"porcentaje_test": 25.0, "semilla": 3}
 
 
-def test_repetir_separacion_descarta_preprocesado_y_modelo(estado_con_seleccion):
+def test_repetir_separacion_descarta_preprocesado_y_modelo(
+    estado_con_seleccion,
+):
     estado = estado_con_seleccion
     estado.guardar_separacion(*separar_datos(estado.datos, 20, 1), 20, 1)
     estado.preprocesado = {"algo": 1}
@@ -496,7 +528,9 @@ def test_borrar_seleccion_borra_separacion(estado_con_seleccion):
     assert not estado.hay_separacion()
 
 
-def test_cargar_nuevo_dataset_obliga_a_repetir_separacion(estado_con_seleccion, tmp_path):
+def test_cargar_nuevo_dataset_obliga_a_repetir_separacion(
+    estado_con_seleccion, tmp_path
+):
     estado = estado_con_seleccion
     estado.guardar_separacion(*separar_datos(estado.datos, 20, 1), 20, 1)
     estado.modelo = "modelo"
@@ -589,7 +623,9 @@ def test_panel_entrenamiento_es_el_complementario(
 def test_panel_separar_correcto(estado_con_seleccion, monkeypatch):
     llamadas = []
     panel, avisos = crear_panel(
-        estado_con_seleccion, monkeypatch, al_separar=lambda: llamadas.append(1)
+        estado_con_seleccion,
+        monkeypatch,
+        al_separar=lambda: llamadas.append(1),
     )
     panel.separar()
     estado = estado_con_seleccion
@@ -602,7 +638,10 @@ def test_panel_separar_correcto(estado_con_seleccion, monkeypatch):
     assert "correctamente" in mensaje
     assert "80 filas" in mensaje
     assert "20 filas" in mensaje
-    assert panel.etiqueta_resultado.text == "Entrenamiento: 80 filas | Test: 20 filas"
+    assert (
+        panel.etiqueta_resultado.text
+        == "Entrenamiento: 80 filas | Test: 20 filas"
+    )
     assert llamadas == [1]
 
 
@@ -619,10 +658,14 @@ def test_panel_separar_con_otros_valores(estado_con_seleccion, monkeypatch):
 
 
 @pytest.mark.parametrize("porcentaje", ["0", "100", "abc", "", "-5", "150"])
-def test_panel_porcentaje_no_valido(estado_con_seleccion, monkeypatch, porcentaje):
+def test_panel_porcentaje_no_valido(
+    estado_con_seleccion, monkeypatch, porcentaje
+):
     llamadas = []
     panel, avisos = crear_panel(
-        estado_con_seleccion, monkeypatch, al_separar=lambda: llamadas.append(1)
+        estado_con_seleccion,
+        monkeypatch,
+        al_separar=lambda: llamadas.append(1),
     )
     panel.entrada_porcentaje.set_value(porcentaje)
     panel.separar()
@@ -668,7 +711,9 @@ def test_panel_conjunto_vacio(monkeypatch):
     assert "vacío" in mensaje
 
 
-def test_panel_error_conserva_separacion_anterior(estado_con_seleccion, monkeypatch):
+def test_panel_error_conserva_separacion_anterior(
+    estado_con_seleccion, monkeypatch
+):
     panel, _ = crear_panel(estado_con_seleccion, monkeypatch)
     panel.separar()
     test_anterior = estado_con_seleccion.test
@@ -677,7 +722,9 @@ def test_panel_error_conserva_separacion_anterior(estado_con_seleccion, monkeypa
     assert estado_con_seleccion.test is test_anterior
 
 
-def test_panel_repetir_separacion_descarta_preprocesado(estado_con_seleccion, monkeypatch):
+def test_panel_repetir_separacion_descarta_preprocesado(
+    estado_con_seleccion, monkeypatch
+):
     panel, _ = crear_panel(estado_con_seleccion, monkeypatch)
     panel.separar()
     estado_con_seleccion.preprocesado = {"algo": 1}
@@ -689,7 +736,9 @@ def test_panel_repetir_separacion_descarta_preprocesado(estado_con_seleccion, mo
     assert estado_con_seleccion.separacion["semilla"] == 1
 
 
-def test_panel_cambio_de_seleccion_borra_resultado(estado_con_seleccion, monkeypatch):
+def test_panel_cambio_de_seleccion_borra_resultado(
+    estado_con_seleccion, monkeypatch
+):
     panel, _ = crear_panel(estado_con_seleccion, monkeypatch)
     panel.separar()
     assert panel.etiqueta_resultado.text != ""
@@ -699,7 +748,9 @@ def test_panel_cambio_de_seleccion_borra_resultado(estado_con_seleccion, monkeyp
     assert not panel.boton_separar.enabled
 
 
-def test_panel_misma_entrada_misma_separacion(estado_con_seleccion, monkeypatch):
+def test_panel_misma_entrada_misma_separacion(
+    estado_con_seleccion, monkeypatch
+):
     panel, _ = crear_panel(estado_con_seleccion, monkeypatch)
     panel.separar()
     primera = ids(estado_con_seleccion.test)

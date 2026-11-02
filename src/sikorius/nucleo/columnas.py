@@ -25,21 +25,30 @@ def validar_seleccion(df, features, target):
     if faltan:
         raise ErrorSeleccion("Falta seleccionar " + " y ".join(faltan) + ".")
 
-    # El selector trabaja con nombres en texto: se asocian a las columnas reales
+    # El selector trabaja con nombres en texto: se asocian a las columnas
+    # reales
     reales = {str(c): c for c in df.columns}
 
     inexistentes = [c for c in list(features) + [target] if c not in reales]
     if inexistentes:
-        raise ErrorSeleccion("Columnas que no existen en el dataset: " + ", ".join(inexistentes))
+        raise ErrorSeleccion(
+            "Columnas que no existen en el dataset: " + ", ".join(inexistentes)
+        )
 
     if target in features:
-        raise ErrorSeleccion("La columna '" + target + "' no puede ser entrada y salida a la vez.")
+        raise ErrorSeleccion(
+            "La columna '"
+            + target
+            + "' no puede ser entrada y salida a la vez."
+        )
 
     no_numericas = [
-        c for c in list(features) + [target] if not pd.api.types.is_numeric_dtype(df[reales[c]])
+        c
+        for c in list(features) + [target]
+        if not pd.api.types.is_numeric_dtype(df[reales[c]])
     ]
     if no_numericas:
         raise ErrorSeleccion(
-            "Estas columnas no son numéricas y no se pueden usar en una regresión lineal: "
-            + ", ".join(no_numericas)
+            "Estas columnas no son numéricas y no se pueden usar en una "
+            "regresión lineal: " + ", ".join(no_numericas)
         )

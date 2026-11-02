@@ -100,11 +100,16 @@ def ejecutar(corrutina):
 
 def oyentes_al_desplegar(selector):
     """Manejadores del evento de abrir el desplegable de un ui.select."""
-    return [e for e in selector._event_listeners.values() if e.type in ("popup-show", "popupShow")]
+    return [
+        e
+        for e in selector._event_listeners.values()
+        if e.type in ("popup-show", "popupShow")
+    ]
 
 
 def desplegar(selector):
-    """Simula que el usuario abre el desplegable (lanza el último manejador)."""
+    """Simula que el usuario abre el desplegable (lanza el último
+    manejador)."""
     manejador = oyentes_al_desplegar(selector)[-1].handler
     if inspect.signature(manejador).parameters:
         manejador(None)
@@ -126,7 +131,9 @@ class Pagina:
         self.subida = None
         self.radio = None
         self.selects = []
-        reales = {n: getattr(ui, n) for n in ("button", "upload", "radio", "select")}
+        reales = {
+            n: getattr(ui, n) for n in ("button", "upload", "radio", "select")
+        }
 
         def button(texto, on_click=None, **kw):
             self.botones[texto] = on_click
@@ -150,13 +157,21 @@ class Pagina:
         monkeypatch.setattr(ui, "upload", upload)
         monkeypatch.setattr(ui, "radio", radio)
         monkeypatch.setattr(ui, "select", select)
-        monkeypatch.setattr(ui, "notify", lambda m, **kw: self.avisos.append((m, kw)))
-        monkeypatch.setattr(ui.upload, "reset", lambda self: None, raising=False)
+        monkeypatch.setattr(
+            ui, "notify", lambda m, **kw: self.avisos.append((m, kw))
+        )
+        monkeypatch.setattr(
+            ui.upload, "reset", lambda self: None, raising=False
+        )
         modulo.pagina_principal()
 
     def _ultimo(self, prefijo):
         """Último ui.select creado cuya etiqueta empieza por el prefijo."""
-        return [s for s in self.selects if str(s.props.get("label", "")).startswith(prefijo)][-1]
+        return [
+            s
+            for s in self.selects
+            if str(s.props.get("label", "")).startswith(prefijo)
+        ][-1]
 
     @property
     def features(self):
@@ -325,7 +340,9 @@ def test_target_excluir_antes_de_cargar():
     assert target.selector.options == []
 
 
-@pytest.mark.parametrize("columnas", [("superficie",), {"superficie"}, iter(["superficie"])])
+@pytest.mark.parametrize(
+    "columnas", [("superficie",), {"superficie"}, iter(["superficie"])]
+)
 def test_target_excluir_acepta_cualquier_iterable(datos, columnas):
     target = SelectorTarget()
     target.cargar_columnas(datos)
@@ -343,7 +360,9 @@ def test_target_excluir_no_guarda_la_lista_del_que_llama(datos):
 
 
 def test_target_sin_al_abrir_no_registra_evento():
-    con = len(oyentes_al_desplegar(SelectorTarget(al_abrir=lambda: None).selector))
+    con = len(
+        oyentes_al_desplegar(SelectorTarget(al_abrir=lambda: None).selector)
+    )
     sin = len(oyentes_al_desplegar(SelectorTarget().selector))
     assert con == sin + 1
 
@@ -381,7 +400,10 @@ def test_confirmar_seleccion_correcta_multiple(pagina_con_datos):
     pagina.target.set_value("precio")
     texto, kw = pagina.confirmar()
     assert kw["type"] == "positive"
-    assert texto == ("Selección confirmada. Entrada: superficie, habitaciones | Salida: precio")
+    assert texto == (
+        "Selección confirmada. Entrada: superficie, habitaciones | "
+        "Salida: precio"
+    )
 
 
 def test_al_abrir_target_se_excluyen_las_features(pagina_con_datos):

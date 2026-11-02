@@ -101,7 +101,9 @@ def test_tarea1_existe_instancia_compartida():
 def test_tarea1_cargar_csv_devuelve_y_guarda_datos(tmp_path):
     from sikorius.estado import EstadoApp
 
-    archivo = crear_csv(tmp_path / "pisos.csv", "superficie,precio\n60.5,121000\n95,189500\n")
+    archivo = crear_csv(
+        tmp_path / "pisos.csv", "superficie,precio\n60.5,121000\n95,189500\n"
+    )
     estado = EstadoApp()
 
     df = estado.cargar(archivo)
@@ -142,7 +144,8 @@ def test_tarea1_funciona_con_espacios_tildes_y_enie(carpeta_rara):
     from sikorius.estado import EstadoApp
 
     archivo = crear_csv(
-        carpeta_rara / "pisos ñ á.csv", "barrio,precio\nElviña,121000\nRiazor,265000\n"
+        carpeta_rara / "pisos ñ á.csv",
+        "barrio,precio\nElviña,121000\nRiazor,265000\n",
     )
     estado = EstadoApp()
 
@@ -287,7 +290,9 @@ def test_tarea1_error_trae_mensaje_del_importador(tmp_path):
     ],
 )
 def test_tarea2_extensiones_permitidas(nombre):
-    from sikorius.gui.componentes.explorador_archivos import es_archivo_permitido
+    from sikorius.gui.componentes.explorador_archivos import (
+        es_archivo_permitido,
+    )
 
     assert es_archivo_permitido(nombre)
 
@@ -306,13 +311,17 @@ def test_tarea2_extensiones_permitidas(nombre):
     ],
 )
 def test_tarea2_extensiones_no_permitidas(nombre):
-    from sikorius.gui.componentes.explorador_archivos import es_archivo_permitido
+    from sikorius.gui.componentes.explorador_archivos import (
+        es_archivo_permitido,
+    )
 
     assert not es_archivo_permitido(nombre)
 
 
 def test_tarea2_acepta_path_y_str():
-    from sikorius.gui.componentes.explorador_archivos import es_archivo_permitido
+    from sikorius.gui.componentes.explorador_archivos import (
+        es_archivo_permitido,
+    )
 
     assert es_archivo_permitido(Path("/una/carpeta/datos.csv"))
     assert es_archivo_permitido("/una/carpeta/datos.csv")
@@ -333,7 +342,13 @@ def test_tarea2_listar_solo_compatibles_y_ordenado(tmp_path):
     resultado = listar_carpeta(tmp_path)
 
     # Primero las carpetas y luego los archivos, alfabético sin mayúsculas
-    assert nombres(resultado) == ["Año 2026", "zeta", "a.xlsx", "b.csv", "C.db"]
+    assert nombres(resultado) == [
+        "Año 2026",
+        "zeta",
+        "a.xlsx",
+        "b.csv",
+        "C.db",
+    ]
 
 
 def test_tarea2_listar_devuelve_path(tmp_path):
@@ -542,7 +557,9 @@ def test_tarea3_con_datos_del_importador(carpeta_rara):
     from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
     from sikorius.nucleo.importador import importar_datos
 
-    archivo = crear_csv(carpeta_rara / "pisos.csv", "barrio;superficie\nElviña;60,5\nRiazor;\n")
+    archivo = crear_csv(
+        carpeta_rara / "pisos.csv", "barrio;superficie\nElviña;60,5\nRiazor;\n"
+    )
     df = importar_datos(archivo)
 
     columnas, filas = dataframe_a_tabla(df)
@@ -563,7 +580,9 @@ def test_tarea6_sin_datos_empieza_en_carpeta_personal(estado_limpio):
     assert Path(carpeta_inicial()) == Path.home()
 
 
-def test_tarea6_no_depende_de_la_carpeta_de_ejecucion(estado_limpio, tmp_path, monkeypatch):
+def test_tarea6_no_depende_de_la_carpeta_de_ejecucion(
+    estado_limpio, tmp_path, monkeypatch
+):
     from sikorius.gui.pagina import carpeta_inicial
 
     monkeypatch.chdir(tmp_path)
@@ -572,7 +591,9 @@ def test_tarea6_no_depende_de_la_carpeta_de_ejecucion(estado_limpio, tmp_path, m
     assert Path(carpeta_inicial()) == Path.home()
 
 
-def test_tarea6_despues_de_cargar_empieza_en_su_carpeta(estado_limpio, carpeta_rara):
+def test_tarea6_despues_de_cargar_empieza_en_su_carpeta(
+    estado_limpio, carpeta_rara
+):
     from sikorius.gui.pagina import carpeta_inicial
 
     archivo = crear_csv(carpeta_rara / "datos.csv", "x\n1\n")

@@ -62,7 +62,9 @@ class EstadoApp:
         """
         return self.entrenamiento is not None and self.test is not None
 
-    def guardar_separacion(self, entrenamiento, test, porcentaje_test, semilla):
+    def guardar_separacion(
+        self, entrenamiento, test, porcentaje_test, semilla
+    ):
         """Guarda los conjuntos de entrenamiento y test.
 
         Descarta el preprocesado y el modelo creados con una separación
@@ -70,7 +72,10 @@ class EstadoApp:
         """
         self.entrenamiento = entrenamiento
         self.test = test
-        self.separacion = {"porcentaje_test": porcentaje_test, "semilla": semilla}
+        self.separacion = {
+            "porcentaje_test": porcentaje_test,
+            "semilla": semilla,
+        }
         self.preprocesado = None
         self.modelo = None
 
@@ -98,7 +103,8 @@ class EstadoApp:
         df = importar_datos(ruta_archivo)
         self.datos = df
         self.ruta = str(Path(ruta_archivo).resolve())
-        self.borrar_seleccion()  # las columnas del dataset anterior ya no valen
+        # Las columnas del dataset anterior ya no valen
+        self.borrar_seleccion()
         return df
 
 

@@ -36,7 +36,9 @@ def pagina_principal():
             boton_cargar = ui.button("Cargar dataset", icon="folder_open")
             with ui.column().classes("gap-0 min-w-0"):
                 ui.label("Ruta:").classes("text-sm text-gray-500")
-                etiqueta_ruta = ui.label("Ningún archivo cargado").classes("font-mono break-all")
+                etiqueta_ruta = ui.label("Ningún archivo cargado").classes(
+                    "font-mono break-all"
+                )
 
     # --- Tabla con los datos ---
     with ui.card().classes("w-full"):
@@ -49,7 +51,10 @@ def pagina_principal():
         ui.label("Columnas del modelo").classes("text-lg font-semibold")
         panel_columnas = PanelSeleccionColumnas(
             estado,
-            al_cambiar=lambda: (panel_separacion.actualizar(), panel_preprocesado.actualizar()),
+            al_cambiar=lambda: (
+                panel_separacion.actualizar(),
+                panel_preprocesado.actualizar(),
+            ),
         )
 
     # --- Separación en entrenamiento y test ---
@@ -68,7 +73,10 @@ def pagina_principal():
         """Muestra en pantalla los datos guardados en el estado."""
         etiqueta_ruta.set_text(estado.ruta)
         etiqueta_resumen.set_text(
-            str(len(estado.datos)) + " filas y " + str(len(estado.datos.columns)) + " columnas"
+            str(len(estado.datos))
+            + " filas y "
+            + str(len(estado.datos.columns))
+            + " columnas"
         )
         tabla.mostrar(estado.datos)
         panel_columnas.cargar_columnas(estado.datos)
@@ -81,7 +89,12 @@ def pagina_principal():
         try:
             estado.cargar(ruta)
         except ErrorImportacion as error:
-            ui.notify(str(error), type="negative", multi_line=True, close_button="Cerrar")
+            ui.notify(
+                str(error),
+                type="negative",
+                multi_line=True,
+                close_button="Cerrar",
+            )
             return
 
         refrescar()

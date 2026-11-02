@@ -21,7 +21,8 @@ class SelectorFeatures:
 
     - Regresión simple   -> selección simple (una sola columna).
     - Regresión múltiple -> selección múltiple.
-    - Al cargar un dataset nuevo muestra sus columnas y limpia la selección anterior.
+    - Al cargar un dataset nuevo muestra sus columnas y limpia la selección
+      anterior.
     """
 
     SIMPLE = "simple"
@@ -34,7 +35,8 @@ class SelectorFeatures:
         self.cambiar_tipo_regresion(tipo_regresion)
 
     def _construir_selector(self):
-        """(Re)crea el ui.select según el tipo de regresión, sin selección previa."""
+        """(Re)crea el ui.select según el tipo de regresión, sin selección
+        previa."""
         self.contenedor.clear()
 
         if self.tipo_regresion == self.MULTIPLE:
@@ -66,19 +68,23 @@ class SelectorFeatures:
     def cambiar_tipo_regresion(self, tipo_regresion):
         """Cambia entre selección simple y múltiple; limpia la selección."""
         if tipo_regresion != self.SIMPLE and tipo_regresion != self.MULTIPLE:
-            raise ValueError("Tipo de regresión no válido: " + str(tipo_regresion))
+            raise ValueError(
+                "Tipo de regresión no válido: " + str(tipo_regresion)
+            )
         self.tipo_regresion = tipo_regresion
         self._construir_selector()
 
     def cargar_columnas(self, df):
-        """Muestra las columnas de un dataset nuevo y limpia la selección anterior."""
+        """Muestra las columnas de un dataset nuevo y limpia la selección
+        anterior."""
         self.columnas = []
         for columna in df.columns:
             self.columnas.append(str(columna))
         self._construir_selector()
 
     def obtener_seleccion(self):
-        """Devuelve siempre una lista de features (vacía si no hay selección)."""
+        """Devuelve siempre una lista de features (vacía si no hay
+        selección)."""
         valor = self.selector.value
         if valor is None:
             return []
@@ -132,7 +138,8 @@ class SelectorTarget:
                 self.selector.enable()
 
     def cargar_columnas(self, df):
-        """Muestra las columnas de un dataset nuevo y limpia la selección anterior."""
+        """Muestra las columnas de un dataset nuevo y limpia la selección
+        anterior."""
         self.columnas = []
         for columna in df.columns:
             self.columnas.append(str(columna))
@@ -140,14 +147,16 @@ class SelectorTarget:
         self._construir_selector()
 
     def excluir(self, columnas):
-        """Quita de las opciones las columnas dadas (las elegidas como features)."""
+        """Quita de las opciones las columnas dadas (las elegidas como
+        features)."""
         self.excluidas = list(columnas)
         self.selector.set_options(self._opciones())
         if self.selector.value in self.excluidas:
             self.selector.set_value(None)
 
     def obtener_seleccion(self):
-        """Devuelve la columna elegida como target, o None si no hay ninguna."""
+        """Devuelve la columna elegida como target, o None si no hay
+        ninguna."""
         return self.selector.value
 
 
@@ -168,7 +177,9 @@ class PanelSeleccionColumnas:
 
         self.features = SelectorFeatures()
         self.target = SelectorTarget(
-            al_abrir=lambda: self.target.excluir(self.features.obtener_seleccion())
+            al_abrir=lambda: self.target.excluir(
+                self.features.obtener_seleccion()
+            )
         )
 
         self.boton_confirmar = ui.button(
@@ -189,7 +200,8 @@ class PanelSeleccionColumnas:
             self.al_cambiar()
 
     def cargar_columnas(self, df):
-        """Muestra las columnas del dataset nuevo y limpia la selección anterior."""
+        """Muestra las columnas del dataset nuevo y limpia la selección
+        anterior."""
         self.features.cargar_columnas(df)
         self.target.cargar_columnas(df)
         self.etiqueta_seleccion.set_text("")
@@ -217,5 +229,7 @@ class PanelSeleccionColumnas:
         self.estado.guardar_seleccion(features, objetivo, tipo_regresion)
         texto = "Entrada: " + ", ".join(features) + " | Salida: " + objetivo
         self.etiqueta_seleccion.set_text(texto)
-        ui.notify("Selección confirmada. " + texto, type="positive", multi_line=True)
+        ui.notify(
+            "Selección confirmada. " + texto, type="positive", multi_line=True
+        )
         self._avisar_cambio()

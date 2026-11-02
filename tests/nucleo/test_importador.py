@@ -35,7 +35,7 @@ from sikorius.nucleo.importador import (
     importar_datos,
 )
 
-# --- Utilidades ---------------------------------------------------------------
+# --- Utilidades ---------------------------------------------------------
 
 
 @pytest.fixture
@@ -158,7 +158,9 @@ def test_I1_cadena_vacia(tmp_path, monkeypatch):
         ("datos.xlsx.db", "_leer_sqlite"),
     ],
 )
-def test_I2_I3_I4_despacho_por_extension(tmp_path, espias_lectores, nombre, lector):
+def test_I2_I3_I4_despacho_por_extension(
+    tmp_path, espias_lectores, nombre, lector
+):
     ruta = escribir(tmp_path / nombre, "x")
     importar_datos(ruta)
     for nombre_espia, espia in espias_lectores.items():
@@ -271,7 +273,9 @@ def test_I_tipo_de_argumento_invalido(argumento):
 
 
 def test_C1_columnas_numericas_no_se_tocan(monkeypatch):
-    df = pd.DataFrame({"i": [1, 2], "f": [1.5, 2.5], "b": [True, False], "t": ["1", "2"]})
+    df = pd.DataFrame(
+        {"i": [1, 2], "f": [1.5, 2.5], "b": [True, False], "t": ["1", "2"]}
+    )
     real = pd.to_numeric
     llamadas = []
 
@@ -517,7 +521,9 @@ def test_L6_empty_data_error_natural(tmp_path):
 
 
 def test_L6_empty_data_error_forzado(tmp_path, monkeypatch):
-    monkeypatch.setattr(pd, "read_csv", Espia(lanzar=pd.errors.EmptyDataError("forzado")))
+    monkeypatch.setattr(
+        pd, "read_csv", Espia(lanzar=pd.errors.EmptyDataError("forzado"))
+    )
     with pytest.raises(ErrorImportacion, match="no contiene datos"):
         _leer_csv(escribir(tmp_path / "a.csv", "a,b\n1,2\n"))
 
@@ -553,16 +559,25 @@ def test_L5_sniffer_falla_con_punto_y_coma(tmp_path, contenido):
 def test_L_texto_con_separador_del_otro_tipo(tmp_path):
     """Comas dentro del texto de un CSV con ';' y viceversa."""
     df = _leer_csv(
-        escribir(tmp_path / "a.csv", "nombre;precio\nGarcía, Ana;1,5\nLópez, Luis;2,5\n")
+        escribir(
+            tmp_path / "a.csv",
+            "nombre;precio\nGarcía, Ana;1,5\nLópez, Luis;2,5\n",
+        )
     )
     assert df.columns.tolist() == ["nombre", "precio"]
     assert df["precio"].tolist() == [1.5, 2.5]
-    df = _leer_csv(escribir(tmp_path / "b.csv", "texto,valor\nhola; adiós,1\nqué; tal,2\n"))
+    df = _leer_csv(
+        escribir(
+            tmp_path / "b.csv", "texto,valor\nhola; adiós,1\nqué; tal,2\n"
+        )
+    )
     assert df.columns.tolist() == ["texto", "valor"]
 
 
 def test_L_campos_entre_comillas(tmp_path):
-    df = _leer_csv(escribir(tmp_path / "a.csv", 'n,v\n"Pérez, J.",1\n"dice ""hola""",2\n'))
+    df = _leer_csv(
+        escribir(tmp_path / "a.csv", 'n,v\n"Pérez, J.",1\n"dice ""hola""",2\n')
+    )
     assert df["n"].tolist() == ["Pérez, J.", 'dice "hola"']
 
 
@@ -647,8 +662,12 @@ def test_E1_xlsx(tmp_path, datos):
 def test_E1_solo_lee_la_primera_hoja(tmp_path):
     ruta = tmp_path / "a.xlsx"
     with pd.ExcelWriter(ruta) as escritor:
-        pd.DataFrame({"h1": [1]}).to_excel(escritor, sheet_name="uno", index=False)
-        pd.DataFrame({"h2": [2]}).to_excel(escritor, sheet_name="dos", index=False)
+        pd.DataFrame({"h1": [1]}).to_excel(
+            escritor, sheet_name="uno", index=False
+        )
+        pd.DataFrame({"h2": [2]}).to_excel(
+            escritor, sheet_name="dos", index=False
+        )
     assert _leer_excel(ruta).columns.tolist() == ["h1"]
 
 
@@ -658,13 +677,17 @@ def test_E1_LIMITACION_primera_hoja_vacia(tmp_path):
     ruta = tmp_path / "a.xlsx"
     with pd.ExcelWriter(ruta) as escritor:
         pd.DataFrame().to_excel(escritor, sheet_name="vacia", index=False)
-        pd.DataFrame({"a": [1]}).to_excel(escritor, sheet_name="datos", index=False)
+        pd.DataFrame({"a": [1]}).to_excel(
+            escritor, sheet_name="datos", index=False
+        )
     with pytest.raises(ErrorImportacion, match="no contiene datos"):
         importar_datos(ruta)
 
 
 def test_E2_falta_libreria(tmp_path, monkeypatch):
-    monkeypatch.setattr(pd, "read_excel", Espia(lanzar=ImportError("Missing optional xlrd")))
+    monkeypatch.setattr(
+        pd, "read_excel", Espia(lanzar=ImportError("Missing optional xlrd"))
+    )
     with pytest.raises(ErrorImportacion, match="Falta la librería") as info:
         _leer_excel(escribir(tmp_path / "a.xls", b"x"))
     assert ".xls" in str(info.value)
@@ -712,7 +735,9 @@ def test_E_LIMITACION_xlsx_renombrado_a_xls_se_acepta(tmp_path, datos):
 
 def test_E_fechas_de_excel(tmp_path):
     ruta = tmp_path / "a.xlsx"
-    pd.DataFrame({"fecha": pd.to_datetime(["2024-01-01"]), "v": [1]}).to_excel(ruta, index=False)
+    pd.DataFrame({"fecha": pd.to_datetime(["2024-01-01"]), "v": [1]}).to_excel(
+        ruta, index=False
+    )
     df = importar_datos(ruta)
     assert pd.api.types.is_datetime64_any_dtype(df["fecha"])
 
@@ -750,7 +775,9 @@ def test_S1_archivo_de_cero_bytes(tmp_path):
 
 @pytest.mark.parametrize("n", [2, 3, 10])
 def test_S2_varias_tablas(tmp_path, n):
-    ruta = crear_sqlite(tmp_path / "a.db", [f"CREATE TABLE t{i}(a)" for i in range(n)])
+    ruta = crear_sqlite(
+        tmp_path / "a.db", [f"CREATE TABLE t{i}(a)" for i in range(n)]
+    )
     with pytest.raises(ErrorImportacion, match="más de una tabla"):
         _leer_sqlite(ruta)
 
@@ -758,7 +785,8 @@ def test_S2_varias_tablas(tmp_path, n):
 def test_S2_LIMITACION_tabla_virtual_fts5(tmp_path):
     """Una tabla FTS5 crea tablas internas: cuenta como 'más de una'."""
     ruta = crear_sqlite(
-        tmp_path / "a.db", ["CREATE VIRTUAL TABLE t USING fts5(a)", "INSERT INTO t VALUES ('x')"]
+        tmp_path / "a.db",
+        ["CREATE VIRTUAL TABLE t USING fts5(a)", "INSERT INTO t VALUES ('x')"],
     )
     with pytest.raises(ErrorImportacion, match="más de una tabla"):
         _leer_sqlite(ruta)
@@ -819,13 +847,16 @@ def test_S3_tipos_de_columna(tmp_path):
 
 def test_S3_numeros_guardados_como_texto(tmp_path):
     ruta = crear_sqlite(
-        tmp_path / "a.db", ["CREATE TABLE t(a TEXT)", "INSERT INTO t VALUES ('1.5'), ('2')"]
+        tmp_path / "a.db",
+        ["CREATE TABLE t(a TEXT)", "INSERT INTO t VALUES ('1.5'), ('2')"],
     )
     assert importar_datos(ruta)["a"].tolist() == [1.5, 2.0]
 
 
 def test_S3_no_modifica_el_archivo(tmp_path):
-    ruta = crear_sqlite(tmp_path / "a.db", ["CREATE TABLE t(a)", "INSERT INTO t VALUES (1)"])
+    ruta = crear_sqlite(
+        tmp_path / "a.db", ["CREATE TABLE t(a)", "INSERT INTO t VALUES (1)"]
+    )
     antes = hashlib.sha256(ruta.read_bytes()).hexdigest()
     _leer_sqlite(ruta)
     assert hashlib.sha256(ruta.read_bytes()).hexdigest() == antes
@@ -860,7 +891,8 @@ def test_S5_pagina_de_datos_corrupta(tmp_path):
     páginas dañadas: falla al hacer el SELECT, dentro de pandas."""
     ruta = crear_sqlite(
         tmp_path / "a.db",
-        ["CREATE TABLE t(a TEXT)"] + [f"INSERT INTO t VALUES ('{'x' * 500}')" for _ in range(50)],
+        ["CREATE TABLE t(a TEXT)"]
+        + [f"INSERT INTO t VALUES ('{'x' * 500}')" for _ in range(50)],
     )
     contenido = bytearray(ruta.read_bytes())
     tam_pagina = int.from_bytes(contenido[16:18], "big")
@@ -871,7 +903,9 @@ def test_S5_pagina_de_datos_corrupta(tmp_path):
     assert isinstance(info.value.__cause__, pd.errors.DatabaseError)
 
 
-@pytest.mark.parametrize("caso", ["ok", "sin_tablas", "varias", "no_es_db", "falla_lectura"])
+@pytest.mark.parametrize(
+    "caso", ["ok", "sin_tablas", "varias", "no_es_db", "falla_lectura"]
+)
 def test_S6_la_conexion_siempre_se_cierra(tmp_path, monkeypatch, caso):
     ruta = tmp_path / "a.db"
     if caso in ("ok", "falla_lectura"):
@@ -883,7 +917,11 @@ def test_S6_la_conexion_siempre_se_cierra(tmp_path, monkeypatch, caso):
     else:
         escribir(ruta, "basura" * 100)
     if caso == "falla_lectura":
-        monkeypatch.setattr(pd, "read_sql_query", Espia(lanzar=pd.errors.DatabaseError("forzado")))
+        monkeypatch.setattr(
+            pd,
+            "read_sql_query",
+            Espia(lanzar=pd.errors.DatabaseError("forzado")),
+        )
 
     creadas = conexiones_de(monkeypatch)
     try:
@@ -945,7 +983,10 @@ def test_fuzz_solo_escapa_error_importacion(tmp_path, extension, semilla):
     """Contenido aleatorio: el resultado tiene que ser un DataFrame no vacío
     o un ErrorImportacion. Cualquier otra excepción es un fallo."""
     for sin_nulos in (False, True):
-        ruta = escribir(tmp_path / f"f{int(sin_nulos)}{extension}", _basura(semilla, sin_nulos))
+        ruta = escribir(
+            tmp_path / f"f{int(sin_nulos)}{extension}",
+            _basura(semilla, sin_nulos),
+        )
         try:
             df = importar_datos(ruta)
         except ErrorImportacion:

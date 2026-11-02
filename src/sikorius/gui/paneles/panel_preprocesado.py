@@ -44,7 +44,12 @@ class PanelPreprocesado:
         self.aviso = ui.label("").classes("text-sm")
         self.tabla = ui.table(
             columns=[
-                {"name": "columna", "label": "Columna", "field": "columna", "align": "left"},
+                {
+                    "name": "columna",
+                    "label": "Columna",
+                    "field": "columna",
+                    "align": "left",
+                },
                 {"name": "train", "label": "Entrenamiento", "field": "train"},
                 {"name": "test", "label": "Test", "field": "test"},
             ],
@@ -80,7 +85,8 @@ class PanelPreprocesado:
             self.al_aplicar()
 
     def actualizar(self):
-        """Vuelve a detectar los valores inexistentes y muestra el resultado."""
+        """Vuelve a detectar los valores inexistentes y muestra el
+        resultado."""
         deteccion = detectar_en_estado(self.estado)
 
         if deteccion is None:
@@ -97,7 +103,11 @@ class PanelPreprocesado:
 
         columnas = columnas_seleccionadas(self.estado)
         self.tabla.rows = [
-            {"columna": c, "train": deteccion["train"][c], "test": deteccion["test"][c]}
+            {
+                "columna": c,
+                "train": deteccion["train"][c],
+                "test": deteccion["test"][c],
+            }
             for c in columnas
         ]
         self.tabla.update()

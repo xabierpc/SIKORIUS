@@ -35,7 +35,7 @@ def dataframe_a_tabla(df):
     filas = []
     for indice, fila in enumerate(valores.itertuples(index=False, name=None)):
         registro = {"_id": indice}
-        for campo, valor in zip(campos, fila):
+        for campo, valor in zip(campos, fila, strict=True):
             registro[campo] = valor
         filas.append(registro)
 
