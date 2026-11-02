@@ -19,7 +19,7 @@ código actual: hoy fallan a propósito. Cuando se corrija el fallo, pytest
 avisará con XPASS(strict) y habrá que quitar el marcador.
 
 Ejecución:
-    uv run pytest test/test_entrada.py -v
+    uv run pytest tests/test_entrada.py -v
 """
 
 import ast

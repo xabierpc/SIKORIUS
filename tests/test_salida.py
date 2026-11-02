@@ -17,7 +17,7 @@ código actual: hoy fallan a propósito. Cuando se corrija el fallo, pytest
 avisará con XPASS(strict) y habrá que quitar el marcador.
 
 Ejecución:
-    uv run pytest test/test_salida.py -v
+    uv run pytest tests/test_salida.py -v
 """
 
 import asyncio
