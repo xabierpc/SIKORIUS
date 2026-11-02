@@ -3,6 +3,21 @@
 import pandas as pd
 from nicegui import ui
 
+# Tipos que el navegador recibe tal cual; el resto se muestra como texto
+_TIPOS_JSON = (str, int, float, bool)
+
+def _valor_para_tabla(valor):
+    """Convierte un valor de pandas en algo que se pueda enviar al navegador.
+    
+    NaN y NaT ya llegan como None. Los bytes de un BLOB de SQLite se muestran
+    como "<binario: N bytes>". Las fechas, horas, duraciones y cualquier otro
+    tipo se muestran como texto.
+    """
+    if valor is None or isinstance(valor, _TIPOS_JSON):
+        return valor
+    if isinstance(valor, bytes):
+        return "<binario: " + str(len(valor)) + " bytes>"
+    return str(valor)
 
 def dataframe_a_tabla(df):
     """Convierte un DataFrame en las columnas y filas que usa ui.table.
@@ -35,8 +50,8 @@ def dataframe_a_tabla(df):
     filas = []
     for indice, fila in enumerate(valores.itertuples(index=False, name=None)):
         registro = {"_id": indice}
-        for campo, valor in zip(campos, fila, strict=True):
-            registro[campo] = valor
+        for campo, valor in zip(campos, fila, strict=True):    
+            registro[campo] = _valor_para_tabla(valor)
         filas.append(registro)
 
     return columnas, filas
