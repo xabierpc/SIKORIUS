@@ -9,13 +9,11 @@ from fractions import Fraction
 
 import numpy as np
 
+from sikorius.nucleo.errores import ErrorSeparacion
+
 PORCENTAJE_TEST_DEFECTO = 20
 SEMILLA_DEFECTO = 42
 FILAS_MINIMAS = 5
-
-
-class ErrorSeparacion(Exception):
-    """Parámetros o dataset no válidos para separar en entrenamiento y test."""
 
 
 def interpretar_porcentaje(valor):

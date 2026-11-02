@@ -12,31 +12,17 @@ import math
 import numpy as np
 import pandas as pd
 
+from sikorius.nucleo.errores import (
+    AvisoPreprocesado,
+    ColumnasNoEncontradasError,
+    ErrorPreprocesado,
+)
+
 ELIMINAR = "eliminar"
 MEDIA = "media"
 MEDIANA = "mediana"
 CONSTANTE = "constante"
 ESTRATEGIAS = (ELIMINAR, MEDIA, MEDIANA, CONSTANTE)
-
-
-class ErrorPreprocesado(Exception):
-    """Error producido al aplicar el preprocesado."""
-
-
-class AvisoPreprocesado(ErrorPreprocesado):
-    """El preprocesado se puede hacer, pero el resultado no sería válido.
-
-    Por ejemplo, eliminar filas dejaría vacío el conjunto de entrenamiento o
-    el de test. Como es un ``ErrorPreprocesado``, tampoco se aplica nada.
-    """
-
-
-class ColumnasNoEncontradasError(ErrorPreprocesado, ValueError):
-    """Se lanza cuando alguna columna seleccionada no existe en el DataFrame.
-
-    Hereda de ``ErrorPreprocesado`` para que la interfaz también la capture
-    y muestre el mensaje en lugar de fallar.
-    """
 
 
 def _comprobar_columnas(df, columnas):

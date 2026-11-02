@@ -5,9 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-
-class ErrorImportacion(Exception):
-    """Error producido al importar un archivo de datos"""
+from sikorius.nucleo.errores import ErrorImportacion
 
 
 def importar_datos(ruta_archivo) -> pd.DataFrame:
