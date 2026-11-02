@@ -11,7 +11,8 @@ class ModeloLineal:
     """Modelo de regresión lineal ya entrenado.
 
     Attributes:
-        features: Nombres de las columnas de entrada.
+        features: Nombres de las columnas de entrada, en el orden de los
+            coeficientes.
         target: Nombre de la columna de salida.
         coeficientes: Un coeficiente por cada columna de entrada.
         termino_independiente: Término independiente del modelo.
@@ -33,23 +34,17 @@ class ModeloLineal:
         Returns:
             Array de numpy con una predicción por fila.
         """
-        resultado = []
-        for fila in df[list(self.features)].to_numpy(dtype=float):
-            suma = self.termino_independiente
-            for valor, coef in zip(fila, self.coeficientes):
-                suma += valor * coef
-            resultado.append(suma)
-        return np.array(resultado)
+        entrada = df[list(self.features)].to_numpy(dtype=float)
+        return entrada @ np.array(self.coeficientes) + (
+            self.termino_independiente)
 
 
 def entrenar_modelo(entrenamiento, features, target):
     """Ajusta un modelo de regresión lineal por mínimos cuadrados.
 
-    Usa el DataFrame que se le pasa, que es el conjunto de
-    entrenamiento, y no lo modifica.
-
     Args:
-        entrenamiento: DataFrame de entrenamiento.
+        entrenamiento: DataFrame de entrenamiento, sin valores
+            inexistentes en las columnas usadas.
         features: Nombres de las columnas de entrada.
         target: Nombre de la columna de salida.
 
@@ -69,11 +64,19 @@ def entrenar_modelo(entrenamiento, features, target):
     )
 
 
-def _entrenamiento_vigente(estado):
-    """Entrenamiento preprocesado, si lo hay, o el original."""
+def conjuntos_vigentes(estado):
+    """Devuelve los conjuntos de entrenamiento y test que se están usando.
+
+    Args:
+        estado: Estado de la aplicación, con la separación hecha.
+
+    Returns:
+        Tupla (entrenamiento, test) de DataFrames.
+    """
     if estado.preprocesado is not None:
-        return estado.preprocesado["entrenamiento"]
-    return estado.entrenamiento
+        return (estado.preprocesado["entrenamiento"],
+                estado.preprocesado["test"])
+    return estado.entrenamiento, estado.test
 
 
 def crear_modelo(estado):
@@ -96,10 +99,88 @@ def crear_modelo(estado):
             "columnas, separa los datos y trata los valores inexistentes."
         )
     seleccion = estado.seleccion
+    entrenamiento, _ = conjuntos_vigentes(estado)
     modelo = entrenar_modelo(
-        _entrenamiento_vigente(estado),
-        seleccion["features"],
-        seleccion["target"],
+        entrenamiento, seleccion["features"], seleccion["target"]
     )
     estado.modelo = modelo
     return modelo
+
+
+def datos_ajuste(modelo, entrenamiento, test):
+    """Calcula los datos que muestra el gráfico del ajuste del modelo.
+
+    Args:
+        modelo: ModeloLineal ya entrenado.
+        entrenamiento: DataFrame de entrenamiento.
+        test: DataFrame de test.
+
+    Returns:
+        Diccionario con las claves "tipo" ("simple" o "multiple"),
+        "etiqueta_x", "etiqueta_y", "etiqueta_recta", y "entrenamiento",
+        "test" y "recta", que son tuplas (valores_x, valores_y).
+    """
+    real = {
+        "entrenamiento": entrenamiento[modelo.target].to_numpy(dtype=float),
+        "test": test[modelo.target].to_numpy(dtype=float),
+    }
+    if len(modelo.features) == 1:
+        columna = modelo.features[0]
+        puntos = {
+            "entrenamiento": (
+                entrenamiento[columna].to_numpy(dtype=float),
+                real["entrenamiento"]),
+            "test": (test[columna].to_numpy(dtype=float), real["test"]),
+        }
+        extremos = np.array([
+            min(puntos["entrenamiento"][0].min(), puntos["test"][0].min()),
+            max(puntos["entrenamiento"][0].max(), puntos["test"][0].max()),
+        ])
+        recta = modelo.coeficientes[0] * extremos + (
+            modelo.termino_independiente)
+        return {
+            "tipo": "simple",
+            "etiqueta_x": columna,
+            "etiqueta_y": modelo.target,
+            "etiqueta_recta": "Recta del modelo",
+            "entrenamiento": puntos["entrenamiento"],
+            "test": puntos["test"],
+            "recta": (extremos, recta),
+        }
+
+    predicho = {
+        "entrenamiento": modelo.predecir(entrenamiento),
+        "test": modelo.predecir(test),
+    }
+    todos = np.concatenate(list(real.values()) + list(predicho.values()))
+    extremos = np.array([todos.min(), todos.max()])
+    return {
+        "tipo": "multiple",
+        "etiqueta_x": "Valor predicho",
+        "etiqueta_y": "Valor real",
+        "etiqueta_recta": "Real = predicho",
+        "entrenamiento": (predicho["entrenamiento"], real["entrenamiento"]),
+        "test": (predicho["test"], real["test"]),
+        "recta": (extremos, extremos),
+    }
+
+
+def dibujar_ajuste(figura, datos):
+    """Dibuja el gráfico del ajuste en una figura de matplotlib.
+
+    Args:
+        figura: Figura de matplotlib (``matplotlib.figure.Figure``).
+        datos: Diccionario devuelto por ``datos_ajuste``.
+    """
+    figura.clear()
+    ejes = figura.subplots()
+    ejes.scatter(*datos["entrenamiento"], color="tab:blue", marker="o",
+                 label="Entrenamiento")
+    ejes.scatter(*datos["test"], color="tab:orange", marker="s",
+                 label="Test")
+    ejes.plot(*datos["recta"], color="black", linestyle="--",
+              label=datos["etiqueta_recta"])
+    ejes.set_xlabel(datos["etiqueta_x"])
+    ejes.set_ylabel(datos["etiqueta_y"])
+    ejes.legend()
+    figura.tight_layout()
