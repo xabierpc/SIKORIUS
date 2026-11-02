@@ -184,3 +184,40 @@ def dibujar_ajuste(figura, datos):
     ejes.set_ylabel(datos["etiqueta_y"])
     ejes.legend()
     figura.tight_layout()
+
+
+DECIMALES_FORMULA = 4
+ 
+ 
+def formula_texto(modelo, decimales=DECIMALES_FORMULA):
+    """Escribe la fórmula del modelo con los nombres de las columnas.
+ 
+    Args:
+        modelo: ModeloLineal ya entrenado.
+        decimales: Decimales con los que se muestran los números.
+ 
+    Returns:
+        El texto de la fórmula.
+    """
+    terminos = []
+    for coeficiente, columna in zip(modelo.coeficientes, modelo.features):
+        numero = _numero_sin_signo(coeficiente, decimales)
+        terminos.append((coeficiente, f"{numero} * {columna}"))
+    independiente = modelo.termino_independiente
+    terminos.append(
+        (independiente, _numero_sin_signo(independiente, decimales))
+    )
+ 
+    texto = f"{modelo.target} ="
+    for posicion, (valor, cuerpo) in enumerate(terminos):
+        negativo = round(valor, decimales) < 0
+        if posicion == 0:
+            texto += f" -{cuerpo}" if negativo else f" {cuerpo}"
+        else:
+            texto += f" - {cuerpo}" if negativo else f" + {cuerpo}"
+    return texto
+ 
+ 
+def _numero_sin_signo(valor, decimales):
+    """Valor absoluto redondeado, con siempre los mismos decimales."""
+    return f"{abs(round(valor, decimales)):.{decimales}f}"
