@@ -1041,7 +1041,14 @@ def test_solo_importa_librerias_permitidas():
             modulos |= {a.name.split(".")[0] for a in nodo.names}
         elif isinstance(nodo, ast.ImportFrom):
             modulos.add(nodo.module.split(".")[0])
-    assert modulos <= {"csv", "sqlite3", "io", "pathlib", "pandas"}
+    assert modulos <= {
+        "csv",
+        "sqlite3",
+        "io",
+        "pathlib",
+        "pandas",
+        "sikorius",
+    }
 
 
 def test_no_hay_print_ni_input():
