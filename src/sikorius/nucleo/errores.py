@@ -1,16 +1,20 @@
-class ErrorImportacion(Exception):
+class ErrorSikorius(Exception):
+    """Error en el codigo"""
+
+
+class ErrorImportacion(ErrorSikorius):
     """Error producido al importar un archivo de datos"""
 
 
-class ErrorSeleccion(Exception):
+class ErrorSeleccion(ErrorSikorius):
     """Selección de columnas no válida para un modelo de regresión lineal."""
 
 
-class ErrorSeparacion(Exception):
+class ErrorSeparacion(ErrorSikorius):
     """Parámetros o dataset no válidos para separar en entrenamiento y test."""
 
 
-class ErrorPreprocesado(Exception):
+class ErrorPreprocesado(ErrorSikorius):
     """Error producido al aplicar el preprocesado."""
 
 
