@@ -13,13 +13,22 @@ Esta guía recoge las normas que seguimos todos los miembros del grupo para trab
 
 ## 2. Guía de estilo de código (PEP 8)
 
-Seguimos la [PEP 8](https://peps.python.org/pep-0008/). El formato se aplica automáticamente con **autopep8**,
-configurado en el `pyproject.toml`, así que todos formateamos igual.
+Seguimos la [PEP 8](https://peps.python.org/pep-0008/). El formato y la
+revisión se hacen con **ruff**, configurado en el `pyproject.toml`, así que
+todos formateamos igual.
 
 - **Herramienta**:
-- Instala la extensión **autopep8** de Microsoft en VS Code. El código se formatea al guardar.
-- autopep8 corrige sangría, espacios, líneas en blanco y líneas largas. **No** ordena imports ni revisa los nombres: eso es responsabilidad de cada uno y se revisa en las Pull Requests.
-- Para revisar desde la terminal: `uv run autopep8 --diff -r src tests` muestra lo que cambiaría sin tocar nada.
+- Instala la extensión **Ruff** (Astral Software) en VS Code y desactiva
+  autopep8 si la tenías. El archivo `.vscode/settings.json` del repo ya
+  configura Ruff como formateador, formatea al guardar y ordena los imports.
+- Elige el intérprete del proyecto: `Ctrl+Shift+P` → "Python: Select
+  Interpreter" → `.venv`.
+- Desde la terminal:
+  - `uv run ruff format src tests` formatea el código.
+  - `uv run ruff check src tests` busca errores y avisos de estilo;
+    con `--fix` corrige los que sabe corregir solo.
+- Ruff no parte cadenas, comentarios ni docstrings largos: esas líneas
+  hay que cortarlas a mano.
 
 - **Nombres** (en español, sin tildes ni ñ):
 - Variables, funciones y métodos: `snake_case`. P. ej.: `calcular_metricas`, `datos_procesados`.
@@ -104,6 +113,21 @@ git pull
 git switch feature/10-101-importacion-datos
 git merge dev
 ```
+
+### Comprobar antes de fusionar
+
+Antes de fusionar en `dev`, estos comandos tienen que salir sin errores:
+
+```bash
+uv run ruff format --check src tests   # el formato está aplicado
+uv run ruff check src tests            # sin avisos
+uv run pytest -q                       # todos los tests pasan
+uv run sikorius                        # la aplicación arranca
+```
+
+Para ver qué partes del código cubren los tests:
+`uv run pytest --cov --cov-report=term-missing`.
+
 
 Si aparece un **conflicto**:
 
