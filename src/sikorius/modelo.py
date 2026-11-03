@@ -221,3 +221,61 @@ def formula_texto(modelo, decimales=DECIMALES_FORMULA):
 def _numero_sin_signo(valor, decimales):
     """Valor absoluto redondeado, con siempre los mismos decimales."""
     return f"{abs(round(valor, decimales)):.{decimales}f}"
+
+
+def calcular_ecm(real, predicho):
+    """Error cuadrático medio: media de (real - predicho) al cuadrado.
+ 
+    Args:
+        real: Valores reales de la salida.
+        predicho: Valores que predice el modelo.
+ 
+    Returns:
+        El error cuadrático medio, como float.
+    """
+    errores = np.asarray(real, dtype=float) - np.asarray(predicho,
+                                                         dtype=float)
+    return float(np.mean(errores ** 2))
+ 
+ 
+def calcular_r2(real, predicho):
+    """Coeficiente de determinación R² = 1 - SS_res / SS_tot.
+ 
+    Args:
+        real: Valores reales de la salida.
+        predicho: Valores que predice el modelo.
+ 
+    Returns:
+        El R² como float. Si todos los valores reales son iguales no se
+        puede calcular (SS_tot es 0) y devuelve ``nan``.
+    """
+    real = np.asarray(real, dtype=float)
+    predicho = np.asarray(predicho, dtype=float)
+    suma_residuos = np.sum((real - predicho) ** 2)
+    suma_total = np.sum((real - real.mean()) ** 2)
+    if suma_total == 0:
+        return float("nan")
+    return float(1 - suma_residuos / suma_total)
+ 
+ 
+def metricas_modelo(modelo, entrenamiento, test):
+    """Calcula R² y ECM del modelo en entrenamiento y en test.
+ 
+    Args:
+        modelo: ModeloLineal ya entrenado.
+        entrenamiento: DataFrame de entrenamiento.
+        test: DataFrame de test.
+ 
+    Returns:
+        Diccionario ``{"entrenamiento": {"r2": ..., "ecm": ...},
+        "test": {"r2": ..., "ecm": ...}}``.
+    """
+    metricas = {}
+    for nombre, df in (("entrenamiento", entrenamiento), ("test", test)):
+        real = df[modelo.target].to_numpy(dtype=float)
+        predicho = modelo.predecir(df)
+        metricas[nombre] = {
+            "r2": calcular_r2(real, predicho),
+            "ecm": calcular_ecm(real, predicho),
+        }
+    return metricas
