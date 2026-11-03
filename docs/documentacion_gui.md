@@ -1,7 +1,5 @@
 # Investigación de librerías de interfaz gráfica (US 12)
 
-> **Borrador** para `docs/investigacion-gui.md` del repositorio. Las partes marcadas con **[COMPLETAR]** dependen de la prueba de concepto de la tarea #100.
-> Fuentes: webs y documentación oficiales de NiceGUI, Streamlit, y PyPI, consultadas el 16/10/2026 (enlaces al final).
 
 ## 1. Objetivo
 
@@ -99,20 +97,11 @@ navegador. Para ello usa la librería pywebview.
 
 ## 6. Prueba de concepto
 
-Código en `prototipos/` (separado de `src/`, como pide la US). Debe incluir:
-
-- [ ] Ventana con título.
-
-- [ ] Botón que abre un diálogo de selección de archivos y muestra la ruta del archivo elegido.
-
-- [ ] Tabla con scroll con datos de ejemplo (si el importador está disponible, las primeras filas de un archivo
-cargado con él).
-
-- [ ] Desplegable con varias opciones y cuadro de texto.
-
-- [ ] Botón que muestra un mensaje con el valor introducido o seleccionado.
-
-Cómo ejecutarla: 'uv run python src\sikorius\NiceGUI.py'
+  La prueba de concepto se hizo en la rama `feature/12-100-prueba-NiceGUI`
+  y cubría la ventana, el diálogo de archivos, la tabla con scroll, el
+  desplegable, el cuadro de texto y los mensajes. Al elegir NiceGUI se
+  eliminó y su código pasó a ser la base de `src/sikorius/gui/`. Sigue
+  disponible en el historial de Git.
 
 ## 7. Dificultades encontradas y cómo se resolvieron
 
