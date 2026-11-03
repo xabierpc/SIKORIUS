@@ -6,6 +6,12 @@ from pathlib import Path
 import pandas as pd
 
 from sikorius.nucleo.errores import ErrorImportacion
+from sikorius.nucleo.formatos import (
+    EXTENSIONES_CSV,
+    EXTENSIONES_EXCEL,
+    EXTENSIONES_SQLITE,
+    extension,
+)
 
 
 def importar_datos(ruta_archivo) -> pd.DataFrame:
@@ -42,17 +48,17 @@ def importar_datos(ruta_archivo) -> pd.DataFrame:
     if not ruta.is_file():
         raise ErrorImportacion(f"El archivo no existe: {ruta_archivo}")
 
-    extension = ruta.suffix.lower()
+    tipo = extension(ruta)
 
     # Lectura del archivo
-    if extension == ".csv":
+    if tipo in EXTENSIONES_CSV:
         df = _leer_csv(ruta)
-    elif extension in [".xlsx", ".xls"]:
+    elif tipo in EXTENSIONES_EXCEL:
         df = _leer_excel(ruta)
-    elif extension in [".sqlite", ".db"]:
+    elif tipo in EXTENSIONES_SQLITE:
         df = _leer_sqlite(ruta)
     else:
-        raise ErrorImportacion(f"Extensión no soportada '{extension}'")
+        raise ErrorImportacion(f"Extensión no soportada '{tipo}'")
 
     # Un archivo cuyas filas no tienen ningún valor (',,') tampoco tiene
     # datos, aunque el DataFrame no esté vacío
