@@ -1,17 +1,17 @@
 """Selección de las columnas de entrada y salida del modelo (historia #11).
 
-Contiene los selectores de columnas y el panel que los junta con el botón
-de confirmar. En la aplicación principal el usuario elige una o varias
-columnas de entrada; el modo simple de ``SelectorFeatures`` se conserva solo
-porque lo usa la demo ``sikorius.datos_entrada_salida``.
-
-El panel no lee archivos: recibe el DataFrame ya cargado por el módulo de
-importación (historia #14) y guarda la selección confirmada en el estado de
-la aplicación.
+El panel junta los selectores de ``sikorius.gui.componentes.selectores`` con
+el botón de confirmar. No lee archivos: recibe el DataFrame ya cargado por
+el módulo de importación (historia #14) y guarda la selección confirmada en
+el estado de la aplicación.
 """
 
 from nicegui import ui
 
+from sikorius.gui.componentes.selectores import (
+    SelectorFeatures,
+    SelectorTarget,
+)
 from sikorius.nucleo.columnas import ErrorSeleccion, validar_seleccion
 
 

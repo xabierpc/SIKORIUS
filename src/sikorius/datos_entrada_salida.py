@@ -1,6 +1,6 @@
 """Demo independiente de la selección de columnas (historia #11).
 
-Los selectores están en ``sikorius.gui.paneles.panel_columnas`` y son los
+Los selectores están en ``sikorius.gui.componentes.selectores`` y son los
 mismos que usa la aplicación principal (``sikorius.gui.pagina``). Esta demo
 carga el dataset con ``ui.upload`` en vez de con el explorador de archivos.
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 from nicegui import ui
 
-from sikorius.gui.paneles.panel_columnas import (
+from sikorius.gui.componentes.selectores import (
     SelectorFeatures,
     SelectorTarget,
 )

@@ -13,16 +13,7 @@ from pathlib import Path
 
 from nicegui import ui
 
-
-def es_archivo_permitido(ruta):
-    """Indica si la extensión del archivo es de un tipo compatible."""
-    return Path(ruta).suffix.lower() in (
-        ".csv",
-        ".xlsx",
-        ".xls",
-        ".sqlite",
-        ".db",
-    )
+from sikorius.nucleo.formatos import EXTENSIONES_ADMITIDAS, es_admitido
 
 
 def _es_windows():
@@ -69,7 +60,7 @@ def listar_carpeta(carpeta):
         if ruta.name.startswith("."):
             continue
         try:
-            if ruta.is_dir() or ruta.is_file() and es_archivo_permitido(ruta):
+            if ruta.is_dir() or ruta.is_file() and es_admitido(ruta):
                 entradas.append(ruta)
         except OSError:
             pass  # enlaces rotos o archivos inaccesibles: no se muestran
@@ -87,7 +78,7 @@ async def seleccionar_archivo(carpeta_inicial):
         Ruta absoluta (str) del archivo elegido, o None si el usuario cierra
         el explorador sin elegir nada (botón Cancelar, Escape o clic fuera).
     """
-    tipos = ", ".join((".csv", ".xlsx", ".xls", ".sqlite", ".db"))
+    tipos = ", ".join(EXTENSIONES_ADMITIDAS)
 
     # Cada botón necesita su propia función: una lambda escrita dentro del
     # bucle de las unidades se quedaría con la última unidad para todos
