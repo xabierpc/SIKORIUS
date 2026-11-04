@@ -85,23 +85,51 @@ uv sync
 uv run sikorius
 ```
 
+### Configurar Git (una sola vez, después de clonar)
+
+```bash
+git config pull.ff only                     # git pull nunca crea fusiones por su cuenta
+git config core.editor "code --wait"        # editor para los mensajes de fusión
+```
+
+Y crea el archivo `.git/hooks/pre-commit` con este contenido, para que Git
+no te deje hacer commits en `dev` ni en `main` por despiste:
+
+```sh
+#!/bin/sh
+rama=$(git branch --show-current)
+if [ "$rama" = "dev" ] || [ "$rama" = "main" ]; then
+    echo "No hagas commits en $rama: crea antes una rama (git switch -c fix/...)" >&2
+    exit 1
+fi
+```
+
+En Linux y macOS, dale permiso de ejecución: `chmod +x .git/hooks/pre-commit`.
+
 ### Crear una rama de trabajo
 
 ```bash
 git switch dev
-git pull                                   # trae lo último de dev
-git switch -c feature/10-101-importacion-datos # crea la rama y se cambia a ella. El primer número corresponde a la historia y el segundo a la tarea correspondiente
-
+git pull                                        # trae lo último de dev
+git switch -c feature/10-101-importacion-datos  # crea la rama y se cambia a ella
 ```
+
+El primer número es el de la historia de usuario y el segundo, el de la tarea.
 
 ### Trabajar y hacer commits
 
 ```bash
+git branch --show-current   # comprueba que estás en tu rama, NO en dev
 git status                  # revisa qué ha cambiado (¡sin archivos de datos!)
 git add <archivos>
 git commit -m "Añade lectura de ficheros CSV"
 git push -u origin feature/10-101-importacion-datos   # el primer push; después basta con git push
 ```
+
+Un cambio solo pertenece a una rama cuando haces el commit: si cambias de
+rama antes, los archivos modificados se van contigo. Haz el commit **antes**
+de volver a `dev`, y el primer `push` **después** del primer commit, para no
+subir una rama vacía.
 
 ### Actualizar la rama con los últimos cambios de dev
 
@@ -113,6 +141,13 @@ git pull
 git switch feature/10-101-importacion-datos
 git merge dev
 ```
+
+Si aparece un **conflicto**:
+
+1. `git status` muestra los archivos en conflicto.
+2. Abre cada archivo y busca las marcas `<<<<<<<`, `=======` y `>>>>>>>`. Entre `<<<<<<<` y `=======` está tu versión; entre `=======` y `>>>>>>>`, la de `dev`.
+3. Deja el contenido correcto y borra las marcas.
+4. `git add <archivo>` y después `git commit` para terminar la fusión.
 
 ### Comprobar antes de fusionar
 
@@ -128,40 +163,32 @@ uv run sikorius                        # la aplicación arranca
 Para ver qué partes del código cubren los tests:
 `uv run pytest --cov --cov-report=term-missing`.
 
-
-Si aparece un **conflicto**:
-
-1. `git status` muestra los archivos en conflicto.
-2. Abre cada archivo y busca las marcas `<<<<<<<`, `=======` y `>>>>>>>`. Entre `<<<<<<<` y `=======` está tu versión; entre `=======` y `>>>>>>>`, la de `dev`.
-3. Deja el contenido correcto y borra las marcas.
-4. `git add <archivo>` y después `git commit` para terminar la fusión.
-
-Comprueba que el proyecto sigue funcionando (`uv run sikorius`) antes de continuar.
-
 ### Fusionar la rama en dev
 
-Se puede hacer con un Pull Request en GitHub (base: `dev`) o en local:
+Las ramas se fusionan en `dev` **siempre con un Pull Request** en GitHub;
+`dev` y `main` no admiten `git push` directo.
+
+1. Sube tu rama (`git push`) y abre un Pull Request con **base: `dev`**.
+2. Espera a que la integración continua (GitHub Actions, check
+   **"Ruff y pytest"**) salga en verde. Si sale en rojo, corrige en tu rama
+   y vuelve a hacer `git push`: el Pull Request se actualiza solo.
+3. Fusiónalo con **"Create a merge commit"**, que equivale a
+   `git merge --no-ff`.
+4. Actualiza tu `dev` local:
 
 ```bash
 git switch dev
 git pull
-git merge --no-ff feature/10-101-importacion-datos
-git push
-
 ```
 
 ### Publicar una release en main
 
 Solo cuando `dev` tiene una versión estable, y de acuerdo con todo el grupo:
+se abre un Pull Request con **base: `main`** y **compare: `dev`**, se espera a
+que la integración continua salga en verde y se fusiona con
+**"Create a merge commit"**.
 
-```bash
-git switch main
-git pull
-git merge --no-ff dev
-git push
-```
-
- **Las ramas no se eliminan, ni en local ni en GitHub, para conservar el historial del trabajo.**
+**Las ramas no se eliminan, ni en local ni en GitHub, para conservar el historial del trabajo.**
 
 ## 5. Mensajes de commit
 
