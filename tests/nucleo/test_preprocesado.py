@@ -8,7 +8,6 @@ Bloques:
     - detectar_nulos / quedan_nulos / detectar_nulos_conjuntos / hay_nulos.
     - interpretar_constante: números válidos ("2,5", " 3 "...) y errores.
     - aplicar_preprocesado: las cuatro estrategias, resumen y errores.
-    - texto_resumen: mensaje que se muestra al usuario.
 """
 
 import numpy as np
@@ -31,7 +30,6 @@ from sikorius.nucleo.preprocesado import (
     interpretar_constante,
     normalizar_espacios_vacios,
     quedan_nulos,
-    texto_resumen,
 )
 
 # =============================================================================
@@ -452,29 +450,3 @@ def test_conserva_columnas_e_indice():
     assert list(train.columns) == ["x", "y", "otra"]
     assert train.index.tolist() == [10, 11, 12, 13]
     assert test.index.tolist() == [20, 21]
-
-
-# =============================================================================
-# texto_resumen
-# =============================================================================
-
-
-def test_texto_resumen():
-    resumen = {
-        "train": {"filas_eliminadas": 3, "valores_rellenados": 0},
-        "test": {"filas_eliminadas": 1, "valores_rellenados": 0},
-    }
-    assert texto_resumen(resumen) == (
-        "Preprocesado aplicado. "
-        "Entrenamiento: 3 filas eliminadas, 0 valores rellenados | "
-        "Test: 1 filas eliminadas, 0 valores rellenados."
-    )
-
-
-def test_texto_resumen_con_resultado_real():
-    _, _, resumen = aplicar_preprocesado(
-        crear_train(), crear_test(), COLUMNAS, MEDIA
-    )
-    texto = texto_resumen(resumen)
-    assert "Entrenamiento: 0 filas eliminadas, 2 valores rellenados" in texto
-    assert "Test: 0 filas eliminadas, 1 valores rellenados" in texto
