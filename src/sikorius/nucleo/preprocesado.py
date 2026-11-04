@@ -1,10 +1,11 @@
-"""
-Elimina las filas con valores inexistentes o los rellena (media, mediana o
-valor constante) en los conjuntos de entrenamiento y test, y guarda el
-resultado en el estado de la aplicación. También detecta los valores
-inexistentes de las columnas seleccionadas.
+"""Tratamiento de los valores inexistentes antes de crear el modelo.
 
-Toda la lógica es independiente de la interfaz gráfica.
+Detecta los valores inexistentes (NaN, None o texto vacío) de las columnas
+seleccionadas y elimina esas filas o las rellena con la media, la mediana o
+un valor constante, en los conjuntos de entrenamiento y test.
+
+Todas las funciones reciben DataFrames y devuelven resultados nuevos: no
+conocen la sesión ni la interfaz gráfica.
 """
 
 import math
@@ -132,31 +133,6 @@ def hay_nulos(deteccion):
     )
 
 
-def detectar_en_estado(estado):
-    """Detecta los valores inexistentes de los conjuntos guardados en el
-    estado.
-
-    Si ya se aplicó un preprocesado, revisa los conjuntos preprocesados.
-
-    Args:
-        estado: Estado de la aplicación.
-
-    Returns:
-        El diccionario de ``detectar_nulos_conjuntos``, o None si aún no hay
-        selección de columnas o separación en entrenamiento y test.
-    """
-    if not estado.hay_seleccion() or not estado.hay_separacion():
-        return None
-    if estado.preprocesado is not None:
-        train = estado.preprocesado["entrenamiento"]
-        test = estado.preprocesado["test"]
-    else:
-        train, test = estado.entrenamiento, estado.test
-    return detectar_nulos_conjuntos(
-        train, test, columnas_seleccionadas(estado)
-    )
-
-
 def interpretar_constante(valor):
     """Convierte el valor constante escrito por el usuario en un número.
 
@@ -177,31 +153,6 @@ def interpretar_constante(valor):
     if math.isnan(numero) or math.isinf(numero):
         raise ErrorPreprocesado(mensaje)
     return numero
-
-
-def columnas_seleccionadas(estado):
-    """Devuelve las columnas de entrada seguidas de la de salida.
-
-    Args:
-        estado: Estado de la aplicación, con la selección ya confirmada.
-
-    Returns:
-        Lista con las features y, al final, el target.
-    """
-    seleccion = estado.seleccion
-    nombres = list(seleccion["features"]) + [seleccion["target"]]
-    # El selector guarda los nombres como texto; si el dataset tiene
-    # cabeceras que no son texto (p. ej. 2020 en un Excel), se usan las
-    # columnas reales para que pandas las encuentre.
-    df = (
-        estado.entrenamiento
-        if estado.entrenamiento is not None
-        else estado.datos
-    )
-    if df is None:
-        return nombres
-    reales = {str(c): c for c in df.columns}
-    return [reales.get(nombre, nombre) for nombre in nombres]
 
 
 def _resumen(filas_eliminadas, valores_rellenados):
@@ -313,81 +264,3 @@ def _comprobar_valores_relleno(valores, estrategia):
 def _nulos(df, columnas):
     """Número total de valores inexistentes en las columnas indicadas."""
     return sum(detectar_nulos(df, columnas).values())
-
-
-def aplicar_al_estado(estado, estrategia, constante=None):
-    """Preprocesa los conjuntos guardados en el estado y guarda el resultado.
-
-    Args:
-        estado: Estado de la aplicación.
-        estrategia: "eliminar", "media", "mediana" o "constante".
-        constante: Número con el que rellenar (solo para "constante").
-
-    Returns:
-        El resumen del preprocesado (ver ``aplicar_preprocesado``).
-
-    Raises:
-        ErrorPreprocesado: Si no hay selección confirmada ni separación en
-            entrenamiento y test, o si ``aplicar_preprocesado`` falla (ver
-            sus errores). En ese caso el estado no se modifica, así que se
-            puede volver a intentar con otras opciones.
-    """
-    if not estado.hay_seleccion():
-        raise ErrorPreprocesado("Confirma primero la selección de columnas.")
-    if not estado.hay_separacion():
-        raise ErrorPreprocesado("Separa primero en entrenamiento y test.")
-    entrenamiento, test, resumen = aplicar_preprocesado(
-        estado.entrenamiento,
-        estado.test,
-        columnas_seleccionadas(estado),
-        estrategia,
-        constante,
-    )
-    estado.preprocesado = {
-        "entrenamiento": entrenamiento,
-        "test": test,
-        "estrategia": estrategia,
-        "resumen": resumen,
-    }
-    return resumen
-
-
-def modelo_disponible(estado):
-    """Indica si se puede crear el modelo con los datos del estado.
-
-    Args:
-        estado: Estado de la aplicación.
-
-    Returns:
-        True si se puede crear el modelo, False en caso contrario.
-    """
-    if not estado.hay_seleccion() or not estado.hay_separacion():
-        return False
-    columnas = columnas_seleccionadas(estado)
-    if estado.preprocesado is not None:
-        entrenamiento = estado.preprocesado["entrenamiento"]
-        test = estado.preprocesado["test"]
-    else:
-        entrenamiento, test = estado.entrenamiento, estado.test
-    return not (
-        quedan_nulos(entrenamiento, columnas) or quedan_nulos(test, columnas)
-    )
-
-
-def texto_resumen(resumen):
-    """Redacta el mensaje de éxito a partir del resumen del preprocesado.
-
-    Args:
-        resumen: Diccionario devuelto por ``aplicar_preprocesado``.
-
-    Returns:
-        Texto con filas eliminadas y valores rellenados de cada conjunto.
-    """
-    partes = []
-    for clave, nombre in (("train", "Entrenamiento"), ("test", "Test")):
-        datos = resumen[clave]
-        partes.append(
-            f"{nombre}: {datos['filas_eliminadas']} filas eliminadas, "
-            f"{datos['valores_rellenados']} valores rellenados"
-        )
-    return "Preprocesado aplicado. " + " | ".join(partes) + "."
