@@ -21,6 +21,10 @@ class ErrorPreprocesado(ErrorSikorius):
     """No se puede aplicar el preprocesado."""
 
 
+class ErrorModelo(ErrorSikorius):
+    """No se puede crear el modelo de regresión lineal."""
+
+
 class AvisoPreprocesado(ErrorPreprocesado):
     """El preprocesado se podría hacer, pero el resultado no sería válido."""
 

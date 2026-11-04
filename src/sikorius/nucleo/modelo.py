@@ -1,10 +1,13 @@
+"""Modelo de regresión lineal: ajuste, métricas, fórmula y gráfico.
+
+Todas las funciones reciben DataFrames y devuelven resultados nuevos: no
+conocen la sesión ni la interfaz gráfica. Quien guarda el modelo y avisa a
+la interfaz es ``Sesion.crear_modelo``.
+"""
+
 import numpy as np
 
-from sikorius.preprocesado import modelo_disponible
-
-
-class ErrorModelo(Exception):
-    """Error producido al crear el modelo."""
+from sikorius.nucleo.errores import ErrorModelo
 
 
 class ModeloLineal:
@@ -18,8 +21,7 @@ class ModeloLineal:
         termino_independiente: Término independiente del modelo.
     """
 
-    def __init__(self, features, target, coeficientes,
-                 termino_independiente):
+    def __init__(self, features, target, coeficientes, termino_independiente):
         self.features = tuple(features)
         self.target = target
         self.coeficientes = tuple(coeficientes)
@@ -36,11 +38,44 @@ class ModeloLineal:
         """
         entrada = df[list(self.features)].to_numpy(dtype=float)
         return entrada @ np.array(self.coeficientes) + (
-            self.termino_independiente)
+            self.termino_independiente
+        )
+
+
+def _columna_numerica(df, columna):
+    """Devuelve una columna como array de floats, o falla con ErrorModelo.
+
+    Args:
+        df: DataFrame que contiene la columna.
+        columna: Nombre de la columna.
+
+    Raises:
+        ErrorModelo: Si la columna no existe, no es numérica o tiene
+            valores inexistentes o infinitos.
+    """
+    if columna not in df.columns:
+        raise ErrorModelo(f"No existe la columna '{columna}' en los datos.")
+    try:
+        valores = df[columna].to_numpy(dtype=float, na_value=np.nan)
+    except (TypeError, ValueError):
+        raise ErrorModelo(
+            f"La columna '{columna}' no es numérica: la regresión lineal "
+            "solo funciona con números."
+        ) from None
+    if np.isnan(valores).any():
+        raise ErrorModelo(
+            f"La columna '{columna}' tiene valores inexistentes."
+        )
+    if np.isinf(valores).any():
+        raise ErrorModelo(f"La columna '{columna}' tiene valores infinitos.")
+    return valores
 
 
 def entrenar_modelo(entrenamiento, features, target):
     """Ajusta un modelo de regresión lineal por mínimos cuadrados.
+
+    Solo usa el DataFrame que se le pasa, que debe ser el conjunto de
+    entrenamiento, y no lo modifica.
 
     Args:
         entrenamiento: DataFrame de entrenamiento, sin valores
@@ -50,12 +85,38 @@ def entrenar_modelo(entrenamiento, features, target):
 
     Returns:
         El ModeloLineal entrenado.
+
+    Raises:
+        ErrorModelo: Si el entrenamiento está vacío, tiene menos filas que
+            parámetros, alguna columna no existe, no es numérica o tiene
+            valores inexistentes o infinitos, o el modelo no tiene una
+            solución única (columnas constantes o dependientes entre sí).
     """
     features = list(features)
-    entrada = entrenamiento[features].to_numpy(dtype=float)
-    salida = entrenamiento[target].to_numpy(dtype=float)
-    ampliada = np.column_stack([entrada, np.ones(len(entrada))])
-    solucion = np.linalg.lstsq(ampliada, salida, rcond=None)[0]
+    if len(entrenamiento) == 0:
+        raise ErrorModelo("El conjunto de entrenamiento no tiene filas.")
+    columnas = [_columna_numerica(entrenamiento, c) for c in features]
+    salida = _columna_numerica(entrenamiento, target)
+
+    parametros = len(features) + 1
+    if len(salida) < parametros:
+        raise ErrorModelo(
+            f"Hay muy pocas filas de entrenamiento ({len(salida)}): con "
+            f"{len(features)} columna(s) de entrada se necesitan al menos "
+            f"{parametros}."
+        )
+    ampliada = np.column_stack(columnas + [np.ones(len(salida))])
+    try:
+        solucion, _, rango, _ = np.linalg.lstsq(ampliada, salida, rcond=None)
+    except np.linalg.LinAlgError:
+        raise ErrorModelo(
+            "No se pudo calcular el modelo con estos datos."
+        ) from None
+    if rango < parametros:
+        raise ErrorModelo(
+            "No se puede calcular un modelo único: alguna columna de "
+            "entrada es constante o se puede obtener a partir de otras."
+        )
     return ModeloLineal(
         features=tuple(features),
         target=target,
@@ -64,51 +125,13 @@ def entrenar_modelo(entrenamiento, features, target):
     )
 
 
-def conjuntos_vigentes(estado):
-    """Devuelve los conjuntos de entrenamiento y test que se están usando.
-
-    Args:
-        estado: Estado de la aplicación, con la separación hecha.
-
-    Returns:
-        Tupla (entrenamiento, test) de DataFrames.
-    """
-    if estado.preprocesado is not None:
-        return (estado.preprocesado["entrenamiento"],
-                estado.preprocesado["test"])
-    return estado.entrenamiento, estado.test
-
-
-def crear_modelo(estado):
-    """Crea el modelo con la selección y el entrenamiento del estado.
-
-    Args:
-        estado: Estado de la aplicación.
-
-    Returns:
-        El ModeloLineal creado.
-
-    Raises:
-        ErrorModelo: Si falta la selección de columnas, la separación en
-            entrenamiento y test, o quedan valores inexistentes en las
-            columnas seleccionadas de alguno de los dos conjuntos.
-    """
-    if not modelo_disponible(estado):
-        raise ErrorModelo(
-            "No se puede crear el modelo: confirma la selección de "
-            "columnas, separa los datos y trata los valores inexistentes."
-        )
-    seleccion = estado.seleccion
-    entrenamiento, _ = conjuntos_vigentes(estado)
-    modelo = entrenar_modelo(
-        entrenamiento, seleccion["features"], seleccion["target"]
-    )
-    estado.modelo = modelo
-    return modelo
-
-
 def datos_ajuste(modelo, entrenamiento, test):
     """Calcula los datos que muestra el gráfico del ajuste del modelo.
+
+    Con una sola columna de entrada (regresión simple) el gráfico enseña
+    los puntos de cada conjunto y la recta del modelo. Con varias
+    (regresión múltiple) enseña el valor real de la salida frente al
+    valor predicho, y la recta en la que ambos coinciden.
 
     Args:
         modelo: ModeloLineal ya entrenado.
@@ -129,15 +152,19 @@ def datos_ajuste(modelo, entrenamiento, test):
         puntos = {
             "entrenamiento": (
                 entrenamiento[columna].to_numpy(dtype=float),
-                real["entrenamiento"]),
+                real["entrenamiento"],
+            ),
             "test": (test[columna].to_numpy(dtype=float), real["test"]),
         }
-        extremos = np.array([
-            min(puntos["entrenamiento"][0].min(), puntos["test"][0].min()),
-            max(puntos["entrenamiento"][0].max(), puntos["test"][0].max()),
-        ])
+        extremos = np.array(
+            [
+                min(puntos["entrenamiento"][0].min(), puntos["test"][0].min()),
+                max(puntos["entrenamiento"][0].max(), puntos["test"][0].max()),
+            ]
+        )
         recta = modelo.coeficientes[0] * extremos + (
-            modelo.termino_independiente)
+            modelo.termino_independiente
+        )
         return {
             "tipo": "simple",
             "etiqueta_x": columna,
@@ -168,18 +195,30 @@ def datos_ajuste(modelo, entrenamiento, test):
 def dibujar_ajuste(figura, datos):
     """Dibuja el gráfico del ajuste en una figura de matplotlib.
 
+    Borra lo que hubiera en la figura, así que se puede llamar de nuevo
+    cada vez que se crea un modelo nuevo.
+
     Args:
         figura: Figura de matplotlib (``matplotlib.figure.Figure``).
         datos: Diccionario devuelto por ``datos_ajuste``.
     """
     figura.clear()
     ejes = figura.subplots()
-    ejes.scatter(*datos["entrenamiento"], color="tab:blue", marker="o",
-                 label="Entrenamiento")
-    ejes.scatter(*datos["test"], color="tab:orange", marker="s",
-                 label="Test")
-    ejes.plot(*datos["recta"], color="black", linestyle="--",
-              label=datos["etiqueta_recta"])
+    ejes.scatter(
+        *datos["entrenamiento"],
+        color="tab:blue",
+        marker="o",
+        label="Entrenamiento",
+    )
+    ejes.scatter(*datos["test"], color="tab:orange", marker="s", label="Test")
+    ejes.plot(
+        *datos["recta"],
+        color="black",
+        linestyle="--",
+        label=datos["etiqueta_recta"],
+    )
+    # Pocas marcas en cada eje: con cifras grandes, si no, se pisan.
+    ejes.locator_params(nbins=5)
     ejes.set_xlabel(datos["etiqueta_x"])
     ejes.set_ylabel(datos["etiqueta_y"])
     ejes.legend()
@@ -187,27 +226,30 @@ def dibujar_ajuste(figura, datos):
 
 
 DECIMALES_FORMULA = 4
- 
- 
+
+
 def formula_texto(modelo, decimales=DECIMALES_FORMULA):
     """Escribe la fórmula del modelo con los nombres de las columnas.
- 
+
     Args:
         modelo: ModeloLineal ya entrenado.
         decimales: Decimales con los que se muestran los números.
- 
+
     Returns:
         El texto de la fórmula.
     """
+    # Cada término es (valor, texto sin signo): "3.0000 * x" o "5.0000"
     terminos = []
-    for coeficiente, columna in zip(modelo.coeficientes, modelo.features):
+    for coeficiente, columna in zip(
+        modelo.coeficientes, modelo.features, strict=True
+    ):
         numero = _numero_sin_signo(coeficiente, decimales)
         terminos.append((coeficiente, f"{numero} * {columna}"))
     independiente = modelo.termino_independiente
     terminos.append(
         (independiente, _numero_sin_signo(independiente, decimales))
     )
- 
+
     texto = f"{modelo.target} ="
     for posicion, (valor, cuerpo) in enumerate(terminos):
         negativo = round(valor, decimales) < 0
@@ -216,8 +258,8 @@ def formula_texto(modelo, decimales=DECIMALES_FORMULA):
         else:
             texto += f" - {cuerpo}" if negativo else f" + {cuerpo}"
     return texto
- 
- 
+
+
 def _numero_sin_signo(valor, decimales):
     """Valor absoluto redondeado, con siempre los mismos decimales."""
     return f"{abs(round(valor, decimales)):.{decimales}f}"
@@ -225,47 +267,51 @@ def _numero_sin_signo(valor, decimales):
 
 def calcular_ecm(real, predicho):
     """Error cuadrático medio: media de (real - predicho) al cuadrado.
- 
+
     Args:
         real: Valores reales de la salida.
         predicho: Valores que predice el modelo.
- 
+
     Returns:
-        El error cuadrático medio, como float.
-    """
-    errores = np.asarray(real, dtype=float) - np.asarray(predicho,
-                                                         dtype=float)
-    return float(np.mean(errores ** 2))
- 
- 
-def calcular_r2(real, predicho):
-    """Coeficiente de determinación R² = 1 - SS_res / SS_tot.
- 
-    Args:
-        real: Valores reales de la salida.
-        predicho: Valores que predice el modelo.
- 
-    Returns:
-        El R² como float. Si todos los valores reales son iguales no se
-        puede calcular (SS_tot es 0) y devuelve ``nan``.
+        El error cuadrático medio, como float (``nan`` si no hay valores).
     """
     real = np.asarray(real, dtype=float)
+    if real.size == 0:
+        return float("nan")
+    errores = real - np.asarray(predicho, dtype=float)
+    return float(np.mean(errores**2))
+
+
+def calcular_r2(real, predicho):
+    """Coeficiente de determinación R² = 1 - SS_res / SS_tot.
+
+    Args:
+        real: Valores reales de la salida.
+        predicho: Valores que predice el modelo.
+
+    Returns:
+        El R² como float. Si no hay valores o todos los reales son iguales
+        no se puede calcular (SS_tot es 0) y devuelve ``nan``.
+    """
+    real = np.asarray(real, dtype=float)
+    if real.size == 0:
+        return float("nan")
     predicho = np.asarray(predicho, dtype=float)
     suma_residuos = np.sum((real - predicho) ** 2)
     suma_total = np.sum((real - real.mean()) ** 2)
     if suma_total == 0:
         return float("nan")
     return float(1 - suma_residuos / suma_total)
- 
- 
+
+
 def metricas_modelo(modelo, entrenamiento, test):
     """Calcula R² y ECM del modelo en entrenamiento y en test.
- 
+
     Args:
         modelo: ModeloLineal ya entrenado.
         entrenamiento: DataFrame de entrenamiento.
         test: DataFrame de test.
- 
+
     Returns:
         Diccionario ``{"entrenamiento": {"r2": ..., "ecm": ...},
         "test": {"r2": ..., "ecm": ...}}``.

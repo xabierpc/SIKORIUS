@@ -4,6 +4,7 @@ from nicegui import ui
 
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset
+from sikorius.gui.paneles.panel_modelo import PanelModelo
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 from sikorius.gui.tema import aplicar_tema
@@ -33,4 +34,11 @@ def construir_pagina(sesion):
         with ui.column().classes("basis-0 grow min-w-0"):
             PanelColumnas(sesion)
             PanelSeparacion(sesion)
-    PanelPreprocesado(sesion)
+    # "items-stretch" iguala la altura de las dos columnas y "*:grow" hace que
+    # la tarjeta de cada panel ocupe toda la columna, para que terminen a la
+    # vez aunque una tenga más contenido que la otra.
+    with ui.row().classes("w-full items-stretch no-wrap gap-4 mt-4"):
+        with ui.column().classes("basis-0 grow min-w-0 *:grow"):
+            PanelPreprocesado(sesion)
+        with ui.column().classes("basis-0 grow min-w-0 *:grow"):
+            PanelModelo(sesion)
