@@ -78,7 +78,7 @@ class TablaDatos:
             )
             .props("virtual-scroll flat bordered dense hide-pagination")
             .classes("w-full")
-            .style("height: 60vh")
+            .style("height: 40vh")
         )
         self.tabla.add_slot(
             "no-data",
