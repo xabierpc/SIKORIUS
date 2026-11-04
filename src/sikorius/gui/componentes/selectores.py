@@ -4,8 +4,8 @@ Son componentes: no saben nada de la sesión ni del flujo de trabajo. Reciben
 el DataFrame, muestran sus columnas y devuelven lo que ha elegido el
 usuario. El panel de columnas los junta con el botón de confirmar.
 
-``SelectorFeatures`` tiene también un modo simple (una sola columna) que el
-panel no usa: el tipo de regresión sale del número de columnas elegidas.
+El tipo de regresión no se elige aquí: la sesión lo deduce del número de
+columnas de entrada (una -> simple, varias -> múltiple).
 """
 
 from nicegui import ui
@@ -15,60 +15,37 @@ class SelectorFeatures:
     """
     Selector dinámico de columnas de entrada (features).
 
-    - Regresión simple   -> selección simple (una sola columna).
-    - Regresión múltiple -> selección múltiple.
+    - Permite elegir una o varias columnas.
     - Al cargar un dataset nuevo muestra sus columnas y limpia la selección
       anterior.
     """
 
-    SIMPLE = "simple"
-    MULTIPLE = "multiple"
-
-    def __init__(self, tipo_regresion="multiple"):
+    def __init__(self):
         self.columnas = []
         self.selector = None
         self.contenedor = ui.column().classes("w-full")
-        self.cambiar_tipo_regresion(tipo_regresion)
+        self._construir_selector()
 
     def _construir_selector(self):
-        """(Re)crea el ui.select según el tipo de regresión, sin selección
-        previa."""
+        """(Re)crea el ui.select sin selección previa."""
         self.contenedor.clear()
-
-        if self.tipo_regresion == self.MULTIPLE:
-            es_multiple = True
-            etiqueta = "Features (selección múltiple)"
-            valor_inicial = []
-        else:
-            es_multiple = False
-            etiqueta = "Feature (selección simple)"
-            valor_inicial = None
-
         with self.contenedor:
-            self.selector = ui.select(
-                options=self.columnas,
-                label=etiqueta,
-                multiple=es_multiple,
-                value=valor_inicial,
-                clearable=True,
-            ).classes("w-full")
-
-            if es_multiple:
-                self.selector.props("use-chips")
+            self.selector = (
+                ui.select(
+                    options=self.columnas,
+                    label="Features (selección múltiple)",
+                    multiple=True,
+                    value=[],
+                    clearable=True,
+                )
+                .props("use-chips")
+                .classes("w-full")
+            )
 
             if len(self.columnas) == 0:
                 self.selector.disable()
             else:
                 self.selector.enable()
-
-    def cambiar_tipo_regresion(self, tipo_regresion):
-        """Cambia entre selección simple y múltiple; limpia la selección."""
-        if tipo_regresion != self.SIMPLE and tipo_regresion != self.MULTIPLE:
-            raise ValueError(
-                "Tipo de regresión no válido: " + str(tipo_regresion)
-            )
-        self.tipo_regresion = tipo_regresion
-        self._construir_selector()
 
     def cargar_columnas(self, df):
         """Muestra las columnas de un dataset nuevo y limpia la selección
@@ -84,9 +61,7 @@ class SelectorFeatures:
         valor = self.selector.value
         if valor is None:
             return []
-        if isinstance(valor, list):
-            return list(valor)
-        return [valor]
+        return list(valor)
 
 
 class SelectorTarget:
