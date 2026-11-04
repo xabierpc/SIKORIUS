@@ -71,7 +71,6 @@ def test_features_sin_dataset_esta_deshabilitado():
 
 def test_features_por_defecto_es_multiple_y_vacio():
     selector = SelectorFeatures()
-    assert selector.tipo_regresion == SelectorFeatures.MULTIPLE
     assert selector.columnas == []
     assert selector.selector.props["multiple"] is True
     assert selector.selector.value == []
@@ -79,18 +78,17 @@ def test_features_por_defecto_es_multiple_y_vacio():
 
 
 def test_features_multiple_usa_chips_y_etiqueta():
-    selector = SelectorFeatures(SelectorFeatures.MULTIPLE)
+    selector = SelectorFeatures()
     assert selector.selector.props.get("use-chips") is True
     assert selector.selector.props["label"] == "Features (selección múltiple)"
 
 
-def test_features_simple():
-    selector = SelectorFeatures(SelectorFeatures.SIMPLE)
-    assert not selector.selector.props.get("multiple")
-    assert not selector.selector.props.get("use-chips")
-    assert selector.selector.value is None
-    assert selector.selector.props["label"] == "Feature (selección simple)"
-    assert selector.obtener_seleccion() == []
+def test_features_no_tiene_modo_simple():
+    """El tipo de regresión lo decide la sesión, no el selector."""
+    assert not hasattr(SelectorFeatures, "SIMPLE")
+    assert not hasattr(SelectorFeatures, "cambiar_tipo_regresion")
+    with pytest.raises(TypeError):
+        SelectorFeatures("simple")
 
 
 def test_features_se_puede_borrar_la_seleccion():
@@ -141,13 +139,6 @@ def test_features_devuelve_siempre_una_lista():
     assert selector.obtener_seleccion() == ["x1", "2020"]
 
 
-def test_features_seleccion_simple_devuelve_lista(casas):
-    selector = SelectorFeatures(SelectorFeatures.SIMPLE)
-    selector.cargar_columnas(casas)
-    selector.selector.set_value("superficie")
-    assert selector.obtener_seleccion() == ["superficie"]
-
-
 def test_features_obtener_seleccion_devuelve_una_copia(casas):
     selector = SelectorFeatures()
     selector.cargar_columnas(casas)
@@ -157,11 +148,18 @@ def test_features_obtener_seleccion_devuelve_una_copia(casas):
 
 
 def test_features_borrar_la_seleccion(casas):
-    selector = SelectorFeatures(SelectorFeatures.SIMPLE)
+    selector = SelectorFeatures()
     selector.cargar_columnas(casas)
-    selector.selector.set_value("superficie")
-    selector.selector.set_value(None)
+    selector.selector.set_value(["superficie"])
+    selector.selector.set_value(None)  # la X de "clearable" deja None
     assert selector.obtener_seleccion() == []
+
+
+def test_features_una_sola_columna_tambien_es_lista(casas):
+    selector = SelectorFeatures()
+    selector.cargar_columnas(casas)
+    selector.selector.set_value(["superficie"])
+    assert selector.obtener_seleccion() == ["superficie"]
 
 
 def test_features_dataset_nuevo_limpia_la_seleccion():
@@ -181,55 +179,12 @@ def test_features_cargar_el_mismo_dataset_tambien_limpia(casas):
     assert selector.obtener_seleccion() == []
 
 
-@pytest.mark.parametrize(
-    "de, a",
-    [
-        (SelectorFeatures.MULTIPLE, SelectorFeatures.SIMPLE),
-        (SelectorFeatures.SIMPLE, SelectorFeatures.MULTIPLE),
-    ],
-)
-def test_features_cambiar_tipo_limpia_y_conserva_columnas(casas, de, a):
-    selector = SelectorFeatures(de)
-    selector.cargar_columnas(casas)
-    selector.selector.set_value(
-        ["superficie"] if de == SelectorFeatures.MULTIPLE else "superficie"
-    )
-    selector.cambiar_tipo_regresion(a)
-    assert selector.tipo_regresion == a
-    assert selector.selector.props.get("multiple", False) == (
-        a == SelectorFeatures.MULTIPLE
-    )
-    assert selector.selector.options == COLUMNAS
-    assert selector.selector.enabled
-    assert selector.obtener_seleccion() == []
-
-
-def test_features_cambiar_tipo_no_deja_selectores_viejos(casas):
+def test_features_recargar_no_deja_selectores_viejos(casas):
     selector = SelectorFeatures()
-    selector.cargar_columnas(casas)
     for _ in range(5):
-        selector.cambiar_tipo_regresion(SelectorFeatures.SIMPLE)
-        selector.cambiar_tipo_regresion(SelectorFeatures.MULTIPLE)
+        selector.cargar_columnas(casas)
     hijos = list(selector.contenedor.default_slot.children)
     assert hijos == [selector.selector]
-
-
-@pytest.mark.parametrize("tipo", ["", "Simple", "MULTIPLE", "lineal", None, 1])
-def test_features_cambiar_a_tipo_no_valido(casas, tipo):
-    selector = SelectorFeatures()
-    selector.cargar_columnas(casas)
-    selector.selector.set_value(["superficie"])
-    with pytest.raises(ValueError, match="no válido"):
-        selector.cambiar_tipo_regresion(tipo)
-    # el error no cambia nada
-    assert selector.tipo_regresion == SelectorFeatures.MULTIPLE
-    assert selector.obtener_seleccion() == ["superficie"]
-
-
-@pytest.mark.parametrize("tipo", ["raro", "Multiple", None])
-def test_features_constructor_con_tipo_no_valido(tipo):
-    with pytest.raises(ValueError):
-        SelectorFeatures(tipo)
 
 
 @pytest.mark.xfail(
