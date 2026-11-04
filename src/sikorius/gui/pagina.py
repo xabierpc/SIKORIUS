@@ -23,8 +23,8 @@ def construir_pagina(sesion):
     with ui.header().classes("items-center"):
         ui.label("SIKORIUS").classes("text-xl font-bold")
 
-    # El dataset ocupa dos tercios y las columnas el tercio de la derecha,
-    # así se eligen las columnas viendo los datos. "basis-0" hace que el
+    # El dataset ocupa dos tercios y las columnas y la separación el tercio
+    # de la derecha, así se eligen viendo los datos. "basis-0" hace que el
     # reparto (2:1) no dependa del contenido y "min-w-0" deja que la tabla
     # encoja y saque su propio scroll horizontal.
     with ui.row().classes("w-full items-start no-wrap gap-4"):
@@ -32,5 +32,5 @@ def construir_pagina(sesion):
             PanelDataset(sesion)
         with ui.column().classes("basis-0 grow min-w-0"):
             PanelColumnas(sesion)
-    PanelSeparacion(sesion)
+            PanelSeparacion(sesion)
     PanelPreprocesado(sesion)
