@@ -1,3 +1,11 @@
+"""Importación de datasets desde archivos CSV, Excel y SQLite.
+
+La única función pública es ``importar_datos``: elige el lector según la
+extensión del archivo y devuelve un DataFrame de pandas. Cualquier problema
+con el archivo se comunica con ``ErrorImportacion``, cuyo mensaje se puede
+mostrar tal cual al usuario.
+"""
+
 import csv
 import sqlite3
 from io import StringIO
@@ -6,6 +14,12 @@ from pathlib import Path
 import pandas as pd
 
 from sikorius.nucleo.errores import ErrorImportacion
+from sikorius.nucleo.formatos import (
+    EXTENSIONES_CSV,
+    EXTENSIONES_EXCEL,
+    EXTENSIONES_SQLITE,
+    extension,
+)
 
 
 def importar_datos(ruta_archivo) -> pd.DataFrame:
@@ -35,29 +49,29 @@ def importar_datos(ruta_archivo) -> pd.DataFrame:
         ruta = Path(ruta_archivo)
     except TypeError as e:
         raise ErrorImportacion(
-            f"Ruta de archivo no válida: {ruta_archivo!r}"
+            "Ruta de archivo no válida: " + repr(ruta_archivo)
         ) from e
 
     # Comprobar que el archivo existe
     if not ruta.is_file():
-        raise ErrorImportacion(f"El archivo no existe: {ruta_archivo}")
+        raise ErrorImportacion("El archivo no existe: " + str(ruta_archivo))
 
-    extension = ruta.suffix.lower()
+    tipo = extension(ruta)
 
     # Lectura del archivo
-    if extension == ".csv":
+    if tipo in EXTENSIONES_CSV:
         df = _leer_csv(ruta)
-    elif extension in [".xlsx", ".xls"]:
+    elif tipo in EXTENSIONES_EXCEL:
         df = _leer_excel(ruta)
-    elif extension in [".sqlite", ".db"]:
+    elif tipo in EXTENSIONES_SQLITE:
         df = _leer_sqlite(ruta)
     else:
-        raise ErrorImportacion(f"Extensión no soportada '{extension}'")
+        raise ErrorImportacion("Extensión no soportada '" + tipo + "'")
 
     # Un archivo cuyas filas no tienen ningún valor (',,') tampoco tiene
     # datos, aunque el DataFrame no esté vacío
     if df.dropna(how="all").empty:
-        raise ErrorImportacion(f"El archivo no contiene datos: {ruta.name}")
+        raise ErrorImportacion("El archivo no contiene datos: " + ruta.name)
 
     return _convertir_numericas(df)
 
@@ -84,11 +98,11 @@ def _leer_texto(ruta) -> str:
     except OSError as e:
         # Sin permiso de lectura o bloqueado por otro programa
         raise ErrorImportacion(
-            f"No se puede leer el archivo: {ruta.name}"
+            "No se puede leer el archivo: " + ruta.name
         ) from e
     if b"\x00" in datos:
         raise ErrorImportacion(
-            f"El archivo está dañado o no es CSV válido: {ruta.name}"
+            "El archivo está dañado o no es CSV válido: " + ruta.name
         )
     try:
         return datos.decode("utf-8-sig")
@@ -99,7 +113,7 @@ def _leer_texto(ruta) -> str:
 def _leer_csv(ruta) -> pd.DataFrame:
     texto = _leer_texto(ruta)
     if not texto.strip():
-        raise ErrorImportacion(f"El archivo no contiene datos: {ruta.name}")
+        raise ErrorImportacion("El archivo no contiene datos: " + ruta.name)
 
     # Detecta el separador (',' o ';'); con ';' el decimal suele ser ','
     try:
@@ -124,16 +138,16 @@ def _leer_csv(ruta) -> pd.DataFrame:
                 df, campos_de_mas = _leer_tabla(texto, ";", ",")
     except pd.errors.EmptyDataError as e:
         raise ErrorImportacion(
-            f"El archivo no contiene datos: {ruta.name}"
+            "El archivo no contiene datos: " + ruta.name
         ) from e
     except pd.errors.ParserError as e:
         raise ErrorImportacion(
-            f"El archivo está dañado o no es CSV válido: {ruta.name}"
+            "El archivo está dañado o no es CSV válido: " + ruta.name
         ) from e
 
     if campos_de_mas:
         raise ErrorImportacion(
-            f"Hay filas con más campos que el encabezado: {ruta.name}"
+            "Hay filas con más campos que el encabezado: " + ruta.name
         )
     return df
 
@@ -173,15 +187,18 @@ def _indice_implicito(texto, separador) -> bool:
 
 def _leer_excel(ruta) -> pd.DataFrame:
     try:
-        return pd.read_excel(ruta)
+        return pd.read_excel(ruta, sheet_name=None)
     except ImportError as e:
-        # Falta una dependencia (xlrd u openpyxl): no es culpa del archivo
+        # Falta una dependencia (xlrd u openpyxl): no es      culpa del archivo
         raise ErrorImportacion(
-            f"Falta la librería para leer archivos {ruta.suffix}: {e}"
+            "Falta la librería para leer archivos "
+            + ruta.suffix
+            + ": "
+            + str(e)
         ) from e
     except Exception as e:
         raise ErrorImportacion(
-            f"El archivo está dañado o no es un excel válido: {ruta.name}"
+            "El archivo está dañado o no es un excel válido: " + ruta.name
         ) from e
 
 
@@ -197,15 +214,17 @@ def _leer_sqlite(ruta) -> pd.DataFrame:
 
             if len(tablas) == 0:
                 raise ErrorImportacion(
-                    f"La base de datos no contiene ninguna tabla: {ruta.name}"
+                    "La base de datos no contiene ninguna tabla: " + ruta.name
                 )
             if len(tablas) > 1:
                 raise ErrorImportacion(
-                    f"La base de datos contiene más de una tabla: {ruta.name}"
+                    "La base de datos contiene más de una tabla: " + ruta.name
                 )
 
             nombre = tablas[0][0].replace('"', '""')
-            return pd.read_sql_query(f'SELECT * FROM "{nombre}"', conexion)
+            return pd.read_sql_query(
+                'SELECT * FROM "' + nombre + '"', conexion
+            )
         finally:
             conexion.close()
     except sqlite3.DatabaseError as e:
@@ -215,5 +234,5 @@ def _leer_sqlite(ruta) -> pd.DataFrame:
         ) from e
     except pd.errors.DatabaseError as e:
         raise ErrorImportacion(
-            f"No se pudo leer la tabla de la base de datos: {ruta.name}"
+            "No se pudo leer la tabla de la base de datos: " + ruta.name
         ) from e
