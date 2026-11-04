@@ -13,13 +13,22 @@ Esta guía recoge las normas que seguimos todos los miembros del grupo para trab
 
 ## 2. Guía de estilo de código (PEP 8)
 
-Seguimos la [PEP 8](https://peps.python.org/pep-0008/). El formato se aplica automáticamente con **autopep8**,
-configurado en el `pyproject.toml`, así que todos formateamos igual.
+Seguimos la [PEP 8](https://peps.python.org/pep-0008/). El formato y la
+revisión se hacen con **ruff**, configurado en el `pyproject.toml`, así que
+todos formateamos igual.
 
 - **Herramienta**:
-- Instala la extensión **autopep8** de Microsoft en VS Code. El código se formatea al guardar.
-- autopep8 corrige sangría, espacios, líneas en blanco y líneas largas. **No** ordena imports ni revisa los nombres: eso es responsabilidad de cada uno y se revisa en las Pull Requests.
-- Para revisar desde la terminal: `uv run autopep8 --diff -r src tests` muestra lo que cambiaría sin tocar nada.
+- Instala la extensión **Ruff** (Astral Software) en VS Code y desactiva
+  autopep8 si la tenías. El archivo `.vscode/settings.json` del repo ya
+  configura Ruff como formateador, formatea al guardar y ordena los imports.
+- Elige el intérprete del proyecto: `Ctrl+Shift+P` → "Python: Select
+  Interpreter" → `.venv`.
+- Desde la terminal:
+  - `uv run ruff format src tests` formatea el código.
+  - `uv run ruff check src tests` busca errores y avisos de estilo;
+    con `--fix` corrige los que sabe corregir solo.
+- Ruff no parte cadenas, comentarios ni docstrings largos: esas líneas
+  hay que cortarlas a mano.
 
 - **Nombres** (en español, sin tildes ni ñ):
 - Variables, funciones y métodos: `snake_case`. P. ej.: `calcular_metricas`, `datos_procesados`.
@@ -105,6 +114,21 @@ git switch feature/10-101-importacion-datos
 git merge dev
 ```
 
+### Comprobar antes de fusionar
+
+Antes de fusionar en `dev`, estos comandos tienen que salir sin errores:
+
+```bash
+uv run ruff format --check src tests   # el formato está aplicado
+uv run ruff check src tests            # sin avisos
+uv run pytest -q                       # todos los tests pasan
+uv run sikorius                        # la aplicación arranca
+```
+
+Para ver qué partes del código cubren los tests:
+`uv run pytest --cov --cov-report=term-missing`.
+
+
 Si aparece un **conflicto**:
 
 1. `git status` muestra los archivos en conflicto.
@@ -128,14 +152,8 @@ git push
 
 ### Publicar una release en main
 
-Solo cuando `dev` tiene una versión estable, y de acuerdo con todo el grupo:
-
-```bash
-git switch main
-git pull
-git merge --no-ff dev
-git push
-```
+`main` solo recibe cambios desde `dev` al publicar una release. Los pasos
+están en la sección [8. Procedimiento de release](#8-procedimiento-de-release).
 
  **Las ramas no se eliminan, ni en local ni en GitHub, para conservar el historial del trabajo.**
 
@@ -164,3 +182,130 @@ Al cambiar dependencias se modifican `pyproject.toml` y `uv.lock`: **se suben lo
 - La documentación del proyecto va en la carpeta `docs/`; el `README.md` contiene la descripción y las instrucciones de instalación y ejecución.
 - Los cambios de documentación se hacen en una rama `docs/<descripcion>` creada desde `dev` y se fusionan en `dev` como cualquier otra rama.
 - Si una `feature` cambia cómo se instala o se ejecuta el proyecto, actualiza el `README.md` en esa misma rama.
+
+## 8. Procedimiento de release
+
+Una release es una versión de la aplicación publicada en GitHub. Seguimos el
+[versionado semántico](https://semver.org/lang/es/) (`MAYOR.MENOR.PARCHE`):
+mientras la versión empiece por `0.`, la aplicación está en desarrollo.
+
+Los ejemplos usan la versión `0.1.0`; para otra versión, cambia el número en
+todos los comandos.
+
+### 1. Requisitos previos
+
+- Todo el grupo está de acuerdo en publicar la versión.
+- Las historias de usuario de la versión están fusionadas en `dev`.
+- La última ejecución de GitHub Actions sobre `dev` está en verde.
+- En local, desde `dev`, pasan todas las comprobaciones:
+
+  ```bash
+  git switch dev
+  git pull
+  uv sync
+  uv run ruff format --check src tests
+  uv run ruff check src tests
+  uv run pytest -q
+  ```
+
+- Un miembro del grupo que **no haya implementado** esas historias ha probado
+  la aplicación a mano (`uv run sikorius`) con los datasets de ejemplo de la
+  asignatura. Los errores encontrados se corrigen en ramas `fix/` antes de
+  seguir.
+- El `README.md` describe las funcionalidades de la versión y cómo ejecutarla.
+
+### 2. Actualizar la versión
+
+El campo `version` del `pyproject.toml` tiene que ser el de la nueva versión:
+
+```bash
+grep '^version' pyproject.toml
+```
+
+Si no lo es, se cambia en una rama creada desde `dev` y se fusiona como
+cualquier otra:
+
+```bash
+git switch -c fix/<numero>-version-0.1.0
+# Cambia la línea a: version = "0.1.0"
+uv lock
+git add pyproject.toml uv.lock
+git commit -m "Sube la versión a 0.1.0"
+git push -u origin fix/<numero>-version-0.1.0
+```
+
+### 3. Fusionar dev en main
+
+```bash
+git switch main
+git pull
+git merge --no-ff dev -m "Publica la versión 0.1.0"
+git diff dev            # no muestra nada: main y dev tienen el mismo código
+git push
+```
+
+Si `main` está protegida y exige un pull request, en lugar de los comandos
+anteriores se abre en GitHub un pull request de `dev` hacia `main`, se espera
+a que GitHub Actions esté en verde y se fusiona con *Create a merge commit*.
+Después: `git switch main` y `git pull`.
+
+### 4. Crear y subir la etiqueta
+
+La etiqueta se crea sobre el último commit de `main`, el de la fusión:
+
+```bash
+git switch main
+git tag -a v0.1.0 -m "Versión 0.1.0"
+git push origin v0.1.0
+git show v0.1.0 --stat   # comprueba que apunta a la fusión
+```
+
+### 5. Crear la release en GitHub
+
+1. En el repositorio, entra en **Releases** → **Draft a new release**.
+2. En **Choose a tag**, elige `v0.1.0`.
+3. Título: `v0.1.0`.
+4. En la descripción, pega las notas de la versión (paso 6).
+5. Mientras la aplicación no permita crear modelos, marca
+   **Set as a pre-release**.
+6. Pulsa **Publish release**.
+
+### 6. Redactar las notas
+
+Las notas se guardan en `docs/notas-v0.1.0.md` (en una rama `docs/` antes del
+paso 3, para que entren en la versión) e incluyen:
+
+- una descripción breve de la aplicación y del estado del proyecto;
+- las funcionalidades incluidas y las correcciones, a partir de las ramas
+  `feature/` y `fix/` fusionadas desde la versión anterior;
+- las funcionalidades pendientes para próximas versiones;
+- un enlace al `README.md` de la versión.
+
+Para ver las ramas fusionadas desde la versión anterior (en la primera
+versión, todas):
+
+```bash
+git log --first-parent --oneline --grep="^Merge branch" dev
+git log --first-parent --oneline --grep="^Merge branch" v0.1.0..dev  # siguientes versiones
+```
+
+### 7. Comprobar la descarga
+
+Un miembro del grupo descarga el código de la release en una carpeta nueva y
+comprueba que se instala y arranca siguiendo el `README.md`:
+
+1. En la página de la release, descarga **Source code (zip)**.
+2. Descomprímelo en una carpeta nueva, fuera de tu clon del repositorio.
+3. Dentro de la carpeta descomprimida (`SIKORIUS-0.1.0`):
+
+   ```bash
+   uv sync
+   uv run sikorius
+   ```
+
+4. Carga un dataset y recorre las funcionalidades de la versión.
+
+### 8. Después de la release
+
+`main` y `dev` tienen el mismo código, y el desarrollo continúa en ramas
+creadas desde `dev`. Las ramas y las etiquetas no se borran.

@@ -1,0 +1,260 @@
+"""Importación de datasets desde archivos CSV, Excel y SQLite.
+
+La única función pública es ``importar_datos``: elige el lector según la
+extensión del archivo y devuelve un DataFrame de pandas. Cualquier problema
+con el archivo se comunica con ``ErrorImportacion``, cuyo mensaje se puede
+mostrar tal cual al usuario.
+"""
+
+import csv
+import sqlite3
+from io import StringIO
+from pathlib import Path
+
+import pandas as pd
+
+from sikorius.nucleo.errores import ErrorImportacion
+from sikorius.nucleo.formatos import (
+    EXTENSIONES_CSV,
+    EXTENSIONES_EXCEL,
+    EXTENSIONES_SQLITE,
+    extension,
+)
+
+
+def importar_datos(ruta_archivo) -> pd.DataFrame:
+    """Importa un CSV, Excel o SQLite y devuelve sus datos.
+
+    El formato se determina a partir de la extensión del archivo. En SQLite
+    la base de datos debe contener una única tabla que se detecta de forma
+    automática. En CSV y Excel la primera fila se tomará como encabezado.
+    Las columnas cuyos valores son todos numéricos se devuelven con tipo
+    numérico.
+
+    Args:
+        ruta_archivo: Ruta del archivo que se importa (str o Path)
+
+    Returns:
+        DataFrame de pandas con los datos importados
+
+    Raises:
+        ErrorImportacion: Si el archivo no existe, la extensión no es
+        correcta, el archivo está dañado o no corresponde a su extensión,
+        no contiene datos o, en SQLite la base de datos no tiene tablas
+        o tiene más de una.
+    """
+
+    # La GUI puede pasar None si se cancela el diálogo de selección
+    try:
+        ruta = Path(ruta_archivo)
+    except TypeError as e:
+        raise ErrorImportacion(
+            "Ruta de archivo no válida: " + repr(ruta_archivo)
+        ) from e
+
+    # Comprobar que el archivo existe
+    if not ruta.is_file():
+        raise ErrorImportacion("El archivo no existe: " + str(ruta_archivo))
+
+    tipo = extension(ruta)
+
+    # Lectura del archivo
+    if tipo in EXTENSIONES_CSV:
+        df = _leer_csv(ruta)
+    elif tipo in EXTENSIONES_EXCEL:
+        df = _leer_excel(ruta)
+    elif tipo in EXTENSIONES_SQLITE:
+        df = _leer_sqlite(ruta)
+    else:
+        raise ErrorImportacion("Extensión no soportada '" + tipo + "'")
+
+    # Un archivo cuyas filas no tienen ningún valor (',,') tampoco tiene
+    # datos, aunque el DataFrame no esté vacío
+    if df.dropna(how="all").empty:
+        raise ErrorImportacion("El archivo no contiene datos: " + ruta.name)
+
+    return _convertir_numericas(df)
+
+
+def _convertir_numericas(df) -> pd.DataFrame:
+    """Convierte a número las columnas de texto cuyos valores son números."""
+    for columna in df.columns:
+        # Solo columnas de texto: pd.to_numeric también convertiría en
+        # enteros las fechas y las duraciones
+        if pd.api.types.is_object_dtype(
+            df[columna]
+        ) or pd.api.types.is_string_dtype(df[columna]):
+            try:
+                df[columna] = pd.to_numeric(df[columna])
+            except (ValueError, TypeError):
+                pass  # la columna tiene texto de verdad: se deja como está
+    return df
+
+
+def _leer_texto(ruta) -> str:
+    """Lee el archivo como texto en UTF-8 o, si falla, en Windows-1252."""
+    try:
+        datos = ruta.read_bytes()
+    except OSError as e:
+        # Sin permiso de lectura o bloqueado por otro programa
+        raise ErrorImportacion(
+            "No se puede leer el archivo: " + ruta.name
+        ) from e
+    if b"\x00" in datos:
+        raise ErrorImportacion(
+            "El archivo está dañado o no es CSV válido: " + ruta.name
+        )
+    try:
+        return datos.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return datos.decode("cp1252", errors="replace")
+
+
+def _leer_csv(ruta) -> pd.DataFrame:
+    texto = _leer_texto(ruta)
+    if not texto.strip():
+        raise ErrorImportacion("El archivo no contiene datos: " + ruta.name)
+
+    # Detecta el separador (',' o ';'); con ';' el decimal suele ser ','
+    try:
+        separador = (
+            csv.Sniffer().sniff(texto[:5000], delimiters=",;\t").delimiter
+        )
+    except csv.Error:
+        separador = ","
+    decimal = "," if separador == ";" else "."
+
+    try:
+        df, campos_de_mas = _leer_tabla(texto, separador, decimal)
+        if separador == "," and len(df.columns) == 1:
+            encabezado = str(df.columns[0])
+            if "\t" in encabezado:
+                # El Sniffer falla si las filas tienen distinto número de
+                # campos; el encabezado delata el separador real
+                df, campos_de_mas = _leer_tabla(texto, "\t", ".")
+            elif ";" in encabezado or campos_de_mas:
+                # Lo mismo con ';', o un CSV de una columna guardado por
+                # Excel en español, donde la coma de '1,5' es decimal
+                df, campos_de_mas = _leer_tabla(texto, ";", ",")
+    except pd.errors.EmptyDataError as e:
+        raise ErrorImportacion(
+            "El archivo no contiene datos: " + ruta.name
+        ) from e
+    except pd.errors.ParserError as e:
+        raise ErrorImportacion(
+            "El archivo está dañado o no es CSV válido: " + ruta.name
+        ) from e
+
+    if campos_de_mas:
+        raise ErrorImportacion(
+            "Hay filas con más campos que el encabezado: " + ruta.name
+        )
+    return df
+
+
+def _leer_tabla(texto, separador, decimal) -> tuple[pd.DataFrame, bool]:
+    """Lee el CSV e indica si alguna fila tiene datos de más.
+
+    Si la primera fila de datos tiene un campo más que el encabezado,
+    pandas toma la primera columna como índice y desplaza los datos sin
+    avisar; la última columna leída es entonces el campo de más. Si ese
+    campo está vacío (separador al final de cada línea) no se pierde nada
+    y se relee con index_col=False, que no desplaza los datos.
+    """
+    df = pd.read_csv(StringIO(texto), sep=separador, decimal=decimal)
+    if not _indice_implicito(texto, separador):
+        return df, False
+    if df.iloc[:, -1].notna().any():
+        return df, True
+    df = pd.read_csv(
+        StringIO(texto), sep=separador, decimal=decimal, index_col=False
+    )
+    return df, False
+
+
+def _indice_implicito(texto, separador) -> bool:
+    """Indica si la primera fila de datos tiene un campo más que el
+    encabezado, que es cuando pandas usa la primera columna como índice."""
+    try:
+        filas = csv.reader(StringIO(texto, newline=""), delimiter=separador)
+        no_vacias = (fila for fila in filas if fila)
+        encabezado = next(no_vacias, [])
+        primera = next(no_vacias, [])
+    except csv.Error:
+        return False  # pandas decidirá si el archivo es válido
+    return len(primera) == len(encabezado) + 1
+
+
+def _leer_excel(ruta) -> pd.DataFrame:
+    """Lee la única hoja con datos del libro de Excel.
+
+    Las hojas vacías se ignoran. Si hay varias hojas con datos no se elige
+    ninguna, igual que en SQLite con varias tablas.
+    """
+    try:
+        hojas = pd.read_excel(ruta, sheet_name=None)
+    except ImportError as e:
+        # Falta una dependencia (xlrd u openpyxl): no es culpa del archivo
+        raise ErrorImportacion(
+            "Falta la librería para leer archivos "
+            + ruta.suffix
+            + ": "
+            + str(e)
+        ) from e
+    except Exception as e:
+        raise ErrorImportacion(
+            "El archivo está dañado o no es un excel válido: " + ruta.name
+        ) from e
+
+    con_datos = []
+    for nombre, hoja in hojas.items():
+        if not hoja.dropna(how="all").empty:
+            con_datos.append(nombre)
+    if len(con_datos) > 1:
+        raise ErrorImportacion(
+            "El libro tiene datos en más de una hoja ("
+            + ", ".join(str(nombre) for nombre in con_datos)
+            + "): deja solo una hoja con datos: "
+            + ruta.name
+        )
+    if len(con_datos) == 1:
+        return hojas[con_datos[0]]
+    # Todas las hojas están vacías: importar_datos avisará de que no hay
+    # datos
+    return next(iter(hojas.values()))
+
+
+def _leer_sqlite(ruta) -> pd.DataFrame:
+    try:
+        conexion = sqlite3.connect(ruta)
+        try:
+            # '_' es comodín en LIKE: se escapa para excluir solo 'sqlite_...'
+            tablas = conexion.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'"
+            ).fetchall()
+
+            if len(tablas) == 0:
+                raise ErrorImportacion(
+                    "La base de datos no contiene ninguna tabla: " + ruta.name
+                )
+            if len(tablas) > 1:
+                raise ErrorImportacion(
+                    "La base de datos contiene más de una tabla: " + ruta.name
+                )
+
+            nombre = tablas[0][0].replace('"', '""')
+            return pd.read_sql_query(
+                'SELECT * FROM "' + nombre + '"', conexion
+            )
+        finally:
+            conexion.close()
+    except sqlite3.DatabaseError as e:
+        raise ErrorImportacion(
+            "El archivo está dañado o no es una base de datos válida: "
+            + ruta.name
+        ) from e
+    except pd.errors.DatabaseError as e:
+        raise ErrorImportacion(
+            "No se pudo leer la tabla de la base de datos: " + ruta.name
+        ) from e

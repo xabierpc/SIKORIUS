@@ -10,10 +10,16 @@ authors = [
     { name = "pepe.lopez.martinez", email = "pepe.lopez.martinez@udc.es" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "nicegui>=3.18.0",
+    "numpy>=2.5.4",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.6",
+    "xlrd>=2.0.2",
+]
 
 [project.scripts]
-sikorius = "sikorius:main"
+sikorius = "sikorius.app:main"
 
 [build-system]
 requires = ["uv_build>=0.12.21,<0.13.0"]
@@ -22,4 +28,30 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.3",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# importlib permite archivos con el mismo nombre en tests/nucleo y tests/gui
+addopts = "-ra --strict-markers --import-mode=importlib"
+
+[tool.coverage.run]
+source = ["sikorius"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 79
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+# UP031/UP032 proponen f-strings, SIM108 ternarios y SIM105 contextlib.suppress:
+# van contra el estilo del proyecto (bloques explícitos)
+ignore = ["UP031", "UP032", "SIM108", "SIM105"]
