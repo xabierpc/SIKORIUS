@@ -1,0 +1,38 @@
+# Integración continua: en cada push y pull request a dev o main comprueba
+# el formato y el estilo con ruff y pasa todos los tests con cobertura.
+# Si algo falla, GitHub marca el commit con una cruz roja.
+name: Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  tests:
+    name: Ruff y pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v7
+
+      # Versión fijada por su hash, como recomienda Astral
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+
+      # --locked falla si uv.lock no corresponde con pyproject.toml.
+      # uv instala la versión de Python de .python-version.
+      - name: Instalar las dependencias
+        run: uv sync --locked
+
+      - name: Comprobar el formato
+        run: uv run ruff format --check src tests
+
+      - name: Comprobar el estilo
+        run: uv run ruff check src tests
+
+      - name: Pasar los tests
+        run: uv run pytest -q --cov --cov-report=term-missing
