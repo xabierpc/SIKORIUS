@@ -4,8 +4,8 @@ Son componentes: no saben nada de la sesión ni del flujo de trabajo. Reciben
 el DataFrame, muestran sus columnas y devuelven lo que ha elegido el
 usuario. El panel de columnas los junta con el botón de confirmar.
 
-El modo simple de ``SelectorFeatures`` solo lo usa la demo
-``sikorius.datos_entrada_salida``; se quitará cuando se borre la demo.
+``SelectorFeatures`` tiene también un modo simple (una sola columna) que el
+panel no usa: el tipo de regresión sale del número de columnas elegidas.
 """
 
 from nicegui import ui
