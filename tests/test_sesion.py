@@ -268,4 +268,29 @@ def test_aplicar_con_cabeceras_no_texto(sesion):
 
 def test_modelo_no_disponible_sin_separacion(sesion, sesion_con_seleccion):
     assert not sesion.puede_crear_modelo()
-    assert not
+    assert not sesion_con_seleccion.puede_crear_modelo()
+
+
+def test_modelo_no_disponible_con_nulos(sesion_con_nulos):
+    assert not sesion_con_nulos.puede_crear_modelo()
+
+
+def test_modelo_disponible_sin_nulos_sin_preprocesar(sesion_sin_nulos):
+    assert sesion_sin_nulos.preprocesado is None
+    assert sesion_sin_nulos.puede_crear_modelo()
+
+
+@pytest.mark.parametrize("estrategia", ESTRATEGIAS)
+def test_modelo_disponible_tras_preprocesar(sesion_con_nulos, estrategia):
+    sesion_con_nulos.aplicar_preprocesado(estrategia, constante=0)
+    assert sesion_con_nulos.puede_crear_modelo()
+
+
+def test_modelo_disponible_ignora_columnas_no_seleccionadas(sesion):
+    """'otra' tiene nulos, pero no se usa en el modelo."""
+    train = crear_train()[["x", "otra"]].assign(y=[1.0, 2.0, 3.0, 4.0])
+    test = crear_test()[["x", "otra"]].assign(y=[5.0, 6.0])
+    train["x"] = train["x"].fillna(0.0)
+    test["x"] = test["x"].fillna(0.0)
+    preparar(sesion, train, test)
+    assert sesion.puede_crear_modelo()
