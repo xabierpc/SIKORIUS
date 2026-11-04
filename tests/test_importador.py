@@ -4,11 +4,6 @@ Cada función del módulo se prueba por separado y cada test indica entre
 corchetes la rama del código que recorre, por ejemplo [I1] o [S4]. El mapa
 completo de ramas está al principio de cada sección.
 
-Los tests marcados con ``xfail(strict=True)`` documentan FALLOS REALES del
-código actual: hoy fallan a propósito. Cuando se corrija el fallo, el test
-pasará y pytest avisará con XPASS(strict); en ese momento hay que quitar el
-marcador ``xfail``.
-
 Ejecución con cobertura de ramas:
      uv run pytest test/test_importador.py
 """
