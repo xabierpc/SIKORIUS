@@ -186,10 +186,15 @@ def _indice_implicito(texto, separador) -> bool:
 
 
 def _leer_excel(ruta) -> pd.DataFrame:
+    """Lee la única hoja con datos del libro de Excel.
+
+    Las hojas vacías se ignoran. Si hay varias hojas con datos no se elige
+    ninguna, igual que en SQLite con varias tablas.
+    """
     try:
-        return pd.read_excel(ruta, sheet_name=None)
+        hojas = pd.read_excel(ruta, sheet_name=None)
     except ImportError as e:
-        # Falta una dependencia (xlrd u openpyxl): no es      culpa del archivo
+        # Falta una dependencia (xlrd u openpyxl): no es culpa del archivo
         raise ErrorImportacion(
             "Falta la librería para leer archivos "
             + ruta.suffix
@@ -200,6 +205,23 @@ def _leer_excel(ruta) -> pd.DataFrame:
         raise ErrorImportacion(
             "El archivo está dañado o no es un excel válido: " + ruta.name
         ) from e
+
+    con_datos = []
+    for nombre, hoja in hojas.items():
+        if not hoja.dropna(how="all").empty:
+            con_datos.append(nombre)
+    if len(con_datos) > 1:
+        raise ErrorImportacion(
+            "El libro tiene datos en más de una hoja ("
+            + ", ".join(str(nombre) for nombre in con_datos)
+            + "): deja solo una hoja con datos: "
+            + ruta.name
+        )
+    if len(con_datos) == 1:
+        return hojas[con_datos[0]]
+    # Todas las hojas están vacías: importar_datos avisará de que no hay
+    # datos
+    return next(iter(hojas.values()))
 
 
 def _leer_sqlite(ruta) -> pd.DataFrame:

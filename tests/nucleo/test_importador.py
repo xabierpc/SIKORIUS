@@ -5,7 +5,7 @@ corchetes la rama del código que recorre, por ejemplo [I1] o [S4]. El mapa
 completo de ramas está al principio de cada sección.
 
 Ejecución con cobertura de ramas:
-     uv run pytest test/test_importador.py
+    uv run pytest tests/nucleo/test_importador.py --cov
 """
 
 import ast
@@ -642,9 +642,10 @@ def test_L_sin_permiso_de_lectura(tmp_path, monkeypatch):
 
 # =============================================================================
 # _leer_excel
-#   [E1] lectura correcta
+#   [E1] lectura correcta: solo la hoja con datos, las vacías se ignoran
 #   [E2] falta la librería (ImportError)     -> "Falta la librería"
 #   [E3] cualquier otro error                -> "dañado"
+#   [E4] datos en más de una hoja            -> "más de una hoja"
 # =============================================================================
 
 
@@ -654,7 +655,7 @@ def test_E1_xlsx(tmp_path, datos):
     pd.testing.assert_frame_equal(_leer_excel(ruta), datos)
 
 
-def test_E1_solo_lee_la_primera_hoja(tmp_path):
+def test_E4_varias_hojas_con_datos_es_error(tmp_path):
     ruta = tmp_path / "a.xlsx"
     with pd.ExcelWriter(ruta) as escritor:
         pd.DataFrame({"h1": [1]}).to_excel(
@@ -663,18 +664,24 @@ def test_E1_solo_lee_la_primera_hoja(tmp_path):
         pd.DataFrame({"h2": [2]}).to_excel(
             escritor, sheet_name="dos", index=False
         )
-    assert _leer_excel(ruta).columns.tolist() == ["h1"]
+    with pytest.raises(ErrorImportacion, match="más de una hoja"):
+        _leer_excel(ruta)
 
 
-def test_E1_LIMITACION_primera_hoja_vacia(tmp_path):
-    """Si la primera hoja está vacía, se informa de que no hay datos aunque
-    otras hojas sí los tengan."""
+def test_E1_ignora_las_hojas_vacias(tmp_path):
     ruta = tmp_path / "a.xlsx"
     with pd.ExcelWriter(ruta) as escritor:
         pd.DataFrame().to_excel(escritor, sheet_name="vacia", index=False)
         pd.DataFrame({"a": [1]}).to_excel(
             escritor, sheet_name="datos", index=False
         )
+    assert importar_datos(ruta).columns.tolist() == ["a"]
+
+
+def test_E1_libro_sin_datos(tmp_path):
+    ruta = tmp_path / "a.xlsx"
+    with pd.ExcelWriter(ruta) as escritor:
+        pd.DataFrame().to_excel(escritor, sheet_name="vacia", index=False)
     with pytest.raises(ErrorImportacion, match="no contiene datos"):
         importar_datos(ruta)
 
