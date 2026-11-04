@@ -2,7 +2,18 @@
 
 [![Tests](https://github.com/xabierpc/SIKORIUS/actions/workflows/tests.yml/badge.svg?branch=dev)](https://github.com/xabierpc/SIKORIUS/actions/workflows/tests.yml)
 
-Aplicación de escritorio en Python que permite crear y visualizar modelos de regresión lineal simple y múltiple a partir de datos almacenados en archivos CSV, Excel y bases de datos SQLite. Con ella se pueden hacer predicciones, así como guardar los modelos y cargarlos más tarde, todo desde una interfaz gráfica.
+Aplicación de escritorio en Python para crear y visualizar modelos de regresión lineal simple y múltiple a partir de datos almacenados en archivos CSV, Excel y bases de datos SQLite, hacer predicciones y guardar los modelos para cargarlos más tarde, todo desde una interfaz gráfica.
+
+El proyecto está en desarrollo. La versión actual es la **0.1.0**: prepara los datos, pero todavía no crea modelos.
+
+## Funcionalidades de la versión 0.1.0
+
+- **Cargar un dataset** desde un explorador de archivos: CSV, Excel (`.xlsx` y `.xls`, con una sola hoja con datos) y SQLite (`.sqlite` y `.db`, con una sola tabla), y verlo en una tabla.
+- **Elegir las columnas del modelo**: una o varias columnas de entrada (*features*) y una de salida (*target*), solo entre las columnas numéricas.
+- **Separar los datos en entrenamiento y test**, indicando el porcentaje de test y una semilla para que la separación se pueda repetir.
+- **Detectar y tratar los valores nulos** de las columnas elegidas, en entrenamiento y en test: eliminar las filas, o rellenar con la media, la mediana o un valor constante.
+
+Pendiente para próximas versiones: crear el modelo de regresión lineal y ver su fórmula y su gráfica, evaluarlo, hacer predicciones, y guardar y cargar modelos.
 
 ## Requisitos
 
@@ -16,11 +27,14 @@ uv se encarga de instalar la versión de Python del proyecto (fijada en `.python
 ```bash
 git clone https://github.com/xabierpc/SIKORIUS.git
 cd SIKORIUS
-git switch dev
 uv sync
 ```
 
 `uv sync` crea el entorno virtual en `.venv/` e instala exactamente las versiones indicadas en `uv.lock`.
+
+También se puede descargar una versión publicada sin usar Git: en la página [Releases](https://github.com/xabierpc/SIKORIUS/releases) se descarga el archivo *Source code (zip)*, se descomprime y, dentro de la carpeta, se ejecuta `uv sync`.
+
+Para desarrollar, el trabajo se hace desde la rama `dev` (`git switch dev`), como explica [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Ejecución
 
