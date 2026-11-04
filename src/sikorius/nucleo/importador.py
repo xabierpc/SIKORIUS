@@ -187,9 +187,9 @@ def _indice_implicito(texto, separador) -> bool:
 
 def _leer_excel(ruta) -> pd.DataFrame:
     try:
-        return pd.read_excel(ruta)
+        return pd.read_excel(ruta, sheet_name=None)
     except ImportError as e:
-        # Falta una dependencia (xlrd u openpyxl): no es culpa del archivo
+        # Falta una dependencia (xlrd u openpyxl): no es      culpa del archivo
         raise ErrorImportacion(
             "Falta la librería para leer archivos "
             + ruta.suffix
