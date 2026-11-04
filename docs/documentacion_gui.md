@@ -1,7 +1,5 @@
 # Investigación de librerías de interfaz gráfica (US 12)
 
-> **Borrador** para `docs/investigacion-gui.md` del repositorio. Las partes marcadas con **[COMPLETAR]** dependen de la prueba de concepto de la tarea #100.
-> Fuentes: webs y documentación oficiales de NiceGUI, Streamlit, y PyPI, consultadas el 16/10/2026 (enlaces al final).
 
 ## 1. Objetivo
 
@@ -97,24 +95,15 @@ navegador. Para ello usa la librería pywebview.
 
 **Dependencia añadida:** `uv add nicegui` (rama `feature/12-100-prueba-NiceGUI`). Si se usa el modo nativo, añadir también pywebview con `uv add pywebview`.
 
-## 6. Prueba de concepto
+## 5. Prueba de concepto
 
-Código en `prototipos/` (separado de `src/`, como pide la US). Debe incluir:
+La prueba de concepto se hizo en la rama `feature/12-100-prueba-NiceGUI`
+y cubría la ventana, el diálogo de archivos, la tabla con scroll, el
+desplegable, el cuadro de texto y los mensajes. Al elegir NiceGUI se
+eliminó y su código pasó a ser la base de `src/sikorius/gui/`. Sigue
+disponible en el historial de Git.
 
-- [ ] Ventana con título.
-
-- [ ] Botón que abre un diálogo de selección de archivos y muestra la ruta del archivo elegido.
-
-- [ ] Tabla con scroll con datos de ejemplo (si el importador está disponible, las primeras filas de un archivo
-cargado con él).
-
-- [ ] Desplegable con varias opciones y cuadro de texto.
-
-- [ ] Botón que muestra un mensaje con el valor introducido o seleccionado.
-
-Cómo ejecutarla: 'uv run python src\sikorius\NiceGUI.py'
-
-## 7. Dificultades encontradas y cómo se resolvieron
+## 6. Dificultades encontradas y cómo se resolvieron
 
 Con NiceGUI no se encontraron dificultades en las primeras pruebas puesto que hay mucha información proporcionada por los
 desarrolladores de la interfaz en su página.
@@ -122,7 +111,7 @@ desarrolladores de la interfaz en su página.
 Por otra parte, Streamlit no terminó de convencernos a la hora de programar y configurarlo, siendo así más rico de información
 online NiceGUI, por lo que, finalmente, subimos las dos para hacer una comparación, pero nos quedaremos con la primera para la versión final.
 
-## 8. Fuentes
+## 7. Fuentes
 
 - NiceGUI: [web](https://nicegui.io/) · [documentación](https://nicegui.io/documentation) · [modo nativo](https://nicegui.io/documentation/section_configuration_deployment) · [ui.aggrid](https://nicegui.io/documentation/aggrid) · [ui.upload](https://nicegui.io/documentation/upload) · [ui.select](https://nicegui.io/documentation/select) · [PyPI](https://pypi.org/project/nicegui/)
 - Streamlit: [web](https://streamlit.io/) · [conceptos básicos](https://docs.streamlit.io/get-started/fundamentals/main-concepts) · [referencia de la API](https://docs.streamlit.io/develop/api-reference) · [st.file_uploader](https://docs.streamlit.io/develop/api-reference/widgets/st.file_uploader) · [PyPI](https://pypi.org/project/streamlit/)

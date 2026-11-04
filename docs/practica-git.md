@@ -9,7 +9,7 @@ git clone https://github.com/xabierpc/SIKORIUS.git
 cd SIKORIUS
 git switch dev
 uv sync
-uv run sikorius     # debe mostrar un saludo
+uv run sikorius     # abre la aplicación en el navegador
 ```
 
 ## 1. Rama feature completa
@@ -17,7 +17,7 @@ uv run sikorius     # debe mostrar un saludo
 1. Crea una rama desde `dev`: `git switch -c feature/0-presentacion-<tu-nombre>`.
 2. Añade tu nombre a la tabla de [integrantes](#integrantes) y haz commit.
 3. Súbela: `git push -u origin feature/0-presentacion-<tu-nombre>`.
-4. Actualízala con `dev` (`git merge dev`), fusiónala en `dev` y elimínala, tal como indica [CONTRIBUTING.md](../CONTRIBUTING.md#3-flujo-de-trabajo).
+4. Actualízala con `dev` (`git merge dev`) y fusiónala en `dev`, tal como indica [CONTRIBUTING.md](../CONTRIBUTING.md#4-flujo-de-trabajo). No la borres: las ramas se conservan.
 
 ## 2. Conflicto de fusión (por parejas)
 
