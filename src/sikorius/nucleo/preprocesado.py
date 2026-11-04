@@ -9,7 +9,6 @@ Toda la lógica es independiente de la interfaz gráfica.
 
 import math
 
-import numpy as np
 import pandas as pd
 
 from sikorius.nucleo.errores import (
@@ -33,6 +32,19 @@ def _comprobar_columnas(df, columnas):
         )
 
 
+def _celdas_vacias(serie):
+    """True en las celdas de texto vacías o con solo espacios."""
+    vacias = serie.map(
+        lambda valor: isinstance(valor, str) and valor.strip() == ""
+    )
+    return vacias.astype(bool)
+
+
+def _mascara_nulos(serie):
+    """True en las celdas sin valor: NaN, None o texto vacío."""
+    return serie.isna() | _celdas_vacias(serie)
+
+
 def normalizar_espacios_vacios(
     df: pd.DataFrame, columnas: list
 ) -> pd.DataFrame:
@@ -51,10 +63,7 @@ def normalizar_espacios_vacios(
     _comprobar_columnas(df, columnas)
     copia = df.copy()
     for columna in columnas:
-        for indice in copia.index:
-            valor = copia.at[indice, columna]
-            if isinstance(valor, str) and valor.strip() == "":
-                copia.at[indice, columna] = np.nan
+        copia[columna] = copia[columna].mask(_celdas_vacias(copia[columna]))
     return copia
 
 
@@ -73,12 +82,8 @@ def detectar_nulos(df: pd.DataFrame, columnas: list) -> dict:
     """
     _comprobar_columnas(df, columnas)
     num_nulos = {}
-    for i in columnas:
-        contador = 0
-        for j in df[i]:
-            if (isinstance(j, str) and j.strip() == "") or pd.isna(j):
-                contador += 1
-        num_nulos[i] = contador
+    for columna in columnas:
+        num_nulos[columna] = int(_mascara_nulos(df[columna]).sum())
     return num_nulos
 
 
@@ -230,7 +235,7 @@ def aplicar_preprocesado(train, test, columnas, estrategia, constante=None):
     """
     columnas = list(columnas)
     if estrategia not in ESTRATEGIAS:
-        raise ErrorPreprocesado(f"Estrategia no válida: {estrategia}")
+        raise ErrorPreprocesado("Estrategia no válida: " + str(estrategia))
 
     # Las celdas vacías pasan a NaN para tratarlas igual que el resto
     train = normalizar_espacios_vacios(train, columnas)
