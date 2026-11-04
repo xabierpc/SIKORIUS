@@ -2,7 +2,10 @@
 
 from nicegui import ui
 
+from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset
+from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
+from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 
 # Quasar pone en mayúsculas el texto de todos los botones. Con "no-caps" se
 # muestran tal cual se escriben: solo la primera letra en mayúscula.
@@ -19,3 +22,6 @@ def construir_pagina(sesion):
         ui.label("SIKORIUS").classes("text-xl font-bold")
 
     PanelDataset(sesion)
+    PanelColumnas(sesion)
+    PanelSeparacion(sesion)
+    PanelPreprocesado(sesion)

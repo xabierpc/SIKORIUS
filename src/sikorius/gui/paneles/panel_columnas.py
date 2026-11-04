@@ -1,235 +1,102 @@
 """Selección de las columnas de entrada y salida del modelo (historia #11).
 
 El panel junta los selectores de ``sikorius.gui.componentes.selectores`` con
-el botón de confirmar. No lee archivos: recibe el DataFrame ya cargado por
-el módulo de importación (historia #14) y guarda la selección confirmada en
-el estado de la aplicación.
+el botón de confirmar. Valida la selección con el núcleo y, si es correcta,
+la guarda en la sesión. Los paneles siguientes se enteran solos porque
+están suscritos a la sesión.
 """
 
 from nicegui import ui
 
+from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes.selectores import (
     SelectorFeatures,
     SelectorTarget,
 )
+from sikorius.gui.paneles.base import Panel
 from sikorius.nucleo.columnas import ErrorSeleccion, validar_seleccion
 
 
-class SelectorFeatures:
-    """
-    Selector dinámico de columnas de entrada (features).
+def texto_seleccion(seleccion):
+    """Texto como "Entrada: x1, x2 | Salida: y"."""
+    return (
+        "Entrada: "
+        + ", ".join(seleccion.features)
+        + " | Salida: "
+        + seleccion.target
+    )
 
-    - Regresión simple   -> selección simple (una sola columna).
-    - Regresión múltiple -> selección múltiple.
-    - Al cargar un dataset nuevo muestra sus columnas y limpia la selección
-      anterior.
-    """
 
-    SIMPLE = "simple"
-    MULTIPLE = "multiple"
+class PanelColumnas(Panel):
+    """Features + target + botón de confirmar."""
 
-    def __init__(self, tipo_regresion="multiple"):
-        self.columnas = []
-        self.selector = None
-        self.contenedor = ui.column().classes("w-full")
-        self.cambiar_tipo_regresion(tipo_regresion)
-
-    def _construir_selector(self):
-        """(Re)crea el ui.select según el tipo de regresión, sin selección
-        previa."""
-        self.contenedor.clear()
-
-        if self.tipo_regresion == self.MULTIPLE:
-            es_multiple = True
-            etiqueta = "Features (selección múltiple)"
-            valor_inicial = []
-        else:
-            es_multiple = False
-            etiqueta = "Feature (selección simple)"
-            valor_inicial = None
-
-        with self.contenedor:
-            self.selector = ui.select(
-                options=self.columnas,
-                label=etiqueta,
-                multiple=es_multiple,
-                value=valor_inicial,
-                clearable=True,
-            ).classes("w-full")
-
-            if es_multiple:
-                self.selector.props("use-chips")
-
-            if len(self.columnas) == 0:
-                self.selector.disable()
-            else:
-                self.selector.enable()
-
-    def cambiar_tipo_regresion(self, tipo_regresion):
-        """Cambia entre selección simple y múltiple; limpia la selección."""
-        if tipo_regresion != self.SIMPLE and tipo_regresion != self.MULTIPLE:
-            raise ValueError(
-                "Tipo de regresión no válido: " + str(tipo_regresion)
+    def __init__(self, sesion):
+        with ui.card().classes("w-full"):
+            ui.label("Columnas del modelo").classes("text-lg font-semibold")
+            self.features = SelectorFeatures()
+            self.target = SelectorTarget(al_abrir=self._excluir_features)
+            self.boton_confirmar = ui.button(
+                "Confirmar selección", icon="check", on_click=self.confirmar
             )
-        self.tipo_regresion = tipo_regresion
-        self._construir_selector()
-
-    def cargar_columnas(self, df):
-        """Muestra las columnas de un dataset nuevo y limpia la selección
-        anterior."""
-        self.columnas = []
-        for columna in df.columns:
-            self.columnas.append(str(columna))
-        self._construir_selector()
-
-    def obtener_seleccion(self):
-        """Devuelve siempre una lista de features (vacía si no hay
-        selección)."""
-        valor = self.selector.value
-        if valor is None:
-            return []
-        if isinstance(valor, list):
-            return list(valor)
-        return [valor]
-
-
-class SelectorTarget:
-    """
-    Selector dinámico de columnas de salida (target).
-
-    - Al cargar un dataset nuevo muestra sus columnas y limpia la selección.
-    - Permite excluir columnas (las ya elegidas como features), para que
-      una misma columna no sea entrada y salida a la vez.
-    """
-
-    def __init__(self, al_abrir=None):
-        self.al_abrir = al_abrir
-        self.columnas = []
-        self.excluidas = []
-        self.selector = None
-        self.contenedor = ui.column().classes("w-full")
-        self._construir_selector()
-
-    def _opciones(self):
-        """Columnas disponibles como target (todas menos las excluidas)."""
-        disponibles = []
-        for columna in self.columnas:
-            if columna not in self.excluidas:
-                disponibles.append(columna)
-        return disponibles
-
-    def _construir_selector(self):
-        """(Re)crea el ui.select sin selección previa."""
-        self.contenedor.clear()
-        with self.contenedor:
-            self.selector = ui.select(
-                options=self._opciones(),
-                label="Target (columna de salida)",
-                value=None,
-                clearable=True,
-            ).classes("w-full")
-
-            if self.al_abrir is not None:
-                self.selector.on("popup-show", lambda: self.al_abrir())
-
-            if len(self.columnas) == 0:
-                self.selector.disable()
-            else:
-                self.selector.enable()
-
-    def cargar_columnas(self, df):
-        """Muestra las columnas de un dataset nuevo y limpia la selección
-        anterior."""
-        self.columnas = []
-        for columna in df.columns:
-            self.columnas.append(str(columna))
-        self.excluidas = []
-        self._construir_selector()
-
-    def excluir(self, columnas):
-        """Quita de las opciones las columnas dadas (las elegidas como
-        features)."""
-        self.excluidas = list(columnas)
-        self.selector.set_options(self._opciones())
-        if self.selector.value in self.excluidas:
-            self.selector.set_value(None)
-
-    def obtener_seleccion(self):
-        """Devuelve la columna elegida como target, o None si no hay
-        ninguna."""
-        return self.selector.value
-
-
-class PanelSeleccionColumnas:
-    """Features + target + botón de confirmar.
-
-    Trabaja sobre el estado de la aplicación: lee ``estado.datos`` para
-    validar y, si la selección es correcta, la guarda con
-    ``estado.guardar_seleccion``.
-
-    ``al_cambiar`` (opcional) se llama cada vez que la selección confirmada
-    se guarda o se borra, para que los pasos siguientes se actualicen.
-    """
-
-    def __init__(self, estado, al_cambiar=None):
-        self.estado = estado
-        self.al_cambiar = al_cambiar
-
-        self.features = SelectorFeatures()
-        self.target = SelectorTarget(
-            al_abrir=lambda: self.target.excluir(
-                self.features.obtener_seleccion()
+            self.etiqueta_seleccion = ui.label("").classes(
+                "text-sm text-gray-500"
             )
-        )
 
-        self.boton_confirmar = ui.button(
-            "Confirmar selección", icon="check", on_click=self.confirmar
-        )
-        self.etiqueta_seleccion = ui.label("").classes("text-sm text-gray-500")
+        # Dataset cuyas columnas tienen ahora los selectores. Solo se
+        # recrean al cambiar de dataset: si se recrearan en cada aviso de la
+        # sesión (al separar, al preprocesar...), el usuario perdería lo que
+        # estuviera eligiendo.
+        self._dataset = None
+        super().__init__(sesion)
 
-        self._actualizar_boton()
+    def _excluir_features(self):
+        """Quita del target las columnas elegidas como features."""
+        self.target.excluir(self.features.obtener_seleccion())
 
-    def _actualizar_boton(self):
-        if self.estado.hay_datos():
-            self.boton_confirmar.enable()
-        else:
+    def _cargar_columnas(self, dataset):
+        """Pone en los selectores las columnas del dataset y vuelve a marcar
+        la selección confirmada, si la hay (por ejemplo, al recargar la
+        página)."""
+        self.features.cargar_columnas(dataset.datos)
+        self.target.cargar_columnas(dataset.datos)
+        seleccion = self.sesion.seleccion
+        if seleccion is not None:
+            self.features.selector.set_value(list(seleccion.features))
+            self._excluir_features()
+            self.target.selector.set_value(seleccion.target)
+
+    def actualizar(self):
+        dataset = self.sesion.dataset
+        if dataset is not self._dataset:
+            self._dataset = dataset
+            if dataset is not None:
+                self._cargar_columnas(dataset)
+
+        if dataset is None:
             self.boton_confirmar.disable()
+        else:
+            self.boton_confirmar.enable()
 
-    def _avisar_cambio(self):
-        if self.al_cambiar is not None:
-            self.al_cambiar()
-
-    def cargar_columnas(self, df):
-        """Muestra las columnas del dataset nuevo y limpia la selección
-        anterior."""
-        self.features.cargar_columnas(df)
-        self.target.cargar_columnas(df)
-        self.etiqueta_seleccion.set_text("")
-        self._actualizar_boton()
-        self._avisar_cambio()
+        if self.sesion.seleccion is None:
+            self.etiqueta_seleccion.set_text("")
+        else:
+            self.etiqueta_seleccion.set_text(
+                texto_seleccion(self.sesion.seleccion)
+            )
 
     def confirmar(self):
-        """Valida la selección y, si es correcta, la guarda en el estado."""
-        if not self.estado.hay_datos():
-            ui.notify("Carga primero un dataset.", type="negative")
+        """Valida la selección y, si es correcta, la guarda en la sesión."""
+        if self.sesion.dataset is None:
+            notificar_error("Carga primero un dataset.")
             return
         features = self.features.obtener_seleccion()
         objetivo = self.target.obtener_seleccion()
         try:
-            validar_seleccion(self.estado.datos, features, objetivo)
+            validar_seleccion(self.sesion.dataset.datos, features, objetivo)
         except ErrorSeleccion as error:
-            ui.notify(str(error), type="negative", multi_line=True)
+            notificar_error(error)
             return
-        # El tipo de regresión ya no lo elige el usuario: se deduce del número
-        # de columnas de entrada (una -> simple, varias -> múltiple).
-        if len(features) == 1:
-            tipo_regresion = "simple"
-        else:
-            tipo_regresion = "multiple"
-        self.estado.guardar_seleccion(features, objetivo, tipo_regresion)
-        texto = "Entrada: " + ", ".join(features) + " | Salida: " + objetivo
-        self.etiqueta_seleccion.set_text(texto)
-        ui.notify(
-            "Selección confirmada. " + texto, type="positive", multi_line=True
+        self.sesion.guardar_seleccion(features, objetivo)
+        notificar_exito(
+            "Selección confirmada. " + texto_seleccion(self.sesion.seleccion)
         )
-        self._avisar_cambio()

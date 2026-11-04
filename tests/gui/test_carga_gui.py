@@ -6,12 +6,13 @@ a medida que se termina cada una:
     uv run pytest tests/gui/test_carga_gui.py -v              # todos
     uv run pytest tests/gui/test_carga_gui.py -v -k tarea2    # una tarea
 
-    Tarea 2 -> sikorius/gui/selector_archivos.py (es_archivo_permitido,
-                                                  listar_carpeta)
-    Tarea 3 -> sikorius/gui/tabla_datos.py       (dataframe_a_tabla)
-    Tarea 6 -> sikorius/gui/pagina.py               (carpeta_inicial)
+    Tarea 2 -> sikorius/nucleo/formatos.py                (es_admitido)
+               sikorius/gui/componentes/explorador_archivos.py
+                                                       (listar_carpeta)
+    Tarea 3 -> sikorius/gui/componentes/tabla_datos.py (dataframe_a_tabla)
 
-Los tests de la tarea 1 (EstadoApp) están en tests/test_estado.py.
+La carga en sí y la carpeta inicial del explorador (tarea 6) se prueban en
+tests/gui/test_panel_dataset.py, con la sesión.
 
 Las tareas 4 y 5 (la tabla y el diálogo en pantalla) se comprueban a mano
 con la lista de la tarea 8, porque necesitan el navegador.
@@ -66,20 +67,8 @@ def carpeta_rara(tmp_path):
     return carpeta
 
 
-@pytest.fixture
-def estado_limpio():
-    """Deja vacía la instancia compartida 'estado' antes y después del test."""
-    from sikorius.estado import estado
-
-    estado.datos = None
-    estado.ruta = None
-    yield estado
-    estado.datos = None
-    estado.ruta = None
-
-
 # =============================================================================
-# Tarea 2 · selector_archivos.py: filtro y listado
+# Tarea 2 · formatos.py y explorador_archivos.py: filtro y listado
 # =============================================================================
 
 
@@ -98,11 +87,9 @@ def estado_limpio():
     ],
 )
 def test_tarea2_extensiones_permitidas(nombre):
-    from sikorius.gui.componentes.explorador_archivos import (
-        es_archivo_permitido,
-    )
+    from sikorius.nucleo.formatos import es_admitido
 
-    assert es_archivo_permitido(nombre)
+    assert es_admitido(nombre)
 
 
 @pytest.mark.parametrize(
@@ -119,20 +106,16 @@ def test_tarea2_extensiones_permitidas(nombre):
     ],
 )
 def test_tarea2_extensiones_no_permitidas(nombre):
-    from sikorius.gui.componentes.explorador_archivos import (
-        es_archivo_permitido,
-    )
+    from sikorius.nucleo.formatos import es_admitido
 
-    assert not es_archivo_permitido(nombre)
+    assert not es_admitido(nombre)
 
 
 def test_tarea2_acepta_path_y_str():
-    from sikorius.gui.componentes.explorador_archivos import (
-        es_archivo_permitido,
-    )
+    from sikorius.nucleo.formatos import es_admitido
 
-    assert es_archivo_permitido(Path("/una/carpeta/datos.csv"))
-    assert es_archivo_permitido("/una/carpeta/datos.csv")
+    assert es_admitido(Path("/una/carpeta/datos.csv"))
+    assert es_admitido("/una/carpeta/datos.csv")
 
 
 def test_tarea2_listar_solo_compatibles_y_ordenado(tmp_path):
@@ -375,36 +358,3 @@ def test_tarea3_con_datos_del_importador(carpeta_rara):
     assert etiquetas_de(columnas) == ["barrio", "superficie"]
     assert filas[0][columnas[1]["field"]] == 60.5
     assert filas[1][columnas[1]["field"]] is None
-
-
-# =============================================================================
-# Tarea 6 · app.py: carpeta_inicial
-# =============================================================================
-
-
-def test_tarea6_sin_datos_empieza_en_carpeta_personal(estado_limpio):
-    from sikorius.gui.pagina import carpeta_inicial
-
-    assert Path(carpeta_inicial()) == Path.home()
-
-
-def test_tarea6_no_depende_de_la_carpeta_de_ejecucion(
-    estado_limpio, tmp_path, monkeypatch
-):
-    from sikorius.gui.pagina import carpeta_inicial
-
-    monkeypatch.chdir(tmp_path)
-
-    assert Path(carpeta_inicial()) != tmp_path
-    assert Path(carpeta_inicial()) == Path.home()
-
-
-def test_tarea6_despues_de_cargar_empieza_en_su_carpeta(
-    estado_limpio, carpeta_rara
-):
-    from sikorius.gui.pagina import carpeta_inicial
-
-    archivo = crear_csv(carpeta_rara / "datos.csv", "x\n1\n")
-    estado_limpio.cargar(archivo)
-
-    assert Path(carpeta_inicial()) == carpeta_rara.resolve()
