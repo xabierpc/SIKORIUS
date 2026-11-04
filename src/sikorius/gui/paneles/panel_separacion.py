@@ -43,10 +43,10 @@ class PanelSeparacion(Panel):
             ui.label("Entrenamiento y test").classes("text-lg font-semibold")
             self.aviso = ui.label("").classes("text-sm text-gray-500")
 
-            # Todo en una sola fila para ocupar poco alto: los campos a la
-            # izquierda, los porcentajes y el resultado en medio y el botón
-            # pegado a la derecha (ui.space empuja el botón hasta el borde).
-            with ui.row().classes("w-full items-center gap-4"):
+            # Pensado para la columna estrecha de la derecha: los dos campos
+            # en una fila, repartiéndose el ancho, y debajo el resultado a la
+            # izquierda y el botón pegado a la derecha (ui.space lo empuja).
+            with ui.row().classes("w-full no-wrap gap-4"):
                 self.entrada_porcentaje = (
                     ui.input(
                         "Porcentaje de test (%)",
@@ -54,14 +54,15 @@ class PanelSeparacion(Panel):
                         on_change=self._mostrar_entrenamiento,
                     )
                     .props("dense")
-                    .classes("w-44")
+                    .classes("basis-0 grow min-w-0")
                 )
                 self.entrada_semilla = (
                     ui.input("Semilla", value=str(SEMILLA_DEFECTO))
                     .props("dense")
-                    .classes("w-44")
+                    .classes("basis-0 grow min-w-0")
                 )
-                with ui.column().classes("gap-0"):
+            with ui.row().classes("w-full items-center no-wrap gap-4"):
+                with ui.column().classes("gap-0 min-w-0"):
                     self.etiqueta_entrenamiento = ui.label("").classes(
                         "text-sm"
                     )
