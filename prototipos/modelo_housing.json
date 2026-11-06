@@ -1,0 +1,40 @@
+{
+  "formato": "sikorius-modelo",
+  "version_formato": 1,
+  "descripcion": "Modelo de ejemplo: precio de la vivienda en California.",
+  "formula": "median_house_value = -42190.3182 * longitude - 42052.1556 * latitude + 1184.1041 * housing_median_age - 7.3599 * total_rooms + 104.2865 * total_bedrooms - 43.0603 * population + 65.7621 * households + 40206.4320 * median_income - 3537030.9757",
+  "modelo": {
+    "features": [
+      "longitude",
+      "latitude",
+      "housing_median_age",
+      "total_rooms",
+      "total_bedrooms",
+      "population",
+      "households",
+      "median_income"
+    ],
+    "target": "median_house_value",
+    "coeficientes": [
+      -42190.318247808755,
+      -42052.15561363036,
+      1184.10412104336,
+      -7.359854035974422,
+      104.28649853989737,
+      -43.06034027427813,
+      65.76212266010589,
+      40206.43198943917
+    ],
+    "termino_independiente": -3537030.9756568824
+  },
+  "metricas": {
+    "entrenamiento": {
+      "r2": 0.6397188361500734,
+      "ecm": 4828367481.482712
+    },
+    "test": {
+      "r2": 0.6234643165055698,
+      "ecm": 4900825641.525061
+    }
+  }
+}
