@@ -327,3 +327,95 @@ def test_no_contiene_logica_del_modelo():
         assert llamada in codigo
     for prohibido in ("lstsq", "polyfit", "numpy", "np.", "mean("):
         assert prohibido not in codigo
+
+
+# =============================================================================
+# Descripción del modelo
+# =============================================================================
+
+
+def test_sin_modelo_no_se_puede_describir(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    assert not panel.resultados.visible  # el campo está dentro de resultados
+
+
+def test_con_modelo_aparece_el_campo_opcional(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    assert panel.resultados.visible
+    assert isinstance(panel.descripcion, ui.textarea)
+    assert panel.descripcion.props["label"] == "Descripción (opcional)"
+    assert panel.descripcion.value == ""
+
+
+def test_lo_escrito_se_guarda_en_el_modelo(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    panel.descripcion.set_value("Precio de las casas")
+
+    assert sesion_lista.modelo.descripcion == "Precio de las casas"
+
+
+def test_cada_cambio_queda_reflejado(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    for texto in ("P", "Pr", "Pre", "Pre\nsio"):
+        panel.descripcion.set_value(texto)
+        assert sesion_lista.modelo.descripcion == texto
+
+
+def test_se_puede_borrar_la_descripcion(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("algo")
+    panel.descripcion.set_value("")
+    assert sesion_lista.modelo.descripcion == ""
+
+
+def test_crear_otro_modelo_vacia_el_campo(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("descripción del primero")
+    primero = sesion_lista.modelo
+
+    panel.crear()
+
+    assert sesion_lista.modelo is not primero
+    assert panel.descripcion.value == ""
+    assert sesion_lista.modelo.descripcion == ""
+    assert primero.descripcion == "descripción del primero"
+
+
+def test_el_modelo_nuevo_no_hereda_la_descripcion_tras_preprocesar(
+    sesion_lista,
+):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("texto")
+
+    sesion_lista.aplicar_preprocesado("media")  # borra el modelo
+    assert not panel.resultados.visible
+    panel.crear()
+
+    assert panel.descripcion.value == ""
+
+
+def test_al_recargar_la_pagina_se_ve_la_descripcion(sesion_lista):
+    sesion_lista.crear_modelo()
+    sesion_lista.guardar_descripcion("Descripción guardada")
+
+    panel = PanelModelo(sesion_lista)
+
+    assert panel.descripcion.value == "Descripción guardada"
+
+
+def test_otros_avisos_no_pisan_lo_que_se_escribe(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("lo que escribo")
+
+    panel.actualizar()  # la sesión avisa por otro motivo
+
+    assert panel.descripcion.value == "lo que escribo"
+    assert sesion_lista.modelo.descripcion == "lo que escribo"

@@ -23,8 +23,16 @@ from sikorius.nucleo.separacion import separar_datos
 
 RUTA = Path(__file__).resolve().parents[1] / "data" / "housing.csv"
 TARGET = "median_house_value"
-FEATURES = ["longitude", "latitude", "housing_median_age", "total_rooms",
-            "total_bedrooms", "population", "households", "median_income"]
+FEATURES = [
+    "longitude",
+    "latitude",
+    "housing_median_age",
+    "total_rooms",
+    "total_bedrooms",
+    "population",
+    "households",
+    "median_income",
+]
 
 
 def con_sklearn(x_train, y_train, x_test):
@@ -52,33 +60,49 @@ def main():
     df = importar_datos(RUTA)
     train, test = separar_datos(df, 20, 42)
     train, test, _ = aplicar_preprocesado(
-        train, test, FEATURES + [TARGET], ELIMINAR)
+        train, test, FEATURES + [TARGET], ELIMINAR
+    )
 
-    print("%-12s %16s %16s %8s"
-          % ("Librería", "Intercepto", "coef. income", "R² test"))
+    print(
+        "%-12s %16s %16s %8s"
+        % ("Librería", "Intercepto", "coef. income", "R² test")
+    )
     resultados = {}
-    for nombre, funcion in (("sklearn", con_sklearn),
-                            ("statsmodels", con_statsmodels),
-                            ("numpy", con_numpy)):
+    for nombre, funcion in (
+        ("sklearn", con_sklearn),
+        ("statsmodels", con_statsmodels),
+        ("numpy", con_numpy),
+    ):
         intercepto, coefs, prediccion = funcion(
-            train[FEATURES], train[TARGET], test[FEATURES])
+            train[FEATURES], train[TARGET], test[FEATURES]
+        )
         r2 = r2_score(test[TARGET], prediccion)
-        resultados[nombre] = (intercepto, coefs,
-                              mean_squared_error(test[TARGET], prediccion))
-        print("%-12s %16.4f %16.4f %8.4f"
-              % (nombre, intercepto, coefs[-1], r2))
+        resultados[nombre] = (
+            intercepto,
+            coefs,
+            mean_squared_error(test[TARGET], prediccion),
+        )
+        print(
+            "%-12s %16.4f %16.4f %8.4f" % (nombre, intercepto, coefs[-1], r2)
+        )
 
     referencia = resultados["sklearn"]
     for nombre, (intercepto, coefs, ecm) in resultados.items():
-        iguales = (np.isclose(intercepto, referencia[0])
-                   and np.allclose(coefs, referencia[1])
-                   and np.isclose(ecm, referencia[2]))
+        iguales = (
+            np.isclose(intercepto, referencia[0])
+            and np.allclose(coefs, referencia[1])
+            and np.isclose(ecm, referencia[2])
+        )
         print("%s coincide con sklearn: %s" % (nombre, iguales))
 
     # Lo que solo da statsmodels: el resumen estadístico completo
     print()
-    print(sm.OLS(train[TARGET], sm.add_constant(train[FEATURES])).fit()
-          .summary().tables[1])
+    print(
+        sm.OLS(train[TARGET], sm.add_constant(train[FEATURES]))
+        .fit()
+        .summary()
+        .tables[1]
+    )
 
 
 if __name__ == "__main__":

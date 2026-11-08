@@ -162,6 +162,16 @@ class Sesion:
         self._avisar()
         return self.modelo
 
+    def guardar_descripcion(self, texto):
+        """Guarda la descripción del modelo actual.
+
+        Raises:
+            ErrorModelo: Si todavía no hay modelo.
+        """
+        if self.modelo is None:
+            raise ErrorModelo("Crea primero el modelo para poder describirlo.")
+        self.modelo.descripcion = "" if texto is None else str(texto)
+
     # --- Consultas ---
 
     def columnas_modelo(self):

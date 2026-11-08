@@ -19,13 +19,24 @@ class ModeloLineal:
         target: Nombre de la columna de salida.
         coeficientes: Un coeficiente por cada columna de entrada.
         termino_independiente: Término independiente del modelo.
+        descripcion: Texto libre, opcional, sobre en qué consiste el modelo
+            y con qué propósito se creó. Empieza vacío y se puede cambiar
+            cuando se quiera.
     """
 
-    def __init__(self, features, target, coeficientes, termino_independiente):
+    def __init__(
+        self,
+        features,
+        target,
+        coeficientes,
+        termino_independiente,
+        descripcion="",
+    ):
         self.features = tuple(features)
         self.target = target
         self.coeficientes = tuple(coeficientes)
         self.termino_independiente = termino_independiente
+        self.descripcion = descripcion
 
     def predecir(self, df):
         """Calcula la salida que predice el modelo para cada fila.
