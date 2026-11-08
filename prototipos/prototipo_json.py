@@ -62,8 +62,9 @@ def guardar_modelo(ruta, modelo, metricas, descripcion=""):
         },
     }
     with open(ruta, "w", encoding="utf-8") as archivo:
-        json.dump(datos, archivo, indent=2, ensure_ascii=False,
-                  allow_nan=False)
+        json.dump(
+            datos, archivo, indent=2, ensure_ascii=False, allow_nan=False
+        )
 
 
 # ----------------------------------------------------------------- cargar
@@ -118,7 +119,8 @@ def entrenar():
     """Mismo flujo que la prueba de concepto de la historia #13."""
     df = importar_datos(RUTA_DATOS)
     features = [
-        c for c in df.columns
+        c
+        for c in df.columns
         if c != TARGET and pd.api.types.is_numeric_dtype(df[c])
     ]
     train, test = separar_datos(df, 20, 42)
@@ -133,8 +135,10 @@ def main():
     original, metricas, test = entrenar()
 
     guardar_modelo(RUTA_MODELO, original, metricas, DESCRIPCION)
-    print("Guardado en %s (%d bytes)\n"
-          % (RUTA_MODELO.name, RUTA_MODELO.stat().st_size))
+    print(
+        "Guardado en %s (%d bytes)\n"
+        % (RUTA_MODELO.name, RUTA_MODELO.stat().st_size)
+    )
 
     cargado, info = cargar_modelo(RUTA_MODELO)
     print("Descripción:", info["descripcion"])
@@ -142,8 +146,10 @@ def main():
     print("Salida:", cargado.target)
     print("Fórmula:", info["formula"])
     for conjunto, valores in info["metricas"].items():
-        print("  %-14s R² = %.4f   ECM = %.2f"
-              % (conjunto, valores["r2"], valores["ecm"]))
+        print(
+            "  %-14s R² = %.4f   ECM = %.2f"
+            % (conjunto, valores["r2"], valores["ecm"])
+        )
 
     iguales = np.array_equal(original.predecir(test), cargado.predecir(test))
     print("\nMismas predicciones que el original: %s" % iguales)

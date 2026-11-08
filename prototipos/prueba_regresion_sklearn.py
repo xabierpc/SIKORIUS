@@ -41,8 +41,9 @@ def escribir_formula(modelo, features, target):
     for coef, nombre in zip(modelo.coef_, features, strict=True):
         formula += _termino("%.4f * %s" % (abs(coef), nombre), coef, primero)
         primero = False
-    return formula + _termino("%.4f" % abs(modelo.intercept_),
-                              modelo.intercept_, primero)
+    return formula + _termino(
+        "%.4f" % abs(modelo.intercept_), modelo.intercept_, primero
+    )
 
 
 def _termino(texto, valor, primero):
@@ -75,10 +76,14 @@ def probar_modelo(titulo, train, test, features, nueva_entrada):
     print("Métricas:")
     # RECM = raíz del ECM: el error típico en las unidades de la salida
     print("  %-14s %18s %12s %8s" % ("Conjunto", "ECM", "RECM", "R²"))
-    print("  %-14s %18.2f %12.2f %8.4f"
-          % ("Entrenamiento", ecm_train, ecm_train ** 0.5, r2_train))
-    print("  %-14s %18.2f %12.2f %8.4f"
-          % ("Test", ecm_test, ecm_test ** 0.5, r2_test))
+    print(
+        "  %-14s %18.2f %12.2f %8.4f"
+        % ("Entrenamiento", ecm_train, ecm_train**0.5, r2_train)
+    )
+    print(
+        "  %-14s %18.2f %12.2f %8.4f"
+        % ("Test", ecm_test, ecm_test**0.5, r2_test)
+    )
 
     # Un DataFrame con los nombres de las columnas evita el aviso de sklearn
     # "X does not have valid feature names"
@@ -96,8 +101,10 @@ def main():
 
     # 1. Cargar los datos (módulo de importación, historia #10)
     df = importar_datos(ruta)
-    print("Dataset: %s (%d filas, %d columnas)\n"
-          % (ruta.name, len(df), len(df.columns)))
+    print(
+        "Dataset: %s (%d filas, %d columnas)\n"
+        % (ruta.name, len(df), len(df.columns))
+    )
 
     # Entradas del modelo múltiple: columnas numéricas menos la salida
     # (ocean_proximity es texto y no se puede usar directamente)
@@ -108,29 +115,40 @@ def main():
 
     # 2. Separar en entrenamiento y test (historia #41)
     train, test = separar_datos(df, PORCENTAJE_TEST, SEMILLA)
-    print("Separación: %d filas de entrenamiento, %d de test (semilla %d)"
-          % (len(train), len(test), SEMILLA))
+    print(
+        "Separación: %d filas de entrenamiento, %d de test (semilla %d)"
+        % (len(train), len(test), SEMILLA)
+    )
 
     # LinearRegression no admite NaN: se eliminan esas filas en cada
     # conjunto con el módulo de preprocesado
     columnas = features_multiple + [TARGET]
     train, test, resumen = aplicar_preprocesado(
-        train, test, columnas, ELIMINAR)
-    print("Filas eliminadas por valores inexistentes: %d en entrenamiento,"
-          " %d en test\n" % (resumen["train"]["filas_eliminadas"],
-                             resumen["test"]["filas_eliminadas"]))
+        train, test, columnas, ELIMINAR
+    )
+    print(
+        "Filas eliminadas por valores inexistentes: %d en entrenamiento,"
+        " %d en test\n"
+        % (
+            resumen["train"]["filas_eliminadas"],
+            resumen["test"]["filas_eliminadas"],
+        )
+    )
 
     # 3-6. Entrenar, fórmula, métricas y predicción
     probar_modelo(
-        "Regresión simple", train, test, [FEATURE_SIMPLE],
-        {FEATURE_SIMPLE: 5.0})
+        "Regresión simple",
+        train,
+        test,
+        [FEATURE_SIMPLE],
+        {FEATURE_SIMPLE: 5.0},
+    )
 
     # Para la entrada nueva se usa la mediana de cada columna en train
     nueva = {}
     for nombre in features_multiple:
         nueva[nombre] = round(float(train[nombre].median()), 4)
-    probar_modelo(
-        "Regresión múltiple", train, test, features_multiple, nueva)
+    probar_modelo("Regresión múltiple", train, test, features_multiple, nueva)
 
 
 if __name__ == "__main__":

@@ -21,7 +21,10 @@ Se han investigado dos métodos, como pide la historia: uno que ejecuta código 
 - Guarda **el objeto de Python completo**. En la prueba se guarda un diccionario con el `ModeloLineal` y su información:
 
   ```python
-  joblib.dump({"modelo": modelo, "formula": ..., "metricas": ..., "descripcion": ...}, "modelo.joblib")
+  joblib.dump(
+      {"modelo": modelo, "formula": ..., "metricas": ..., "descripcion": ...},
+      "modelo.joblib",
+  )
   datos = joblib.load("modelo.joblib")
   ```
 
