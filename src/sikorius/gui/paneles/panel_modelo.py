@@ -49,6 +49,13 @@ class PanelModelo(Panel):
                             )
                             self.metricas[clave] = (ui.label(""), ui.label(""))
 
+                self.descripcion = ui.textarea(
+                    label="Descripción (opcional)",
+                    placeholder="En qué consiste el modelo y para qué se creó",
+                    on_change=self._cambiar_descripcion,
+                ).classes("w-full mt-2")
+                self.descripcion.props("autogrow")
+
                 # El gráfico es un SVG que se estira hasta el ancho que le
                 # den: "max-w-lg" evita que se agrande con el panel.
                 self.grafico = ui.pyplot(figsize=(5, 3.6)).classes(
@@ -86,9 +93,21 @@ class PanelModelo(Panel):
             r2.set_text(texto_metrica("R²", metricas[clave]["r2"]))
             ecm.set_text(texto_metrica("ECM", metricas[clave]["ecm"]))
 
+        # La descripción es del modelo, no del campo: al cambiar de modelo
+        # (o al recargar la página) el campo muestra la del modelo actual.
+        if self.descripcion.value != mod.descripcion:
+            self.descripcion.set_value(mod.descripcion)
+
         datos = modelo.datos_ajuste(mod, entrenamiento, test)
         with self.grafico:
             modelo.dibujar_ajuste(self.grafico.fig, datos)
+
+    def _cambiar_descripcion(self, evento):
+        """Cada cambio del campo se guarda en la descripción del modelo."""
+        mod = self.sesion.modelo
+        if mod is None or evento.value == mod.descripcion:
+            return
+        self.sesion.guardar_descripcion(evento.value)
 
     def crear(self):
         """Crea el modelo. Si falla, la sesión no cambia y se avisa."""
