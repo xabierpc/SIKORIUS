@@ -3,6 +3,8 @@
 uv run pytest tests/nucleo/test_modelo.py -v
 """
 
+import inspect
+import json
 import warnings
 
 import numpy as np
@@ -334,3 +336,95 @@ def test_metricas_con_conjunto_vacio_dan_nan_sin_avisos():
     assert np.isnan(metricas["test"]["ecm"])
     assert np.isnan(metricas["test"]["r2"])
     assert metricas["entrenamiento"]["r2"] == pytest.approx(1.0)
+
+
+# =============================================================================
+# Descripción del modelo
+# =============================================================================
+
+
+def test_un_modelo_entrenado_tiene_la_descripcion_vacia():
+    modelo = entrenar_modelo(datos_lineales(), ["x1", "x2"], "y")
+    assert modelo.descripcion == ""
+
+
+def test_la_descripcion_es_opcional_al_crear_el_modelo():
+    modelo = ModeloLineal(("x",), "y", (2.0,), 1.0)
+    assert modelo.descripcion == ""
+
+
+def test_la_descripcion_se_guarda_en_el_modelo():
+    modelo = ModeloLineal(("x",), "y", (2.0,), 1.0, "Precio de casas")
+    assert modelo.descripcion == "Precio de casas"
+
+
+def test_la_descripcion_se_puede_cambiar_despues():
+    modelo = entrenar_modelo(datos_lineales(), ["x1", "x2"], "y")
+    modelo.descripcion = "Primera versión"
+    modelo.descripcion = "Segunda versión\ncon dos líneas"
+    assert modelo.descripcion == "Segunda versión\ncon dos líneas"
+
+
+def test_la_descripcion_no_cambia_el_resto_del_modelo():
+    modelo = entrenar_modelo(datos_lineales(), ["x1", "x2"], "y")
+    formula = formula_texto(modelo)
+    coeficientes = modelo.coeficientes
+    modelo.descripcion = "Un texto cualquiera"
+    assert formula_texto(modelo) == formula
+    assert modelo.coeficientes == coeficientes
+
+
+# =============================================================================
+# Estructura de persistencia (investigación #20)
+# =============================================================================
+
+
+def bloque_modelo(modelo):
+    """El bloque "modelo" del archivo JSON de la investigación."""
+    return {
+        "features": list(modelo.features),
+        "target": modelo.target,
+        "coeficientes": list(modelo.coeficientes),
+        "termino_independiente": modelo.termino_independiente,
+    }
+
+
+def test_el_constructor_acepta_los_campos_del_bloque_json():
+    parametros = set(inspect.signature(ModeloLineal).parameters)
+    campos = {"features", "target", "coeficientes", "termino_independiente"}
+    assert campos <= parametros
+    assert "descripcion" not in campos  # la descripción va fuera del bloque
+
+
+def test_el_modelo_se_reconstruye_desde_el_bloque_json():
+    df = datos_lineales()
+    original = entrenar_modelo(df, ["x1", "x2"], "y")
+    texto = json.dumps(bloque_modelo(original), allow_nan=False)
+
+    reconstruido = ModeloLineal(**json.loads(texto))
+
+    assert reconstruido.features == original.features
+    assert reconstruido.coeficientes == original.coeficientes
+    assert reconstruido.predecir(df).tolist() == original.predecir(df).tolist()
+    assert reconstruido.descripcion == ""
+
+
+def test_los_numeros_del_modelo_son_float_normales():
+    modelo = entrenar_modelo(datos_lineales(), ["x1", "x2"], "y")
+    assert all(type(c) is float for c in modelo.coeficientes)
+    assert type(modelo.termino_independiente) is float
+
+
+def test_las_metricas_tienen_la_estructura_del_archivo():
+    df = datos_lineales()
+    modelo = entrenar_modelo(df.iloc[:15], ["x1", "x2"], "y")
+    metricas = metricas_modelo(modelo, df.iloc[:15], df.iloc[15:])
+    assert set(metricas) == {"entrenamiento", "test"}
+    for conjunto in metricas.values():
+        assert set(conjunto) == {"r2", "ecm"}
+    json.dumps(metricas, allow_nan=False)  # son números JSON válidos
+
+
+def test_la_formula_es_un_texto():
+    modelo = entrenar_modelo(datos_lineales(), ["x1", "x2"], "y")
+    assert isinstance(formula_texto(modelo), str)

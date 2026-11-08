@@ -450,3 +450,72 @@ def test_motivo_pide_preprocesar_si_quedan_nulos(sesion_con_nulos):
 def test_motivo_es_none_si_se_puede_crear(sesion_sin_nulos):
     assert sesion_sin_nulos.motivo_no_crear_modelo() is None
     assert sesion_sin_nulos.puede_crear_modelo()
+
+
+# =============================================================================
+# guardar_descripcion
+# =============================================================================
+
+
+def test_guardar_descripcion_la_deja_en_el_modelo(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("Precio de las casas según su tamaño")
+    assert sesion.modelo.descripcion == "Precio de las casas según su tamaño"
+
+
+def test_el_modelo_nuevo_tiene_la_descripcion_vacia(sesion):
+    sesion_lineal(sesion)
+    assert sesion.crear_modelo().descripcion == ""
+
+
+def test_la_ultima_descripcion_es_la_que_vale(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("uno")
+    sesion.guardar_descripcion("uno\ndos")
+    assert sesion.modelo.descripcion == "uno\ndos"
+
+
+def test_descripcion_none_se_guarda_vacia(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("algo")
+    sesion.guardar_descripcion(None)
+    assert sesion.modelo.descripcion == ""
+
+
+def test_crear_otro_modelo_vacia_la_descripcion(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("descripción del primero")
+    segundo = sesion.crear_modelo()
+    assert segundo.descripcion == ""
+    assert sesion.modelo.descripcion == ""
+
+
+def test_guardar_descripcion_no_avisa_a_la_interfaz(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+    sesion.guardar_descripcion("texto")
+    assert avisos == []
+
+
+def test_guardar_descripcion_sin_modelo(sesion):
+    sesion_lineal(sesion)
+    with pytest.raises(ErrorModelo, match="Crea primero"):
+        sesion.guardar_descripcion("texto")
+
+
+def test_si_se_borra_el_modelo_no_se_puede_describir(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("texto")
+    entrenamiento = sesion.separacion.entrenamiento
+    test = sesion.separacion.test
+    sesion.guardar_separacion(entrenamiento, test, 20, 1)  # borra el modelo
+    with pytest.raises(ErrorModelo):
+        sesion.guardar_descripcion("otro")
+    assert sesion.modelo is None
