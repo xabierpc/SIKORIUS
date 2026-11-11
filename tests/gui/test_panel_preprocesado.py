@@ -204,7 +204,7 @@ def test_aplicar_correcto(sesion_con_nulos, avisos):
 
     panel.aplicar()
 
-    mensaje, tipo = avisos[-1]
+    mensaje, tipo = avisos[-2]
     assert tipo == "positive"
     assert mensaje == texto_resumen(sesion_con_nulos.preprocesado.resumen)
     assert sesion_con_nulos.preprocesado.estrategia == MEDIA
