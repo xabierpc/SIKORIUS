@@ -4,16 +4,20 @@
 
 Aplicación de escritorio en Python para crear y visualizar modelos de regresión lineal simple y múltiple a partir de datos almacenados en archivos CSV, Excel y bases de datos SQLite, hacer predicciones y guardar los modelos para cargarlos más tarde, todo desde una interfaz gráfica.
 
-El proyecto está en desarrollo. La versión actual es la **0.1.0**: prepara los datos, pero todavía no crea modelos.
+El proyecto está en desarrollo. La versión actual es la **0.2.0**: prepara los datos, pero todavía no crea modelos.
 
-## Funcionalidades de la versión 0.1.0
+## Funcionalidades de la versión 0.2.0
 
 - **Cargar un dataset** desde un explorador de archivos: CSV, Excel (`.xlsx` y `.xls`, con una sola hoja con datos) y SQLite (`.sqlite` y `.db`, con una sola tabla), y verlo en una tabla.
 - **Elegir las columnas del modelo**: una o varias columnas de entrada (*features*) y una de salida (*target*), solo entre las columnas numéricas.
 - **Separar los datos en entrenamiento y test**, indicando el porcentaje de test y una semilla para que la separación se pueda repetir.
 - **Detectar y tratar los valores nulos** de las columnas elegidas, en entrenamiento y en test: eliminar las filas, o rellenar con la media, la mediana o un valor constante.
+- **Crear el modelo de regresión lineal** simple o múltiple con los datos de entrenamiento. Se crea automáticamente al aplicar el preprocesado, o con el botón "Crear modelo".
+- **Ver la fórmula del modelo** con los nombres de las columnas, y añadirle una descripción opcional.
+- **Evaluar el modelo**: R² y error cuadrático medio (ECM) en entrenamiento y en test.
+- **Ver el gráfico del ajuste**: en regresión simple, los puntos y la recta del modelo; en múltiple, el valor real frente al predicho.
 
-Pendiente para próximas versiones: crear el modelo de regresión lineal y ver su fórmula y su gráfica, evaluarlo, hacer predicciones, y guardar y cargar modelos.
+Pendiente para próximas versiones: hacer predicciones, y guardar y cargar modelos.
 
 ## Requisitos
 
@@ -67,7 +71,7 @@ Los datasets y los modelos generados **no se suben al repositorio**. Cada desarr
 SIKORIUS/
 ├── src/sikorius/
 │   ├── nucleo/          # Lógica sin interfaz: importar, columnas,
-│   │                    # separación, preprocesado
+│   │                    # separación, preprocesado, modelo
 │   ├── gui/
 │   │   ├── componentes/ # Piezas reutilizables: tabla, explorador...
 │   │   ├── paneles/     # Un panel por paso de la aplicación
