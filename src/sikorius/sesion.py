@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from sikorius.nucleo import preprocesado
+from sikorius.nucleo import modelo, preprocesado
 from sikorius.nucleo.columnas import resolver_columnas
-from sikorius.nucleo.errores import ErrorPreprocesado
+from sikorius.nucleo.errores import ErrorModelo, ErrorPreprocesado
 
 # Orden del flujo: cambiar un paso borra todos los que van detrás
 PASOS = ("dataset", "seleccion", "separacion", "preprocesado", "modelo")
@@ -140,6 +140,38 @@ class Sesion:
         self._avisar()
         return resumen
 
+    def crear_modelo(self):
+        """Entrena el modelo con el entrenamiento actual y lo guarda.
+
+        El modelo nuevo sustituye al anterior, si lo había.
+
+        Returns:
+            El ModeloLineal creado.
+
+        Raises:
+            ErrorModelo: Si faltan pasos previos, quedan valores
+                inexistentes o el modelo no se puede ajustar. En ese caso
+                la sesión no cambia.
+        """
+        motivo = self.motivo_no_crear_modelo()
+        if motivo is not None:
+            raise ErrorModelo(motivo)
+        entrenamiento, _ = self.conjuntos_actuales()
+        *features, target = self.columnas_modelo()
+        self.modelo = modelo.entrenar_modelo(entrenamiento, features, target)
+        self._avisar()
+        return self.modelo
+
+    def guardar_descripcion(self, texto):
+        """Guarda la descripción del modelo actual.
+
+        Raises:
+            ErrorModelo: Si todavía no hay modelo.
+        """
+        if self.modelo is None:
+            raise ErrorModelo("Crea primero el modelo para poder describirlo.")
+        self.modelo.descripcion = "" if texto is None else str(texto)
+
     # --- Consultas ---
 
     def columnas_modelo(self):
@@ -169,3 +201,21 @@ class Sesion:
         if deteccion is None:
             return False
         return not preprocesado.hay_nulos(deteccion)
+
+    def motivo_no_crear_modelo(self):
+        """Explica por qué todavía no se puede crear el modelo.
+
+        Returns:
+            El texto de lo que falta, o None si ya se puede crear.
+        """
+        if self.seleccion is None:
+            return "Confirma primero la selección de columnas."
+        if self.separacion is None:
+            return "Separa primero en entrenamiento y test."
+        if not self.puede_crear_modelo():
+            return (
+                "Quedan valores inexistentes en las columnas "
+                "seleccionadas: trátalos con el preprocesado antes de "
+                "crear el modelo."
+            )
+        return None

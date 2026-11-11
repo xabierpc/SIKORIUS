@@ -1,11 +1,12 @@
-# Integración continua: en cada push y pull request a dev o main comprueba
-# el formato y el estilo con ruff y pasa todos los tests con cobertura.
+# Integración continua: en cada push a cualquier rama, y en cada pull
+# request hacia dev o main, comprueba el formato y el estilo con ruff y pasa
+# todos los tests con cobertura.
 # Si algo falla, GitHub marca el commit con una cruz roja.
 name: Tests
 
 on:
   push:
-    branches: [main, dev]
+    branches: ["**"]
   pull_request:
     branches: [main, dev]
 

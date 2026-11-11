@@ -1,4 +1,4 @@
-"""Tests de la sesión: cascada de pasos, avisos y preprocesado.
+"""Tests de la sesión: cascada de pasos, avisos, preprocesado y modelo.
 
 Recogen también las reglas que antes probaba tests/test_estado.py con el
 estado antiguo (EstadoApp). La lectura de archivos ya no es de la sesión:
@@ -7,13 +7,19 @@ la prueban tests/nucleo/test_importador.py y tests/gui/test_panel_dataset.py.
     uv run pytest tests/test_sesion.py -v
 """
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.errores import AvisoPreprocesado, ErrorPreprocesado
+from sikorius.nucleo.errores import (
+    AvisoPreprocesado,
+    ErrorModelo,
+    ErrorPreprocesado,
+)
+from sikorius.nucleo.modelo import ModeloLineal
 from sikorius.nucleo.preprocesado import ESTRATEGIAS
 
 # =============================================================================
@@ -294,3 +300,222 @@ def test_modelo_disponible_ignora_columnas_no_seleccionadas(sesion):
     test["x"] = test["x"].fillna(0.0)
     preparar(sesion, train, test)
     assert sesion.puede_crear_modelo()
+
+
+# =============================================================================
+# crear_modelo
+# =============================================================================
+
+
+def datos_lineales(n=20):
+    """y = 2*x1 - 3*x2 + 5, sin ruido (un coeficiente es negativo)."""
+    x1 = np.arange(n, dtype=float)
+    x2 = (np.arange(n, dtype=float) * 7) % 11
+    return pd.DataFrame({"x1": x1, "x2": x2, "y": 2 * x1 - 3 * x2 + 5})
+
+
+def sesion_lineal(sesion, features=("x1", "x2")):
+    """Sesión con datos_lineales separados en 15 de entrenamiento y 5 de
+    test."""
+    df = datos_lineales()
+    return preparar(sesion, df.iloc[:15], df.iloc[15:], features)
+
+
+def test_crear_modelo_lo_guarda_en_la_sesion(sesion):
+    sesion_lineal(sesion)
+    modelo = sesion.crear_modelo()
+    assert isinstance(modelo, ModeloLineal)
+    assert sesion.modelo is modelo
+    assert modelo.features == ("x1", "x2")
+    assert modelo.target == "y"
+    assert modelo.coeficientes == pytest.approx((2.0, -3.0))
+    assert modelo.termino_independiente == pytest.approx(5.0)
+
+
+def test_crear_modelo_solo_usa_el_entrenamiento(sesion):
+    df = datos_lineales()
+    test = df.iloc[15:].copy()
+    test["y"] = test["y"] + 1000  # un test muy distinto no debe influir
+    preparar(sesion, df.iloc[:15], test, ("x1", "x2"))
+    modelo = sesion.crear_modelo()
+    assert modelo.coeficientes == pytest.approx((2.0, -3.0))
+    assert modelo.termino_independiente == pytest.approx(5.0)
+
+
+def test_crear_modelo_usa_el_entrenamiento_preprocesado(sesion_con_nulos):
+    sesion_con_nulos.aplicar_preprocesado("eliminar")  # quedan 2 filas
+    modelo = sesion_con_nulos.crear_modelo()
+    # (1, 10) y (5, 40): pendiente 7.5 y término independiente 2.5
+    assert modelo.coeficientes == pytest.approx((7.5,))
+    assert modelo.termino_independiente == pytest.approx(2.5)
+    # El entrenamiento original conserva su valor inexistente
+    assert sesion_con_nulos.separacion.entrenamiento["x"].isna().sum() == 1
+
+
+def test_crear_modelo_con_cabeceras_no_texto(sesion):
+    train = pd.DataFrame({2020: [1.0, 2.0, 3.0], "y": [3.0, 5.0, 7.0]})
+    test = pd.DataFrame({2020: [4.0], "y": [9.0]})
+    preparar(sesion, train, test, features=("2020",))
+    modelo = sesion.crear_modelo()
+    assert modelo.features == (2020,)
+    assert modelo.coeficientes == pytest.approx((2.0,))
+
+
+def test_un_modelo_nuevo_sustituye_al_anterior(sesion):
+    sesion_lineal(sesion)
+    primero = sesion.crear_modelo()
+    segundo = sesion.crear_modelo()
+    assert segundo is not primero
+    assert sesion.modelo is segundo
+
+
+def test_crear_modelo_avisa_a_la_interfaz(sesion):
+    sesion_lineal(sesion)
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+    sesion.crear_modelo()
+    assert avisos == ["cambio"]
+
+
+def test_cambiar_un_paso_anterior_borra_el_modelo(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    entrenamiento = sesion.separacion.entrenamiento
+    test = sesion.separacion.test
+    sesion.guardar_separacion(entrenamiento, test, 20, 1)
+    assert sesion.modelo is None
+
+    sesion.crear_modelo()
+    sesion.aplicar_preprocesado("media")
+    assert sesion.modelo is None
+
+
+def test_crear_modelo_sin_seleccion(sesion, datos):
+    sesion.cargar_dataset(datos, "datos.csv")
+    with pytest.raises(ErrorModelo, match="selección"):
+        sesion.crear_modelo()
+
+
+def test_crear_modelo_sin_separacion(sesion_con_seleccion):
+    with pytest.raises(ErrorModelo, match="Separa primero"):
+        sesion_con_seleccion.crear_modelo()
+    assert sesion_con_seleccion.modelo is None
+
+
+def test_crear_modelo_con_nulos_pide_preprocesar(sesion_con_nulos):
+    with pytest.raises(ErrorModelo, match="preprocesado"):
+        sesion_con_nulos.crear_modelo()
+    assert sesion_con_nulos.modelo is None
+
+
+def test_crear_modelo_con_columna_de_texto(sesion):
+    df = datos_lineales().assign(texto="a")
+    preparar(sesion, df.iloc[:15], df.iloc[15:], ("x1", "texto"))
+    with pytest.raises(ErrorModelo, match="'texto' no es numérica"):
+        sesion.crear_modelo()
+    assert sesion.modelo is None
+
+
+def test_crear_modelo_error_conserva_el_anterior(sesion):
+    sesion_lineal(sesion)
+    anterior = sesion.crear_modelo()
+    constante = sesion.separacion.entrenamiento.assign(x1=1.0)
+    sesion.separacion = replace(sesion.separacion, entrenamiento=constante)
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+    with pytest.raises(ErrorModelo, match="modelo único"):
+        sesion.crear_modelo()
+    assert sesion.modelo is anterior
+    assert avisos == []
+
+
+# =============================================================================
+# motivo_no_crear_modelo
+# =============================================================================
+
+
+def test_motivo_segun_lo_que_falta(sesion, datos):
+    assert "selección" in sesion.motivo_no_crear_modelo()
+    sesion.cargar_dataset(datos, "datos.csv")
+    sesion.guardar_seleccion(["x1"], "y")
+    assert "Separa primero" in sesion.motivo_no_crear_modelo()
+
+
+def test_motivo_pide_preprocesar_si_quedan_nulos(sesion_con_nulos):
+    assert "inexistentes" in sesion_con_nulos.motivo_no_crear_modelo()
+    sesion_con_nulos.aplicar_preprocesado("media")
+    assert sesion_con_nulos.motivo_no_crear_modelo() is None
+
+
+def test_motivo_es_none_si_se_puede_crear(sesion_sin_nulos):
+    assert sesion_sin_nulos.motivo_no_crear_modelo() is None
+    assert sesion_sin_nulos.puede_crear_modelo()
+
+
+# =============================================================================
+# guardar_descripcion
+# =============================================================================
+
+
+def test_guardar_descripcion_la_deja_en_el_modelo(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("Precio de las casas según su tamaño")
+    assert sesion.modelo.descripcion == "Precio de las casas según su tamaño"
+
+
+def test_el_modelo_nuevo_tiene_la_descripcion_vacia(sesion):
+    sesion_lineal(sesion)
+    assert sesion.crear_modelo().descripcion == ""
+
+
+def test_la_ultima_descripcion_es_la_que_vale(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("uno")
+    sesion.guardar_descripcion("uno\ndos")
+    assert sesion.modelo.descripcion == "uno\ndos"
+
+
+def test_descripcion_none_se_guarda_vacia(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("algo")
+    sesion.guardar_descripcion(None)
+    assert sesion.modelo.descripcion == ""
+
+
+def test_crear_otro_modelo_vacia_la_descripcion(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("descripción del primero")
+    segundo = sesion.crear_modelo()
+    assert segundo.descripcion == ""
+    assert sesion.modelo.descripcion == ""
+
+
+def test_guardar_descripcion_no_avisa_a_la_interfaz(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+    sesion.guardar_descripcion("texto")
+    assert avisos == []
+
+
+def test_guardar_descripcion_sin_modelo(sesion):
+    sesion_lineal(sesion)
+    with pytest.raises(ErrorModelo, match="Crea primero"):
+        sesion.guardar_descripcion("texto")
+
+
+def test_si_se_borra_el_modelo_no_se_puede_describir(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("texto")
+    entrenamiento = sesion.separacion.entrenamiento
+    test = sesion.separacion.test
+    sesion.guardar_separacion(entrenamiento, test, 20, 1)  # borra el modelo
+    with pytest.raises(ErrorModelo):
+        sesion.guardar_descripcion("otro")
+    assert sesion.modelo is None
