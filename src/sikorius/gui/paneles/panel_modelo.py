@@ -1,16 +1,24 @@
 """Panel para crear y evaluar el modelo de regresión lineal."""
 
 import math
+from pathlib import Path
 
 from nicegui import ui
 
 from sikorius.gui.avisos import notificar_error, notificar_exito
+from sikorius.gui.componentes import dialogo_guardado
 from sikorius.gui.paneles.base import Panel
 from sikorius.nucleo import modelo
-from sikorius.nucleo.errores import ErrorModelo
+from sikorius.nucleo.errores import ErrorModelo, ErrorPersistencia
+from sikorius.nucleo.persistencia import EXTENSION
 from sikorius.nucleo.texto import formatear_numero
 
 DECIMALES_METRICAS = 4
+
+AVISO_SIN_DESCRIPCION = (
+    "El modelo no tiene descripción. Puedes guardarlo igualmente, pero "
+    "después será más difícil saber para qué se creó."
+)
 
 
 def texto_metrica(nombre, valor):
@@ -20,6 +28,34 @@ def texto_metrica(nombre, valor):
     return f"{nombre}: {formatear_numero(valor, DECIMALES_METRICAS)}"
 
 
+def destino_inicial(sesion):
+    """Carpeta y nombre que propone el diálogo de guardado.
+
+    - Si el modelo ya se guardó, el mismo archivo (para volver a
+      guardarlo hay que confirmar que se sobrescribe).
+    - Si no, la carpeta del dataset y "modelo_<nombre del dataset>.json".
+    - Sin dataset, la carpeta personal y "modelo.json".
+
+    Returns:
+        Tupla (carpeta como ``Path``, nombre del archivo).
+    """
+    if sesion.ruta_modelo is not None:
+        ruta = Path(sesion.ruta_modelo)
+        return ruta.parent, ruta.name
+    if sesion.dataset is not None:
+        ruta = Path(sesion.dataset.ruta)
+        return ruta.parent, "modelo_" + ruta.stem + EXTENSION
+    return Path.home(), "modelo" + EXTENSION
+
+
+def aviso_antes_de_guardar(mod):
+    """Aviso del diálogo de guardado si falta la descripción, o None."""
+    descripcion = mod.descripcion
+    if descripcion is None or descripcion.strip() == "":
+        return AVISO_SIN_DESCRIPCION
+    return None
+
+
 class PanelModelo(Panel):
     """Botón de creación, fórmula, métricas y gráfico de ajuste."""
 
@@ -27,7 +63,11 @@ class PanelModelo(Panel):
         with ui.card().classes("w-full"):
             ui.label("Modelo").classes("text-lg font-semibold")
             self.aviso = ui.label("").classes("text-sm text-gray-500")
-            self.boton = ui.button("Crear modelo", on_click=self.crear)
+            with ui.row().classes("items-center gap-2"):
+                self.boton = ui.button("Crear modelo", on_click=self.crear)
+                self.boton_guardar = ui.button(
+                    "Guardar modelo", icon="save", on_click=self.guardar
+                ).props("outline")
 
             self.resultados = ui.column().classes("w-full mt-4")
             with self.resultados:
@@ -62,6 +102,10 @@ class PanelModelo(Panel):
                     "w-full max-w-lg self-center mt-4"
                 )
 
+        # Modelo que se ve ahora. La sesión avisa también por cambios que
+        # no son del modelo (por ejemplo, al guardarlo), y redibujar el
+        # gráfico en cada aviso sería lento y no cambiaría nada.
+        self._mostrado = None
         super().__init__(sesion)
 
     def actualizar(self):
@@ -76,10 +120,15 @@ class PanelModelo(Panel):
             self.boton.enable()
 
         if self.sesion.modelo is not None:
-            self._mostrar_resultados()
+            if self.sesion.modelo is not self._mostrado:
+                self._mostrar_resultados()
+                self._mostrado = self.sesion.modelo
             self.resultados.set_visibility(True)
+            self.boton_guardar.enable()
         else:
+            self._mostrado = None
             self.resultados.set_visibility(False)
+            self.boton_guardar.disable()
 
     def _mostrar_resultados(self):
         """Escribe la fórmula y las métricas y dibuja el gráfico."""
@@ -88,7 +137,7 @@ class PanelModelo(Panel):
 
         self.formula.set_text(modelo.formula_texto(mod))
 
-        metricas = modelo.metricas_modelo(mod, entrenamiento, test)
+        metricas = self.sesion.metricas_modelo()
         for clave, (r2, ecm) in self.metricas.items():
             r2.set_text(texto_metrica("R²", metricas[clave]["r2"]))
             ecm.set_text(texto_metrica("ECM", metricas[clave]["ecm"]))
@@ -117,3 +166,26 @@ class PanelModelo(Panel):
             notificar_error(error)
             return
         notificar_exito("Modelo creado correctamente.")
+
+    async def guardar(self):
+        """Pide la ruta con el diálogo y guarda el modelo en ella.
+
+        Si el usuario cierra el diálogo no pasa nada. Si el guardado falla
+        se muestra el error y se puede volver a intentar.
+        """
+        mod = self.sesion.modelo
+        if mod is None:
+            notificar_error("Crea primero el modelo para poder guardarlo.")
+            return
+        carpeta, nombre = destino_inicial(self.sesion)
+        ruta = await dialogo_guardado.elegir_ruta_guardado(
+            carpeta, nombre, aviso_antes_de_guardar(mod)
+        )
+        if ruta is None:
+            return  # el usuario cerró el diálogo: no se guarda nada
+        try:
+            guardada = self.sesion.guardar_modelo(ruta)
+        except ErrorPersistencia as error:
+            notificar_error(error)
+            return
+        notificar_exito("Modelo guardado en " + str(guardada))

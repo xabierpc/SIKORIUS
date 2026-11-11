@@ -25,6 +25,10 @@ class ErrorModelo(ErrorSikorius):
     """No se puede crear el modelo de regresión lineal."""
 
 
+class ErrorPersistencia(ErrorSikorius):
+    """No se puede guardar el modelo en un archivo."""
+
+
 class AvisoPreprocesado(ErrorPreprocesado):
     """El preprocesado se podría hacer, pero el resultado no sería válido."""
 

@@ -11,9 +11,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from sikorius.nucleo import modelo, preprocesado
+from sikorius.nucleo import modelo, persistencia, preprocesado
 from sikorius.nucleo.columnas import resolver_columnas
-from sikorius.nucleo.errores import ErrorModelo, ErrorPreprocesado
+from sikorius.nucleo.errores import (
+    ErrorModelo,
+    ErrorPersistencia,
+    ErrorPreprocesado,
+)
 
 # Orden del flujo: cambiar un paso borra todos los que van detrás
 PASOS = ("dataset", "seleccion", "separacion", "preprocesado", "modelo")
@@ -62,6 +66,11 @@ class Sesion:
         self.separacion = None
         self.preprocesado = None
         self.modelo = None
+        # Archivo en el que se guardó el modelo actual por última vez, y si
+        # ha cambiado desde entonces (un modelo recién creado aún no se ha
+        # guardado; cambiar la descripción también es un cambio).
+        self.ruta_modelo = None
+        self.modelo_sin_guardar = False
         self._oyentes = []
 
     # --- Avisos ---
@@ -88,6 +97,9 @@ class Sesion:
         """Borra paso y todos los que van detrás en el flujo."""
         for nombre in PASOS[PASOS.index(paso) :]:
             setattr(self, nombre, None)
+        # Sin modelo no hay nada que guardar
+        self.ruta_modelo = None
+        self.modelo_sin_guardar = False
 
     # --- Pasos del flujo ---
 
@@ -159,6 +171,8 @@ class Sesion:
         entrenamiento, _ = self.conjuntos_actuales()
         *features, target = self.columnas_modelo()
         self.modelo = modelo.entrenar_modelo(entrenamiento, features, target)
+        self.ruta_modelo = None
+        self.modelo_sin_guardar = True
         self._avisar()
         return self.modelo
 
@@ -170,7 +184,37 @@ class Sesion:
         """
         if self.modelo is None:
             raise ErrorModelo("Crea primero el modelo para poder describirlo.")
-        self.modelo.descripcion = "" if texto is None else str(texto)
+        if texto is None:
+            texto = ""
+        texto = str(texto)
+        if texto != self.modelo.descripcion:
+            self.modelo.descripcion = texto
+            self.modelo_sin_guardar = True
+
+    def guardar_modelo(self, ruta):
+        """Guarda el modelo actual, con sus métricas, en un archivo JSON.
+
+        Escribe exactamente en ruta (sobrescribe si ya existe): añadir la
+        extensión y pedir confirmación es cosa de la interfaz.
+
+        Returns:
+            La ruta absoluta del archivo guardado, como ``Path``.
+
+        Raises:
+            ErrorPersistencia: Si no hay modelo o no se puede escribir el
+                archivo. En ese caso la sesión no cambia.
+        """
+        if self.modelo is None:
+            raise ErrorPersistencia(
+                "Crea primero el modelo para poder guardarlo."
+            )
+        guardada = persistencia.guardar_modelo(
+            self.modelo, self.metricas_modelo(), ruta
+        )
+        self.ruta_modelo = str(guardada)
+        self.modelo_sin_guardar = False
+        self._avisar()
+        return guardada
 
     # --- Consultas ---
 
@@ -184,6 +228,18 @@ class Sesion:
         if self.preprocesado is not None:
             return self.preprocesado.entrenamiento, self.preprocesado.test
         return self.separacion.entrenamiento, self.separacion.test
+
+    def metricas_modelo(self):
+        """R² y ECM del modelo actual en entrenamiento y test.
+
+        Returns:
+            El diccionario de ``modelo.metricas_modelo``, o None si no hay
+            modelo.
+        """
+        if self.modelo is None:
+            return None
+        entrenamiento, test = self.conjuntos_actuales()
+        return modelo.metricas_modelo(self.modelo, entrenamiento, test)
 
     def detectar_nulos(self):
         """Nulos por columna en train y test, o None si aún no hay
