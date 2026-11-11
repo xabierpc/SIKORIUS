@@ -128,6 +128,22 @@ uv run sikorius                        # la aplicación arranca
 Para ver qué partes del código cubren los tests:
 `uv run pytest --cov --cov-report=term-missing`.
 
+### Reglas de fusión según GitHub Actions
+
+GitHub Actions ejecuta estas mismas comprobaciones en cada push a cualquier
+rama (ver [`docs/integracion-continua.md`](docs/integracion-continua.md)).
+Estas reglas sustituyen a las de fusionar solo con las pruebas en local:
+
+- Una rama de trabajo (`feature`, `fix` o `docs`) solo se fusiona en `dev`
+  si las comprobaciones pasan en local **y** su última ejecución en GitHub
+  Actions ha terminado en verde. Se mira en la pestaña **Actions**,
+  filtrando por la rama, o en el PR.
+- Después de cada fusión en `dev`, se comprueba que la ejecución de GitHub
+  Actions sobre `dev` también termina en verde. Si falla, se corrige en una
+  rama `fix/<descripcion>` antes de fusionar ninguna otra rama.
+- `dev` solo se fusiona en `main` si su última ejecución en GitHub Actions
+  ha terminado en verde.
+
 
 Si aparece un **conflicto**:
 

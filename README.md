@@ -51,9 +51,11 @@ uv run ruff format --check src tests               # revisar el formato
 uv run ruff check src tests                        # revisar el estilo
 ```
 
-GitHub Actions ejecuta estas mismas comprobaciones en cada push y pull
-request a `dev` y `main` (`.github/workflows/tests.yml`). La insignia del
-principio indica si la última ejecución en `dev` ha pasado.
+GitHub Actions ejecuta estas mismas comprobaciones en cada push a cualquier
+rama y en cada pull request hacia `dev` o `main`
+(`.github/workflows/tests.yml`). La insignia del principio indica si la
+última ejecución en `dev` ha pasado. El funcionamiento del flujo está
+explicado en [`docs/integracion-continua.md`](docs/integracion-continua.md).
 
 ## Datos
 
