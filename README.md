@@ -4,8 +4,7 @@
 
 Aplicación de escritorio en Python para crear y visualizar modelos de regresión lineal simple y múltiple a partir de datos almacenados en archivos CSV, Excel y bases de datos SQLite, hacer predicciones y guardar los modelos para cargarlos más tarde, todo desde una interfaz gráfica.
 
-El proyecto está en desarrollo. La versión actual es la **0.2.0**: prepara los datos, pero todavía no crea modelos.
-
+El proyecto está en desarrollo. La versión actual es la **0.2.0**: prepara los datos y crea y evalúa modelos de regresión lineal.
 ## Funcionalidades de la versión 0.2.0
 
 - **Cargar un dataset** desde un explorador de archivos: CSV, Excel (`.xlsx` y `.xls`, con una sola hoja con datos) y SQLite (`.sqlite` y `.db`, con una sola tabla), y verlo en una tabla.
