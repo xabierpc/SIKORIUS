@@ -16,7 +16,11 @@ from sikorius.gui.avisos import (
     notificar_exito,
 )
 from sikorius.gui.paneles.base import Panel
-from sikorius.nucleo.errores import AvisoPreprocesado, ErrorPreprocesado
+from sikorius.nucleo.errores import (
+    AvisoPreprocesado,
+    ErrorModelo,
+    ErrorPreprocesado,
+)
 from sikorius.nucleo.preprocesado import (
     CONSTANTE,
     ELIMINAR,
@@ -171,7 +175,12 @@ class PanelPreprocesado(Panel):
             return
 
         self._mostrar_tabla(deteccion)
-        if hay_nulos(deteccion):
+        if hay_nulos(deteccion) and self.sesion.preprocesado is not None:
+            # Ya están tratados: el aviso de valores inexistentes sobra y
+            # basta con la etiqueta de lo aplicado.
+            self.aviso.set_text("")
+            self.controles.set_visibility(True)
+        elif hay_nulos(deteccion):
             total_train = sum(deteccion["train"].values())
             total_test = sum(deteccion["test"].values())
             self.aviso.set_text(
@@ -206,3 +215,14 @@ class PanelPreprocesado(Panel):
             notificar_error(error)
             return
         notificar_exito(texto_resumen(resumen))
+        self._crear_modelo()
+
+    def _crear_modelo(self):
+        """Crea el modelo con los datos recién preprocesados. Si falla, el
+        preprocesado se conserva y se avisa del error."""
+        try:
+            self.sesion.crear_modelo()
+        except ErrorModelo as error:
+            notificar_error(error)
+            return
+        notificar_exito("Modelo creado correctamente.")
