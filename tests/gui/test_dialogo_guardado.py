@@ -366,3 +366,93 @@ def test_cancelar_no_elige_nada(tmp_path):
     dialogo.cancelar()
     assert dialogo.resultado is None
     assert list(tmp_path.iterdir()) == []
+
+
+# =============================================================================
+# Mejoras: nombres que Windows no admite, ruta final y doble Enter
+# =============================================================================
+
+
+@pytest.mark.parametrize(
+    "nombre", ["CON", "con", "nul.json", "Com1", "LPT9.txt", " aux "]
+)
+def test_nombres_reservados_de_windows(nombre):
+    assert "reservado" in motivo_nombre_no_valido(nombre)
+
+
+@pytest.mark.parametrize("nombre", ["consola", "com10", "nulo.json"])
+def test_nombres_parecidos_a_reservados_si_valen(nombre):
+    assert motivo_nombre_no_valido(nombre) is None
+
+
+def test_nombre_terminado_en_punto():
+    assert "punto" in motivo_nombre_no_valido("modelo.")
+
+
+@pytest.mark.parametrize("nombre", ["mo\tdelo", "mo\ndelo", "mo\x00delo"])
+def test_nombre_con_caracteres_de_control(nombre):
+    assert motivo_nombre_no_valido(nombre) is not None
+
+
+def test_nombre_demasiado_largo():
+    assert motivo_nombre_no_valido("a" * 250) is None  # 255 con ".json"
+    assert "largo" in motivo_nombre_no_valido("a" * 251)
+    # Se cuentan bytes: la ñ ocupa dos
+    assert "largo" in motivo_nombre_no_valido("ñ" * 126)
+
+
+def test_muestra_la_ruta_final_con_extension(carpeta_rara):
+    dialogo = DialogoGuardado(carpeta_rara, "modelo")
+    esperado = str(carpeta_rara.resolve() / "modelo.json")
+    assert dialogo.destino.text == "Se guardará como: " + esperado
+
+
+def test_la_ruta_final_cambia_al_escribir_y_al_navegar(tmp_path):
+    (tmp_path / "sub").mkdir()
+    dialogo = DialogoGuardado(tmp_path, "modelo")
+
+    dialogo.nombre.set_value("otro.json")
+    assert dialogo.destino.text.endswith(str(tmp_path.resolve() / "otro.json"))
+
+    dialogo.mostrar(tmp_path.resolve() / "sub")
+    assert dialogo.destino.text.endswith(
+        str(tmp_path.resolve() / "sub" / "otro.json")
+    )
+
+
+def test_la_ruta_final_explica_si_el_nombre_no_vale(tmp_path):
+    dialogo = DialogoGuardado(tmp_path, "modelo")
+    dialogo.nombre.set_value("")
+    assert "Escribe un nombre" in dialogo.destino.text
+
+
+def test_dos_enter_seguidos_solo_preguntan_una_vez(tmp_path):
+    """Mientras se pregunta si sobrescribir, otro Enter no hace nada."""
+    (tmp_path / "viejo.json").write_text("{}", encoding="utf-8")
+    preguntas = []
+
+    async def preguntar_despacio(titulo, mensaje, texto_aceptar):
+        preguntas.append(titulo)
+        await asyncio.sleep(0.01)
+        return True
+
+    dialogo = DialogoGuardado(tmp_path, "viejo", preguntar=preguntar_despacio)
+
+    async def pulsar_dos_veces():
+        await asyncio.gather(dialogo.aceptar(), dialogo.aceptar())
+
+    asyncio.run(pulsar_dos_veces())
+
+    assert len(preguntas) == 1
+    assert dialogo.resultado == tmp_path.resolve() / "viejo.json"
+
+
+def test_tras_no_sobrescribir_se_puede_volver_a_pulsar(tmp_path):
+    (tmp_path / "viejo.json").write_text("{}", encoding="utf-8")
+    preguntas = []
+    dialogo = DialogoGuardado(
+        tmp_path, "viejo", preguntar=respuesta_fija(False, preguntas)
+    )
+    asyncio.run(dialogo.aceptar())
+    asyncio.run(dialogo.aceptar())
+    assert len(preguntas) == 2

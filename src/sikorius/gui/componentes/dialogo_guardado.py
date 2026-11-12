@@ -26,6 +26,18 @@ from sikorius.nucleo.persistencia import EXTENSION, ruta_con_extension
 # todos los sistemas para que los modelos se puedan copiar a cualquiera.
 CARACTERES_PROHIBIDOS = '<>:"/\\|?*'
 
+# Nombres que Windows reserva para dispositivos, con o sin extensión
+# ("con.json" tampoco vale). Por lo mismo, se rechazan en todos los sistemas.
+NOMBRES_RESERVADOS = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + ["COM%d" % i for i in range(1, 10)]
+    + ["LPT%d" % i for i in range(1, 10)]
+)
+
+# Longitud máxima de un nombre de archivo en casi todos los sistemas
+# (en bytes, con la extensión incluida).
+LONGITUD_MAXIMA = 255
+
 
 def es_modelo(ruta):
     """Archivos que se muestran en el diálogo: los de modelo (.json)."""
@@ -54,6 +66,19 @@ def motivo_nombre_no_valido(nombre):
                 "El nombre del archivo no puede contener ninguno de "
                 "estos caracteres: " + " ".join(CARACTERES_PROHIBIDOS)
             )
+    if any(ord(caracter) < 32 for caracter in nombre):
+        return "El nombre del archivo no puede contener tabuladores ni saltos."
+    if nombre.endswith("."):
+        # Windows quita el punto final y guardaría otro archivo
+        return "El nombre del archivo no puede terminar en punto."
+    if nombre.split(".")[0].strip().upper() in NOMBRES_RESERVADOS:
+        return (
+            "'" + nombre + "' es un nombre reservado del sistema. "
+            "Elige otro nombre."
+        )
+    nombre_final = ruta_con_extension(nombre).name
+    if len(nombre_final.encode("utf-8")) > LONGITUD_MAXIMA:
+        return "El nombre del archivo es demasiado largo."
     return None
 
 
@@ -114,6 +139,10 @@ class DialogoGuardado:
         self._preguntar = preguntar
         self.resultado = None
         self.carpeta = None
+        # Mientras se comprueba el nombre (y se pregunta si sobrescribir),
+        # otro Enter o clic en "Guardar" no hace nada: así no se abren dos
+        # preguntas a la vez.
+        self._comprobando = False
 
         with (
             ui.dialog() as self.dialogo,
@@ -149,9 +178,15 @@ class DialogoGuardado:
 
             # Enter en el campo equivale a pulsar "Guardar"
             self.nombre = ui.input(
-                label="Nombre del archivo", value=nombre_inicial
+                label="Nombre del archivo",
+                value=nombre_inicial,
+                on_change=lambda _: self._actualizar_destino(),
             ).classes("w-full")
             self.nombre.on("keydown.enter", self.aceptar)
+            # Ruta completa con la que se guardará, extensión incluida
+            self.destino = ui.label("").classes(
+                "text-sm text-gray-500 break-all"
+            )
 
             with ui.row().classes("w-full justify-end"):
                 ui.button("Cancelar", on_click=self.cancelar).props("flat")
@@ -204,6 +239,7 @@ class DialogoGuardado:
 
         self.carpeta = carpeta
         self.etiqueta_carpeta.set_text(str(carpeta))
+        self._actualizar_destino()
         self.lista.clear()
         with self.lista:
             if carpeta.parent != carpeta:
@@ -219,6 +255,21 @@ class DialogoGuardado:
                         "text-gray-500"
                     )
 
+    def texto_destino(self):
+        """Dónde se guardará con el nombre escrito, o por qué no se puede."""
+        motivo = motivo_nombre_no_valido(self.nombre.value)
+        if motivo is not None:
+            return motivo
+        return "Se guardará como: " + str(
+            ruta_destino(self.carpeta, self.nombre.value)
+        )
+
+    def _actualizar_destino(self):
+        # Al crear el diálogo, mostrar() se llama antes de que exista la
+        # carpeta; hasta entonces no hay nada que enseñar
+        if self.carpeta is not None:
+            self.destino.set_text(self.texto_destino())
+
     # --- Botones ---
 
     def cancelar(self):
@@ -232,17 +283,31 @@ class DialogoGuardado:
         Si el nombre no vale, o el archivo existe y el usuario no quiere
         sobrescribirlo, el diálogo sigue abierto para elegir otro.
         """
+        if self._comprobando:
+            return
+        self._comprobando = True
+        try:
+            ruta = await self._comprobar_ruta()
+        finally:
+            self._comprobando = False
+        if ruta is None:
+            return
+        self.resultado = ruta
+        self.dialogo.submit(ruta)
+
+    async def _comprobar_ruta(self):
+        """La ruta elegida si se puede usar, o None (tras avisar)."""
         motivo = motivo_nombre_no_valido(self.nombre.value)
         if motivo is not None:
             notificar_error(motivo)
-            return
+            return None
         ruta = ruta_destino(self.carpeta, self.nombre.value)
         if ruta.is_dir():
             notificar_error(
                 "Ya hay una carpeta llamada '" + ruta.name + "'. "
                 "Elige otro nombre."
             )
-            return
+            return None
         if ruta.exists():
             sobrescribir = await self._preguntar(
                 "El archivo ya existe",
@@ -254,9 +319,8 @@ class DialogoGuardado:
                 "Sobrescribir",
             )
             if not sobrescribir:
-                return
-        self.resultado = ruta
-        self.dialogo.submit(ruta)
+                return None
+        return ruta
 
     async def elegir(self):
         """Abre el diálogo y espera a que el usuario termine.
