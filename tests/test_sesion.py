@@ -7,6 +7,7 @@ la prueban tests/nucleo/test_importador.py y tests/gui/test_panel_dataset.py.
     uv run pytest tests/test_sesion.py -v
 """
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -17,9 +18,10 @@ import pytest
 from sikorius.nucleo.errores import (
     AvisoPreprocesado,
     ErrorModelo,
+    ErrorPersistencia,
     ErrorPreprocesado,
 )
-from sikorius.nucleo.modelo import ModeloLineal
+from sikorius.nucleo.modelo import ModeloLineal, metricas_modelo
 from sikorius.nucleo.preprocesado import ESTRATEGIAS
 
 # =============================================================================
@@ -519,3 +521,173 @@ def test_si_se_borra_el_modelo_no_se_puede_describir(sesion):
     with pytest.raises(ErrorModelo):
         sesion.guardar_descripcion("otro")
     assert sesion.modelo is None
+
+
+# =============================================================================
+# guardar_modelo (historia #21)
+# =============================================================================
+
+
+def leer_json(ruta):
+    with open(ruta, encoding="utf-8") as archivo:
+        return json.load(archivo)
+
+
+def test_sesion_nueva_no_tiene_nada_que_guardar(sesion):
+    assert sesion.ruta_modelo is None
+    assert not sesion.modelo_sin_guardar
+    assert sesion.metricas_modelo() is None
+
+
+def test_modelo_recien_creado_esta_sin_guardar(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    assert sesion.modelo_sin_guardar
+    assert sesion.ruta_modelo is None
+
+
+def test_guardar_modelo_escribe_el_archivo(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("Mi modelo")
+
+    ruta = sesion.guardar_modelo(tmp_path / "modelo.json")
+
+    datos = leer_json(ruta)
+    assert datos["descripcion"] == "Mi modelo"
+    assert datos["modelo"]["features"] == ["x1", "x2"]
+    assert datos["modelo"]["target"] == "y"
+    assert datos["metricas"] == sesion.metricas_modelo()
+
+
+def test_guardar_usa_las_metricas_de_entrenamiento_y_test(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    entrenamiento, test = sesion.conjuntos_actuales()
+    esperadas = metricas_modelo(sesion.modelo, entrenamiento, test)
+
+    datos = leer_json(sesion.guardar_modelo(tmp_path / "m.json"))
+
+    assert datos["metricas"]["entrenamiento"]["ecm"] == pytest.approx(
+        esperadas["entrenamiento"]["ecm"], abs=1e-12
+    )
+    assert datos["metricas"]["test"]["ecm"] == pytest.approx(
+        esperadas["test"]["ecm"], abs=1e-12
+    )
+
+
+def test_guardar_recuerda_la_ruta_y_quita_los_cambios(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    ruta = sesion.guardar_modelo(tmp_path / "m.json")
+    assert sesion.ruta_modelo == str(ruta)
+    assert Path(sesion.ruta_modelo).is_absolute()
+    assert not sesion.modelo_sin_guardar
+
+
+def test_guardar_avisa_a_la_interfaz(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+    sesion.guardar_modelo(tmp_path / "m.json")
+    assert avisos == ["cambio"]
+
+
+def test_cambiar_la_descripcion_deja_cambios_sin_guardar(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_modelo(tmp_path / "m.json")
+    sesion.guardar_descripcion("nueva")
+    assert sesion.modelo_sin_guardar
+    assert sesion.ruta_modelo is not None  # se sigue proponiendo el archivo
+
+
+def test_la_misma_descripcion_no_es_un_cambio(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("igual")
+    sesion.guardar_modelo(tmp_path / "m.json")
+    sesion.guardar_descripcion("igual")
+    assert not sesion.modelo_sin_guardar
+
+
+def test_guardar_otra_vez_con_la_descripcion_nueva(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    ruta = sesion.guardar_modelo(tmp_path / "m.json")
+    antes = leer_json(ruta)
+    sesion.guardar_descripcion("Segunda versión")
+
+    sesion.guardar_modelo(ruta)
+
+    despues = leer_json(ruta)
+    assert despues["descripcion"] == "Segunda versión"
+    assert despues["modelo"] == antes["modelo"]
+    assert despues["metricas"] == antes["metricas"]
+
+
+def test_crear_otro_modelo_olvida_la_ruta(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_modelo(tmp_path / "m.json")
+    sesion.crear_modelo()
+    assert sesion.ruta_modelo is None
+    assert sesion.modelo_sin_guardar
+
+
+@pytest.mark.parametrize(
+    "paso",
+    ["dataset", "seleccion", "separacion", "preprocesado"],
+)
+def test_borrar_el_modelo_olvida_la_ruta(sesion, tmp_path, paso):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    sesion.guardar_descripcion("cambio")
+    sesion.guardar_modelo(tmp_path / "m.json")
+    entrenamiento = sesion.separacion.entrenamiento
+    test = sesion.separacion.test
+    if paso == "dataset":
+        sesion.cargar_dataset(pd.DataFrame({"a": [1]}), "otro.csv")
+    elif paso == "seleccion":
+        sesion.guardar_seleccion(["x1"], "y")
+    elif paso == "separacion":
+        sesion.guardar_separacion(entrenamiento, test, 20, 1)
+    else:
+        sesion.aplicar_preprocesado("eliminar")
+    assert sesion.modelo is None
+    assert sesion.ruta_modelo is None
+    assert not sesion.modelo_sin_guardar
+
+
+def test_guardar_sin_modelo(sesion, tmp_path):
+    sesion_lineal(sesion)
+    with pytest.raises(ErrorPersistencia, match="Crea primero"):
+        sesion.guardar_modelo(tmp_path / "m.json")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_error_al_guardar_no_cambia_la_sesion(sesion, tmp_path):
+    sesion_lineal(sesion)
+    modelo = sesion.crear_modelo()
+    sesion.guardar_modelo(tmp_path / "bueno.json")
+    sesion.guardar_descripcion("cambio sin guardar")
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+
+    with pytest.raises(ErrorPersistencia):
+        sesion.guardar_modelo(tmp_path / "no_existe" / "m.json")
+
+    assert sesion.modelo is modelo
+    assert sesion.ruta_modelo == str(tmp_path / "bueno.json")
+    assert sesion.modelo_sin_guardar
+    assert avisos == []
+
+
+def test_tras_un_error_se_puede_volver_a_guardar(sesion, tmp_path):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    with pytest.raises(ErrorPersistencia):
+        sesion.guardar_modelo(tmp_path / "no_existe" / "m.json")
+    ruta = sesion.guardar_modelo(tmp_path / "m.json")
+    assert ruta.exists()

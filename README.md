@@ -15,8 +15,9 @@ El proyecto está en desarrollo. La versión actual es la **0.2.0**: prepara los
 - **Ver la fórmula del modelo** con los nombres de las columnas, y añadirle una descripción opcional.
 - **Evaluar el modelo**: R² y error cuadrático medio (ECM) en entrenamiento y en test.
 - **Ver el gráfico del ajuste**: en regresión simple, los puntos y la recta del modelo; en múltiple, el valor real frente al predicho.
+- **Guardar el modelo** en un archivo JSON (`.json`) elegido con un diálogo: guarda la fórmula, los coeficientes, las columnas, las métricas y la descripción, pero no los datos ni los gráficos.
 
-Pendiente para próximas versiones: hacer predicciones, y guardar y cargar modelos.
+Pendiente para próximas versiones: hacer predicciones y cargar modelos guardados.
 
 ## Requisitos
 

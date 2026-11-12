@@ -47,10 +47,15 @@ def _clave_orden(ruta):
     return (not ruta.is_dir(), ruta.name.lower())
 
 
-def listar_carpeta(carpeta):
+def listar_carpeta(carpeta, admitido=es_admitido):
     """Devuelve las subcarpetas y los archivos compatibles de una carpeta.
 
     Se omiten los archivos y carpetas ocultos (los que empiezan por punto).
+
+    Args:
+        carpeta: Carpeta que se lista.
+        admitido: Función que recibe la ruta de un archivo y dice si se
+            muestra. Por defecto, los datasets que se pueden importar.
 
     Raises:
         PermissionError: Si no hay permiso para leer la carpeta.
@@ -60,7 +65,7 @@ def listar_carpeta(carpeta):
         if ruta.name.startswith("."):
             continue
         try:
-            if ruta.is_dir() or ruta.is_file() and es_admitido(ruta):
+            if ruta.is_dir() or ruta.is_file() and admitido(ruta):
                 entradas.append(ruta)
         except OSError:
             pass  # enlaces rotos o archivos inaccesibles: no se muestran

@@ -1,16 +1,24 @@
 """Panel para crear y evaluar el modelo de regresión lineal."""
 
 import math
+from pathlib import Path
 
 from nicegui import ui
 
 from sikorius.gui.avisos import notificar_error, notificar_exito
+from sikorius.gui.componentes import dialogo_guardado
 from sikorius.gui.paneles.base import Panel
 from sikorius.nucleo import modelo
-from sikorius.nucleo.errores import ErrorModelo
+from sikorius.nucleo.errores import ErrorModelo, ErrorPersistencia
+from sikorius.nucleo.persistencia import EXTENSION
 from sikorius.nucleo.texto import formatear_numero
 
 DECIMALES_METRICAS = 4
+
+AVISO_SIN_DESCRIPCION = (
+    "El modelo no tiene descripción. Puedes guardarlo igualmente, pero "
+    "después será más difícil saber para qué se creó."
+)
 
 
 def texto_metrica(nombre, valor):
@@ -20,6 +28,51 @@ def texto_metrica(nombre, valor):
     return f"{nombre}: {formatear_numero(valor, DECIMALES_METRICAS)}"
 
 
+def destino_inicial(sesion):
+    """Carpeta y nombre que propone el diálogo de guardado.
+
+    - Si el modelo ya se guardó, el mismo archivo (para volver a
+      guardarlo hay que confirmar que se sobrescribe).
+    - Si no, la carpeta del dataset y "modelo_<nombre del dataset>.json".
+    - Sin dataset, la carpeta personal y "modelo.json".
+
+    Returns:
+        Tupla (carpeta como ``Path``, nombre del archivo).
+    """
+    if sesion.ruta_modelo is not None:
+        ruta = Path(sesion.ruta_modelo)
+        return ruta.parent, ruta.name
+    if sesion.dataset is not None:
+        ruta = Path(sesion.dataset.ruta)
+        return ruta.parent, "modelo_" + ruta.stem + EXTENSION
+    return Path.home(), "modelo" + EXTENSION
+
+
+def texto_estado_guardado(sesion):
+    """Si el modelo actual está guardado y dónde, o "" si no hay modelo.
+
+    Ejemplos: "Sin guardar", "Guardado en /ruta/modelo.json" o "Cambios
+    sin guardar (guardado antes en /ruta/modelo.json)".
+    """
+    if sesion.modelo is None:
+        return ""
+    if sesion.ruta_modelo is None:
+        return "Sin guardar"
+    if sesion.modelo_sin_guardar:
+        return (
+            "Cambios sin guardar (guardado antes en %s)" % sesion.ruta_modelo
+        )
+    return "Guardado en " + sesion.ruta_modelo
+
+
+def aviso_antes_de_guardar(mod):
+    """Aviso del diálogo de guardado si falta la descripción, o None."""
+    descripcion = mod.descripcion
+    if descripcion is None or descripcion.strip() == "":
+        return AVISO_SIN_DESCRIPCION
+    return None
+
+
 class PanelModelo(Panel):
     """Botón de creación, fórmula, métricas y gráfico de ajuste."""
 
@@ -27,7 +80,14 @@ class PanelModelo(Panel):
         with ui.card().classes("w-full"):
             ui.label("Modelo").classes("text-lg font-semibold")
             self.aviso = ui.label("").classes("text-sm text-gray-500")
-            self.boton = ui.button("Crear modelo", on_click=self.crear)
+            with ui.row().classes("items-center gap-2"):
+                self.boton = ui.button("Crear modelo", on_click=self.crear)
+                self.boton_guardar = ui.button(
+                    "Guardar modelo", icon="save", on_click=self.guardar
+                ).props("outline")
+                self.estado_guardado = ui.label("").classes(
+                    "text-sm text-gray-500 break-all"
+                )
 
             self.resultados = ui.column().classes("w-full mt-4")
             with self.resultados:
@@ -62,6 +122,13 @@ class PanelModelo(Panel):
                     "w-full max-w-lg self-center mt-4"
                 )
 
+        # Modelo que se ve ahora. La sesión avisa también por cambios que
+        # no son del modelo (por ejemplo, al guardarlo), y redibujar el
+        # gráfico en cada aviso sería lento y no cambiaría nada.
+        self._mostrado = None
+        # True mientras el diálogo de guardado está abierto: un segundo clic
+        # en "Guardar modelo" no abre otro diálogo encima.
+        self._guardando = False
         super().__init__(sesion)
 
     def actualizar(self):
@@ -76,10 +143,24 @@ class PanelModelo(Panel):
             self.boton.enable()
 
         if self.sesion.modelo is not None:
-            self._mostrar_resultados()
+            if self.sesion.modelo is not self._mostrado:
+                self._mostrar_resultados()
+                self._mostrado = self.sesion.modelo
             self.resultados.set_visibility(True)
         else:
+            self._mostrado = None
             self.resultados.set_visibility(False)
+
+        if self.sesion.modelo is not None and not self._guardando:
+            self.boton_guardar.enable()
+        else:
+            self.boton_guardar.disable()
+        self._mostrar_estado_guardado()
+
+    def _mostrar_estado_guardado(self):
+        texto = texto_estado_guardado(self.sesion)
+        self.estado_guardado.set_text(texto)
+        self.estado_guardado.set_visibility(texto != "")
 
     def _mostrar_resultados(self):
         """Escribe la fórmula y las métricas y dibuja el gráfico."""
@@ -88,7 +169,7 @@ class PanelModelo(Panel):
 
         self.formula.set_text(modelo.formula_texto(mod))
 
-        metricas = modelo.metricas_modelo(mod, entrenamiento, test)
+        metricas = self.sesion.metricas_modelo()
         for clave, (r2, ecm) in self.metricas.items():
             r2.set_text(texto_metrica("R²", metricas[clave]["r2"]))
             ecm.set_text(texto_metrica("ECM", metricas[clave]["ecm"]))
@@ -108,6 +189,9 @@ class PanelModelo(Panel):
         if mod is None or evento.value == mod.descripcion:
             return
         self.sesion.guardar_descripcion(evento.value)
+        # La sesión no avisa por la descripción (se escribe letra a letra):
+        # el estado de guardado se actualiza aquí.
+        self._mostrar_estado_guardado()
 
     def crear(self):
         """Crea el modelo. Si falla, la sesión no cambia y se avisa."""
@@ -117,3 +201,42 @@ class PanelModelo(Panel):
             notificar_error(error)
             return
         notificar_exito("Modelo creado correctamente.")
+
+    async def guardar(self):
+        """Pide la ruta con el diálogo y guarda el modelo en ella.
+
+        Si el usuario cierra el diálogo no pasa nada. Si el guardado falla
+        se muestra el error y se puede volver a intentar.
+        """
+        if self._guardando:
+            return  # ya hay un diálogo de guardado abierto
+        mod = self.sesion.modelo
+        if mod is None:
+            notificar_error("Crea primero el modelo para poder guardarlo.")
+            return
+        self._guardando = True
+        self.boton_guardar.disable()
+        try:
+            carpeta, nombre = destino_inicial(self.sesion)
+            ruta = await dialogo_guardado.elegir_ruta_guardado(
+                carpeta, nombre, aviso_antes_de_guardar(mod)
+            )
+        finally:
+            self._guardando = False
+            self.actualizar()
+        if ruta is None:
+            return  # el usuario cerró el diálogo: no se guarda nada
+        if self.sesion.modelo is not mod:
+            # Desde otra pestaña se puede cambiar o borrar el modelo con el
+            # diálogo abierto: no se guarda uno distinto del que se veía.
+            notificar_error(
+                "El modelo ha cambiado mientras elegías el archivo. "
+                "Revísalo y vuelve a guardarlo."
+            )
+            return
+        try:
+            guardada = self.sesion.guardar_modelo(ruta)
+        except ErrorPersistencia as error:
+            notificar_error(error)
+            return
+        notificar_exito("Modelo guardado en " + str(guardada))

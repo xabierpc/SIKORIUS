@@ -3,15 +3,26 @@
 uv run pytest tests/gui/test_panel_modelo.py -v
 """
 
+import asyncio
 import inspect
+import json
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 from nicegui import ui
 
-from sikorius.gui.paneles.panel_modelo import PanelModelo, texto_metrica
+from sikorius.gui.componentes import dialogo_guardado
+from sikorius.gui.paneles.panel_modelo import (
+    AVISO_SIN_DESCRIPCION,
+    PanelModelo,
+    aviso_antes_de_guardar,
+    destino_inicial,
+    texto_estado_guardado,
+    texto_metrica,
+)
 from sikorius.sesion import Sesion
 
 # =============================================================================
@@ -419,3 +430,436 @@ def test_otros_avisos_no_pisan_lo_que_se_escribe(sesion_lista):
 
     assert panel.descripcion.value == "lo que escribo"
     assert sesion_lista.modelo.descripcion == "lo que escribo"
+
+
+# =============================================================================
+# Guardar el modelo (historia #21)
+# =============================================================================
+
+
+def elegir_al_guardar(monkeypatch, ruta):
+    """El diálogo de guardado devuelve ruta sin abrirse.
+
+    Returns:
+        Lista con los argumentos (carpeta, nombre, aviso) de cada llamada.
+    """
+    llamadas = []
+
+    async def dialogo_falso(carpeta, nombre, aviso=None):
+        llamadas.append((carpeta, nombre, aviso))
+        return ruta
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_falso
+    )
+    return llamadas
+
+
+def leer_json(ruta):
+    with open(ruta, encoding="utf-8") as archivo:
+        return json.load(archivo)
+
+
+def test_sin_modelo_no_se_puede_guardar(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    assert panel.boton_guardar.text == "Guardar modelo"
+    assert not panel.boton_guardar.enabled
+
+
+def test_sin_nada_no_se_puede_guardar():
+    panel = PanelModelo(Sesion())
+    assert not panel.boton_guardar.enabled
+
+
+def test_al_crear_el_modelo_se_habilita_guardar(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    assert panel.boton_guardar.enabled
+
+
+def test_al_borrarse_el_modelo_se_deshabilita_guardar(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    sesion_lista.aplicar_preprocesado("media")  # borra el modelo
+    assert not panel.boton_guardar.enabled
+
+
+def test_al_recargar_la_pagina_se_puede_guardar(sesion_lista):
+    sesion_lista.crear_modelo()
+    panel = PanelModelo(sesion_lista)
+    assert panel.boton_guardar.enabled
+
+
+def test_guardar_escribe_el_archivo_y_avisa(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    ruta = tmp_path / "Mis modelos ñ" / "modelo.json"
+    ruta.parent.mkdir()
+    elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("Descripción del modelo")
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert avisos == [("Modelo guardado en " + str(ruta), "positive")]
+    datos = leer_json(ruta)
+    assert datos["descripcion"] == "Descripción del modelo"
+    assert datos["formula"] == panel.formula.text
+    assert datos["modelo"]["features"] == ["x1", "x2"]
+    assert datos["modelo"]["target"] == "y"
+    assert set(datos["metricas"]) == {"entrenamiento", "test"}
+    assert not sesion_lista.modelo_sin_guardar
+
+
+def test_lo_guardado_es_lo_que_se_ve(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    """Las métricas del archivo son las que muestra el panel."""
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    datos = leer_json(tmp_path / "m.json")
+    for clave, (r2, ecm) in panel.metricas.items():
+        assert r2.text == texto_metrica("R²", datos["metricas"][clave]["r2"])
+        assert ecm.text == texto_metrica(
+            "ECM", datos["metricas"][clave]["ecm"]
+        )
+
+
+def test_cerrar_el_dialogo_no_guarda_nada(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, None)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert avisos == []
+    assert list(tmp_path.iterdir()) == []
+    assert sesion_lista.modelo_sin_guardar
+    assert sesion_lista.ruta_modelo is None
+
+
+def test_sin_descripcion_el_dialogo_avisa(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    llamadas = elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    assert llamadas[0][2] == AVISO_SIN_DESCRIPCION
+    # El aviso no impide guardar
+    assert leer_json(tmp_path / "m.json")["descripcion"] == ""
+
+
+def test_descripcion_solo_con_espacios_tambien_avisa(sesion_lista):
+    sesion_lista.crear_modelo()
+    sesion_lista.guardar_descripcion("  \n ")
+    assert aviso_antes_de_guardar(sesion_lista.modelo) is not None
+
+
+def test_con_descripcion_no_hay_aviso(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    llamadas = elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("algo")
+
+    asyncio.run(panel.guardar())
+
+    assert llamadas[0][2] is None
+
+
+def test_error_al_guardar_avisa_y_se_puede_reintentar(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "no_existe" / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert len(avisos) == 1
+    mensaje, tipo = avisos[0]
+    assert tipo == "negative"
+    assert "no existe la carpeta" in mensaje
+    assert panel.boton_guardar.enabled
+    assert sesion_lista.modelo is not None
+
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    asyncio.run(panel.guardar())
+    assert (tmp_path / "m.json").exists()
+    assert avisos[-1][1] == "positive"
+
+
+def test_sobrescribe_el_archivo_elegido(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    """La confirmación la pide el diálogo: si devuelve la ruta, se escribe."""
+    ruta = tmp_path / "m.json"
+    ruta.write_text("viejo", encoding="utf-8")
+    elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    assert leer_json(ruta)["modelo"]["target"] == "y"
+
+
+def test_guardar_no_redibuja_ni_cambia_el_modelo(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("texto")
+    modelo = sesion_lista.modelo
+
+    asyncio.run(panel.guardar())
+
+    assert sesion_lista.modelo is modelo
+    assert panel.descripcion.value == "texto"
+    assert panel.resultados.visible
+
+
+# --- Carpeta y nombre que propone el diálogo ---
+
+
+def test_destino_sin_dataset():
+    assert destino_inicial(Sesion()) == (Path.home(), "modelo.json")
+
+
+def test_destino_junto_al_dataset(tmp_path):
+    sesion = Sesion()
+    sesion.cargar_dataset(datos_lineales(), tmp_path / "pisos ñ.csv")
+    carpeta, nombre = destino_inicial(sesion)
+    assert carpeta == tmp_path.resolve()
+    assert nombre == "modelo_pisos ñ.json"
+
+
+def test_destino_tras_guardar_es_el_mismo_archivo(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    ruta = tmp_path / "guardado.json"
+    llamadas = elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+    panel.descripcion.set_value("cambio")
+    asyncio.run(panel.guardar())
+
+    assert llamadas[1][0] == tmp_path
+    assert llamadas[1][1] == "guardado.json"
+    assert leer_json(ruta)["descripcion"] == "cambio"
+
+
+def test_destino_de_un_modelo_nuevo_vuelve_al_dataset(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "guardado.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    asyncio.run(panel.guardar())
+
+    panel.crear()
+
+    _, nombre = destino_inicial(sesion_lista)
+    assert nombre == "modelo_datos.json"
+
+
+def test_el_panel_no_escribe_archivos_por_su_cuenta():
+    """El panel delega: el JSON lo escribe nucleo.persistencia."""
+    import sikorius.gui.paneles.panel_modelo as panel
+
+    codigo = inspect.getsource(panel)
+    assert "guardar_modelo(" in codigo
+    for prohibido in ("import json", "json.", "open(", "write_text"):
+        assert prohibido not in codigo
+
+
+def test_guardar_no_vuelve_a_dibujar_el_grafico(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    veces = []
+    monkeypatch.setattr(
+        panel, "_mostrar_resultados", lambda: veces.append("dibujo")
+    )
+
+    asyncio.run(panel.guardar())
+    assert veces == []
+
+    panel.crear()  # un modelo nuevo sí se dibuja
+    assert veces == ["dibujo"]
+
+
+# =============================================================================
+# Mejoras: estado de guardado, doble clic y modelo que cambia
+# =============================================================================
+
+
+def test_estado_sin_modelo_no_se_ve(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    assert texto_estado_guardado(sesion_lista) == ""
+    assert not panel.estado_guardado.visible
+
+
+def test_estado_modelo_nuevo_sin_guardar(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    assert panel.estado_guardado.text == "Sin guardar"
+    assert panel.estado_guardado.visible
+
+
+def test_estado_tras_guardar_muestra_la_ruta(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    ruta = tmp_path / "m.json"
+    elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    assert panel.estado_guardado.text == "Guardado en " + str(ruta)
+
+
+def test_estado_cambiar_la_descripcion_deja_cambios_sin_guardar(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    ruta = tmp_path / "m.json"
+    elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    asyncio.run(panel.guardar())
+
+    panel.descripcion.set_value("nueva descripción")
+
+    assert panel.estado_guardado.text.startswith("Cambios sin guardar")
+    assert str(ruta) in panel.estado_guardado.text
+
+
+def test_estado_modelo_nuevo_tras_guardar_vuelve_a_sin_guardar(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    asyncio.run(panel.guardar())
+
+    panel.crear()
+
+    assert panel.estado_guardado.text == "Sin guardar"
+
+
+def test_con_el_dialogo_abierto_el_boton_esta_deshabilitado(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    estados = []
+    panel = PanelModelo(sesion_lista)
+
+    async def dialogo_falso(carpeta, nombre, aviso=None):
+        estados.append(panel.boton_guardar.enabled)
+        panel.actualizar()  # la sesión avisa con el diálogo abierto
+        estados.append(panel.boton_guardar.enabled)
+        return None
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_falso
+    )
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    assert estados == [False, False]
+    assert panel.boton_guardar.enabled  # al cerrar se vuelve a habilitar
+
+
+def test_doble_clic_solo_abre_un_dialogo(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    llamadas = []
+
+    async def dialogo_lento(carpeta, nombre, aviso=None):
+        llamadas.append(nombre)
+        await asyncio.sleep(0.01)
+        return tmp_path / "m.json"
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_lento
+    )
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    avisos.clear()
+
+    async def dos_clics():
+        await asyncio.gather(panel.guardar(), panel.guardar())
+
+    asyncio.run(dos_clics())
+
+    assert len(llamadas) == 1
+    assert avisos == [
+        ("Modelo guardado en " + str(tmp_path / "m.json"), "positive")
+    ]
+
+
+def test_si_el_modelo_cambia_con_el_dialogo_abierto_no_se_guarda(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    """Desde otra pestaña se crea otro modelo mientras se elige archivo."""
+    panel = PanelModelo(sesion_lista)
+
+    async def dialogo_falso(carpeta, nombre, aviso=None):
+        sesion_lista.crear_modelo()
+        return tmp_path / "m.json"
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_falso
+    )
+    panel.crear()
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert not (tmp_path / "m.json").exists()
+    assert len(avisos) == 1
+    assert avisos[0][1] == "negative"
+    assert "ha cambiado" in avisos[0][0]
+    assert panel.boton_guardar.enabled
+
+
+def test_si_el_modelo_se_borra_con_el_dialogo_abierto_no_se_guarda(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    panel = PanelModelo(sesion_lista)
+
+    async def dialogo_falso(carpeta, nombre, aviso=None):
+        sesion_lista.aplicar_preprocesado("media")  # borra el modelo
+        return tmp_path / "m.json"
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_falso
+    )
+    panel.crear()
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert not (tmp_path / "m.json").exists()
+    assert avisos[0][1] == "negative"
+    assert not panel.boton_guardar.enabled
