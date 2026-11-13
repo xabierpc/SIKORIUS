@@ -92,7 +92,7 @@ async def seleccionar_archivo(carpeta_inicial):
 
     with ui.dialog() as dialogo, ui.card().classes("w-[650px] max-w-full"):
         ui.label("Selecciona un dataset").classes("text-lg font-semibold")
-        ui.label("Tipos admitidos: " + tipos).classes("text-sm text-gray-500")
+        ui.label("Tipos admitidos: " + tipos).classes("text-sm text-secondary")
         with ui.row().classes("w-full items-center no-wrap"):
             ui.button(
                 icon="home", on_click=lambda: mostrar(Path.home())
@@ -154,7 +154,7 @@ async def seleccionar_archivo(carpeta_inicial):
                 with ui.item():
                     ui.item_label(
                         "No hay carpetas ni archivos compatibles"
-                    ).classes("text-gray-500")
+                    ).classes("text-secondary")
 
     inicio = Path(carpeta_inicial).resolve()
     if not inicio.is_dir():

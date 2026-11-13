@@ -134,7 +134,7 @@ def test_muestra_nulos_por_conjunto(sesion_con_nulos):
         {"columna": "y", "train": 1, "test": 0},
     ]
     assert "Entrenamiento: 2 | Test: 1" in panel.aviso.text
-    assert "text-orange-700" in panel.aviso.classes
+    assert "text-warning" in panel.aviso.classes
     assert panel.controles.visible
 
 
@@ -145,7 +145,7 @@ def test_sin_nulos_oculta_controles(sesion_sin_nulos):
         {"columna": "y", "train": 0, "test": 0},
     ]
     assert "No hay valores inexistentes" in panel.aviso.text
-    assert "text-green-700" in panel.aviso.classes
+    assert "text-positive" in panel.aviso.classes
     assert not panel.controles.visible
 
 

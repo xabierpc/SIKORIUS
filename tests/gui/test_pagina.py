@@ -11,11 +11,12 @@ uv run pytest tests/gui/test_pagina.py -v
 import pytest
 from nicegui import ui
 
-from sikorius.gui.pagina import construir_pagina
+from sikorius.gui.pagina import TITULOS, Pestanas, construir_pagina
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
+from sikorius.nucleo.separacion import separar_datos
 
 
 @pytest.fixture(autouse=True)
@@ -102,3 +103,53 @@ def test_al_recargar_cada_panel_muestra_su_paso(sesion, datos):
     assert despues.separacion.entrada_semilla.value == "7"
     assert despues.preprocesado.estrategia.value == "mediana"
     assert despues.preprocesado.aplicado.text.startswith("Aplicado:")
+
+
+# =============================================================================
+# Pestañas con desbloqueo progresivo
+# =============================================================================
+
+
+def pestanas_activas(pestanas):
+    return [e for e, p in pestanas.pestanas.items() if p.enabled]
+
+
+def test_pestanas_al_empezar_solo_datos(sesion):
+    pestanas = Pestanas(sesion)
+    assert pestanas_activas(pestanas) == ["datos"]
+    assert pestanas.paneles.value == "datos"
+
+
+def test_pestanas_se_desbloquean_con_el_flujo(sesion, datos):
+    pestanas = Pestanas(sesion)
+    sesion.cargar_dataset(datos, "datos.csv")
+    assert pestanas_activas(pestanas) == ["datos", "variables"]
+    sesion.guardar_seleccion(["x1", "x2"], "y")
+    entrenamiento, test = separar_datos(sesion.dataset.datos, 20, 42)
+    sesion.guardar_separacion(entrenamiento, test, 20, 42)
+    assert pestanas_activas(pestanas) == ["datos", "variables", "preprocesado"]
+    sesion.aplicar_preprocesado("media")
+    assert pestanas_activas(pestanas) == list(TITULOS)
+
+
+def test_pestanas_si_se_cierra_la_que_se_ve_se_va_a_la_ultima_abierta(
+    sesion_separada, datos
+):
+    sesion_separada.aplicar_preprocesado("media")
+    pestanas = Pestanas(sesion_separada)
+    pestanas.paneles.set_value("modelo")
+
+    sesion_separada.cargar_dataset(datos, "otro.csv")
+
+    assert pestanas.paneles.value == "variables"
+
+
+def test_pestanas_no_mueven_al_usuario_si_su_pestana_sigue_abierta(
+    sesion_separada,
+):
+    pestanas = Pestanas(sesion_separada)
+    pestanas.paneles.set_value("preprocesado")
+
+    sesion_separada.aplicar_preprocesado("media")
+
+    assert pestanas.paneles.value == "preprocesado"

@@ -39,7 +39,7 @@ class PanelColumnas(Panel):
                 "Confirmar selección", icon="check", on_click=self.confirmar
             )
             self.etiqueta_seleccion = ui.label("").classes(
-                "text-sm text-gray-500"
+                "text-sm text-secondary"
             )
 
         # Dataset cuyas columnas tienen ahora los selectores. Solo se

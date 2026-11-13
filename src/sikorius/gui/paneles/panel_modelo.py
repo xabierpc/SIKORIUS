@@ -79,20 +79,20 @@ class PanelModelo(Panel):
     def __init__(self, sesion):
         with ui.card().classes("w-full"):
             ui.label("Modelo").classes("text-lg font-semibold")
-            self.aviso = ui.label("").classes("text-sm text-gray-500")
+            self.aviso = ui.label("").classes("text-sm opacity-70")
             with ui.row().classes("items-center gap-2"):
                 self.boton = ui.button("Crear modelo", on_click=self.crear)
                 self.boton_guardar = ui.button(
                     "Guardar modelo", icon="save", on_click=self.guardar
                 ).props("outline")
                 self.estado_guardado = ui.label("").classes(
-                    "text-sm text-gray-500 break-all"
+                    "text-sm opacity-70 break-all"
                 )
 
             self.resultados = ui.column().classes("w-full mt-4")
             with self.resultados:
                 self.formula = ui.label("").classes(
-                    "font-mono text-sm bg-gray-100 p-2 rounded w-full "
+                    "font-mono text-sm bg-white/5 p-2 rounded w-full "
                     "break-words"
                 )
 
@@ -105,7 +105,7 @@ class PanelModelo(Panel):
                     ):
                         with ui.column().classes("gap-1"):
                             ui.label(titulo).classes(
-                                "font-semibold text-gray-700"
+                                "font-semibold text-secondary"
                             )
                             self.metricas[clave] = (ui.label(""), ui.label(""))
 

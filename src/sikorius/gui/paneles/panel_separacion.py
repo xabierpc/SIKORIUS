@@ -41,7 +41,7 @@ class PanelSeparacion(Panel):
     def __init__(self, sesion):
         with ui.card().classes("w-full"):
             ui.label("Entrenamiento y test").classes("text-lg font-semibold")
-            self.aviso = ui.label("").classes("text-sm text-gray-500")
+            self.aviso = ui.label("").classes("text-sm text-secondary")
 
             # Pensado para la columna estrecha de la derecha: los dos campos
             # en una fila, repartiéndose el ancho, y debajo el resultado a la

@@ -150,10 +150,10 @@ class DialogoGuardado:
         ):
             ui.label("Guardar modelo").classes("text-lg font-semibold")
             ui.label("Formato: JSON (" + EXTENSION + ")").classes(
-                "text-sm text-gray-500"
+                "text-sm text-secondary"
             )
             self.aviso = ui.label("").classes(
-                "text-sm text-orange-800 bg-orange-50 p-2 rounded w-full"
+                "text-sm text-warning bg-warning p-2 rounded w-full"
             )
             if aviso:
                 self.aviso.set_text(aviso)
@@ -185,7 +185,7 @@ class DialogoGuardado:
             self.nombre.on("keydown.enter", self.aceptar)
             # Ruta completa con la que se guardará, extensión incluida
             self.destino = ui.label("").classes(
-                "text-sm text-gray-500 break-all"
+                "text-sm text-secondary break-all"
             )
 
             with ui.row().classes("w-full justify-end"):
@@ -252,7 +252,7 @@ class DialogoGuardado:
             if len(entradas) == 0:
                 with ui.item():
                     ui.item_label("No hay carpetas ni modelos").classes(
-                        "text-gray-500"
+                        "text-secondary"
                     )
 
     def texto_destino(self):

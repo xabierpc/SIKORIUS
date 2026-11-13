@@ -96,7 +96,7 @@ class PanelPreprocesado(Panel):
                 self.boton = ui.button(
                     "Aplicar preprocesado", on_click=self.aplicar
                 )
-            self.aplicado = ui.label("").classes("text-sm text-gray-500")
+            self.aplicado = ui.label("").classes("text-sm text-secondary")
 
         self.estrategia.on_value_change(self._actualizar_constante)
         self._actualizar_constante()
@@ -166,7 +166,7 @@ class PanelPreprocesado(Panel):
                 "Separa primero los datos en entrenamiento y test para "
                 "detectar los valores inexistentes."
             )
-            self.aviso.classes(replace="text-sm text-gray-500")
+            self.aviso.classes(replace="text-sm text-secondary")
             self.tabla.rows = []
             self.tabla.update()
             self.tabla.set_visibility(False)
@@ -190,14 +190,14 @@ class PanelPreprocesado(Panel):
                 + str(total_test)
                 + ". Elige cómo tratarlos."
             )
-            self.aviso.classes(replace="text-sm text-orange-700")
+            self.aviso.classes(replace="text-sm text-warning")
             self.controles.set_visibility(True)
         else:
             self.aviso.set_text(
                 "No hay valores inexistentes en las columnas seleccionadas. "
                 "Puedes continuar sin preprocesar."
             )
-            self.aviso.classes(replace="text-sm text-green-700")
+            self.aviso.classes(replace="text-sm text-positive")
             self.controles.set_visibility(False)
         self._mostrar_aplicado()
 

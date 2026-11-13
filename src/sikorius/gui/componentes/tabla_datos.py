@@ -82,7 +82,7 @@ class TablaDatos:
         )
         self.tabla.add_slot(
             "no-data",
-            '<div class="w-full text-center text-gray-500">'
+            '<div class="w-full text-center text-secondary">'
             "Todavía no se ha cargado ningún dataset</div>",
         )
 

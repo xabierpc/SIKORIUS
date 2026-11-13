@@ -37,7 +37,7 @@ class PanelDataset(Panel):
                     "Cargar dataset", icon="folder_open", on_click=self.cargar
                 )
                 with ui.column().classes("gap-0 min-w-0"):
-                    ui.label("Ruta:").classes("text-sm text-gray-500")
+                    ui.label("Ruta:").classes("text-sm text-secondary")
                     self.etiqueta_ruta = ui.label("").classes(
                         "font-mono break-all"
                     )
@@ -46,7 +46,7 @@ class PanelDataset(Panel):
             ui.label("Datos").classes("text-lg font-semibold")
             self.tabla = TablaDatos()
             self.etiqueta_resumen = ui.label("").classes(
-                "text-sm text-gray-500"
+                "text-sm text-secondary"
             )
 
         # Dataset que se ve ahora en la tabla. La sesión avisa en cada paso
