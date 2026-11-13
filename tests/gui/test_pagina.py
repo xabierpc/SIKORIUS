@@ -153,3 +153,52 @@ def test_pestanas_no_mueven_al_usuario_si_su_pestana_sigue_abierta(
     sesion_separada.aplicar_preprocesado("media")
 
     assert pestanas.paneles.value == "preprocesado"
+
+
+# =============================================================================
+# Pantalla de inicio
+# =============================================================================
+
+
+def test_sin_dataset_se_ve_el_inicio_y_no_la_tabla(sesion):
+    panel = PanelDataset(sesion)
+    assert panel.inicio.visible
+    assert not panel.contenido.visible
+    assert panel.boton_cargar.text == "Subir dataset"
+
+
+def test_al_cargar_un_dataset_el_inicio_desaparece(sesion, datos):
+    panel = PanelDataset(sesion)
+
+    sesion.cargar_dataset(datos, "datos.csv")
+
+    assert not panel.inicio.visible
+    assert panel.contenido.visible
+    assert panel.etiqueta_resumen.text == "10 filas y 3 columnas"
+    assert len(panel.tabla.tabla.rows) == 10
+
+
+def test_al_recargar_con_dataset_no_se_ve_el_inicio(sesion, datos):
+    sesion.cargar_dataset(datos, "datos.csv")
+
+    panel = PanelDataset(sesion)  # F5
+
+    assert not panel.inicio.visible
+    assert panel.contenido.visible
+
+
+def test_el_logo_se_incrusta_con_su_animacion(sesion):
+    panel = PanelDataset(sesion)
+    html = [e for e in panel.inicio if isinstance(e, ui.html)]
+    assert len(html) == 1
+    assert "<svg" in html[0].content
+    assert "sk-morado" in html[0].content
+
+
+def test_se_puede_cargar_otro_dataset_desde_la_tabla(sesion, datos):
+    sesion.cargar_dataset(datos, "datos.csv")
+    panel = PanelDataset(sesion)
+    assert panel.boton_otro.text == "Cargar otro"
+    sesion.cargar_dataset(datos.iloc[:4], "otro.csv")
+    assert panel.etiqueta_resumen.text == "4 filas y 3 columnas"
+    assert panel.contenido.visible
