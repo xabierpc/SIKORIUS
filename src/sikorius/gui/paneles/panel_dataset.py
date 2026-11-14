@@ -38,6 +38,21 @@ CSS_INICIO = """
 """
 
 
+# Alto en píxeles de cada fila de la tabla (modo "dense") y de sus bordes
+ALTO_FILA = 28.5
+ALTO_BORDES = 3
+
+
+def alto_tabla(filas):
+    """Alto CSS de la tabla: el justo para sus filas, con un máximo.
+
+    Una tabla de 10 filas no debe dejar un hueco vacío debajo; una de miles
+    ocupa como mucho el 70% de la pantalla y saca su propio scroll.
+    """
+    justo = round((filas + 1) * ALTO_FILA) + ALTO_BORDES  # +1: cabecera
+    return "min(70vh, " + str(justo) + "px)"
+
+
 def carpeta_inicial(sesion):
     """Carpeta del último archivo cargado o, si no hay, la carpeta personal."""
     if sesion.dataset is not None:
@@ -58,7 +73,7 @@ class PanelDataset(Panel):
     def __init__(self, sesion):
         ui.add_css(CSS_INICIO)
 
-        self.inicio = ui.column().classes("w-full items-center gap-6 mt-8")
+        self.inicio = ui.column().classes("w-full items-center gap-6")
         with self.inicio:
             logo = RUTA_LOGO.read_text(encoding="utf-8")
             # sanitize=False: el SVG es un archivo nuestro y lleva su <style>
@@ -89,8 +104,6 @@ class PanelDataset(Panel):
                     "Cargar otro", icon="folder_open", on_click=self.cargar
                 ).props("outline")
             self.tabla = TablaDatos()
-            # La tabla es la protagonista: más alta que la de por defecto
-            self.tabla.tabla.style("height: 70vh")
 
         # Dataset que se ve ahora en la tabla. La sesión avisa en cada paso
         # (columnas, separación...), y volver a enviar todas las filas al
@@ -112,6 +125,7 @@ class PanelDataset(Panel):
         self.etiqueta_ruta.set_text(dataset.ruta)
         self.etiqueta_resumen.set_text(texto_resumen(dataset.datos))
         self.tabla.mostrar(dataset.datos)
+        self.tabla.tabla.style("height: " + alto_tabla(len(dataset.datos)))
 
     async def cargar(self):
         """Abre el explorador e importa el archivo elegido."""

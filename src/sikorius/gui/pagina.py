@@ -16,6 +16,13 @@ from sikorius.sesion import ETAPAS
 ui.button.default_props("no-caps")
 
 
+# El contenido ocupa como mínimo el alto de la página (min-height: inherit
+# copia el de q-page, que ya descuenta la barra de arriba). Así lo que tiene
+# "my-auto" queda con el mismo espacio arriba que abajo.
+CSS_PAGINA = """
+.nicegui-content { min-height: inherit; }
+"""
+
 TITULOS = {
     "datos": "Datos",
     "variables": "Variables y separación",
@@ -34,7 +41,9 @@ class Pestanas(Panel):
     """
 
     def __init__(self, sesion):
-        with ui.header().classes("items-center"):
+        # Sin dataset se ve la pantalla de inicio y la barra no hace falta
+        self.header = ui.header().classes("items-center")
+        with self.header:
             ui.label("SIKORIUS").classes("text-xl font-bold")
             ui.space()
             self.tabs = ui.tabs().props("no-caps")
@@ -43,12 +52,15 @@ class Pestanas(Panel):
                 for etapa in ETAPAS:
                     self.pestanas[etapa] = ui.tab(etapa, label=TITULOS[etapa])
         # El contenido se coloca después, dentro de self.paneles
+        # "my-auto" centra verticalmente el contenido de la pestaña en el
+        # espacio que queda libre (ver CSS_PAGINA)
         self.paneles = ui.tab_panels(self.tabs, value="datos").classes(
-            "w-full bg-transparent"
+            "w-full bg-transparent my-auto"
         )
         super().__init__(sesion)
 
     def actualizar(self):
+        self.header.set_value(self.sesion.dataset is not None)
         disponibles = self.sesion.etapas_disponibles()
         for etapa, pestana in self.pestanas.items():
             if etapa in disponibles:
@@ -66,19 +78,22 @@ def construir_pagina(sesion):
     conectan unos paneles con otros.
     """
     aplicar_tema()
+    ui.add_css(CSS_PAGINA)
     pestanas = Pestanas(sesion)
     with pestanas.paneles:
         with ui.tab_panel("datos"):
             PanelDataset(sesion)
         # Columnas a la izquierda y separación a la derecha. "basis-0"
-        # reparte el ancho a partes iguales sin depender del contenido.
+        # reparte el ancho a partes iguales sin depender del contenido,
+        # "items-stretch" iguala la altura de las dos columnas y "*:grow"
+        # hace que la tarjeta de cada panel la ocupe entera.
         with (
             ui.tab_panel("variables"),
-            ui.row().classes("w-full items-start no-wrap gap-4"),
+            ui.row().classes("w-full items-stretch no-wrap gap-4"),
         ):
-            with ui.column().classes("basis-0 grow min-w-0"):
+            with ui.column().classes("basis-0 grow min-w-0 *:grow"):
                 PanelColumnas(sesion)
-            with ui.column().classes("basis-0 grow min-w-0"):
+            with ui.column().classes("basis-0 grow min-w-0 *:grow"):
                 PanelSeparacion(sesion)
         with ui.tab_panel("preprocesado"):
             PanelPreprocesado(sesion)

@@ -13,7 +13,7 @@ from nicegui import ui
 
 from sikorius.gui.pagina import TITULOS, Pestanas, construir_pagina
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
-from sikorius.gui.paneles.panel_dataset import PanelDataset
+from sikorius.gui.paneles.panel_dataset import PanelDataset, alto_tabla
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 from sikorius.nucleo.separacion import separar_datos
@@ -202,3 +202,26 @@ def test_se_puede_cargar_otro_dataset_desde_la_tabla(sesion, datos):
     sesion.cargar_dataset(datos.iloc[:4], "otro.csv")
     assert panel.etiqueta_resumen.text == "4 filas y 3 columnas"
     assert panel.contenido.visible
+
+
+# =============================================================================
+# Barra superior y tamaño de la tabla
+# =============================================================================
+
+
+def test_la_barra_no_se_ve_en_la_pantalla_de_inicio(sesion, datos):
+    pestanas = Pestanas(sesion)
+    assert not pestanas.header.value
+
+    sesion.cargar_dataset(datos, "datos.csv")
+
+    assert pestanas.header.value
+
+
+def test_la_tabla_pequena_no_deja_hueco_debajo():
+    # 10 filas + cabecera: 11 * 28.5 = 313.5 px, más los bordes
+    assert alto_tabla(10) == "min(70vh, 317px)"
+
+
+def test_la_tabla_grande_se_limita_al_70_por_ciento_de_la_pantalla():
+    assert alto_tabla(20000).startswith("min(70vh, ")
