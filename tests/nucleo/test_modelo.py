@@ -10,7 +10,6 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
-from matplotlib.figure import Figure
 
 from sikorius.nucleo.errores import ErrorModelo
 from sikorius.nucleo.modelo import (
@@ -18,10 +17,10 @@ from sikorius.nucleo.modelo import (
     calcular_ecm,
     calcular_r2,
     datos_ajuste,
-    dibujar_ajuste,
     entrenar_modelo,
     formula_texto,
     metricas_modelo,
+    terminos_formula,
 )
 
 # =============================================================================
@@ -125,50 +124,6 @@ def test_datos_ajuste_regresion_multiple():
     assert extremos[1] == pytest.approx(todos.max())
 
 
-def test_dibujar_ajuste_simple_etiquetas_y_leyenda():
-    entrenamiento, test = datos_simples()
-    modelo = entrenar_modelo(entrenamiento, ["x"], "y")
-    figura = Figure()
-    dibujar_ajuste(figura, datos_ajuste(modelo, entrenamiento, test))
-    ejes = figura.axes[0]
-    assert ejes.get_xlabel() == "x"
-    assert ejes.get_ylabel() == "y"
-    textos = [t.get_text() for t in ejes.get_legend().get_texts()]
-    assert textos == ["Entrenamiento", "Test", "Recta del modelo"]
-
-
-def test_dibujar_ajuste_multiple_etiquetas_y_leyenda():
-    df = datos_lineales()
-    modelo = entrenar_modelo(df.iloc[:15], ["x1", "x2"], "y")
-    figura = Figure()
-    dibujar_ajuste(figura, datos_ajuste(modelo, df.iloc[:15], df.iloc[15:]))
-    ejes = figura.axes[0]
-    assert ejes.get_xlabel() == "Valor predicho"
-    assert ejes.get_ylabel() == "Valor real"
-    textos = [t.get_text() for t in ejes.get_legend().get_texts()]
-    assert textos == ["Entrenamiento", "Test", "Real = predicho"]
-
-
-def test_dibujar_ajuste_usa_pocas_marcas_en_los_ejes():
-    df = datos_lineales() * 100000  # cifras grandes: marcas largas
-    modelo = entrenar_modelo(df.iloc[:15], ["x1", "x2"], "y")
-    figura = Figure()
-    dibujar_ajuste(figura, datos_ajuste(modelo, df.iloc[:15], df.iloc[15:]))
-    ejes = figura.axes[0]
-    assert len(ejes.get_xticks()) <= 7
-    assert len(ejes.get_yticks()) <= 7
-
-
-def test_dibujar_ajuste_dos_veces_sustituye_el_grafico():
-    entrenamiento, test = datos_simples()
-    modelo = entrenar_modelo(entrenamiento, ["x"], "y")
-    datos = datos_ajuste(modelo, entrenamiento, test)
-    figura = Figure()
-    dibujar_ajuste(figura, datos)
-    dibujar_ajuste(figura, datos)
-    assert len(figura.axes) == 1
-
-
 # =============================================================================
 # Fórmula del modelo
 # =============================================================================
@@ -213,6 +168,31 @@ def test_formula_usa_los_nombres_reales_de_las_columnas():
     df = datos_lineales()
     modelo = entrenar_modelo(df, ["x1", "x2"], "y")
     assert formula_texto(modelo) == "y = 2.0000 * x1 - 3.0000 * x2 + 5.0000"
+
+
+def test_terminos_de_la_formula():
+    modelo = ModeloLineal(("x1", "x2"), "y", (2.0, -3.0), 5.0)
+    assert terminos_formula(modelo) == [
+        (False, "2.0000", "x1"),
+        (True, "3.0000", "x2"),
+        (False, "5.0000", None),
+    ]
+
+
+def test_terminos_independiente_negativo_y_decimales():
+    modelo = ModeloLineal(("x",), "y", (1.23456,), -0.5)
+    assert terminos_formula(modelo, decimales=2) == [
+        (False, "1.23", "x"),
+        (True, "0.50", None),
+    ]
+
+
+def test_terminos_negativo_que_redondea_a_cero_no_resta():
+    modelo = ModeloLineal(("x",), "y", (-0.00001,), 3.0)
+    assert terminos_formula(modelo) == [
+        (False, "0.0000", "x"),
+        (False, "3.0000", None),
+    ]
 
 
 # =============================================================================

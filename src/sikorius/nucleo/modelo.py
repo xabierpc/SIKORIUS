@@ -203,44 +203,57 @@ def datos_ajuste(modelo, entrenamiento, test):
     }
 
 
-def dibujar_ajuste(figura, datos):
-    """Dibuja el gráfico del ajuste en una figura de matplotlib.
+DECIMALES_FORMULA = 4
 
-    Borra lo que hubiera en la figura, así que se puede llamar de nuevo
-    cada vez que se crea un modelo nuevo.
+
+def terminos_formula(modelo, decimales=DECIMALES_FORMULA):
+    """Descompone la fórmula del modelo en sus términos.
+
+    Hay un término por coeficiente y uno final con el término
+    independiente. Es lo que usan ``formula_texto`` y la interfaz para
+    escribir la fórmula.
 
     Args:
-        figura: Figura de matplotlib (``matplotlib.figure.Figure``).
-        datos: Diccionario devuelto por ``datos_ajuste``.
+        modelo: ModeloLineal ya entrenado.
+        decimales: Decimales con los que se muestran los números.
+
+    Returns:
+        Lista de tuplas ``(negativo, numero, columna)``: ``negativo`` es
+        True si el término resta (mirando el valor ya redondeado, así que
+        -0.00001 no es negativo), ``numero`` es el valor absoluto como
+        texto con siempre los mismos decimales y ``columna`` es el nombre de
+        la columna, o None en el término independiente.
     """
-    figura.clear()
-    ejes = figura.subplots()
-    ejes.scatter(
-        *datos["entrenamiento"],
-        color="tab:blue",
-        marker="o",
-        label="Entrenamiento",
+    terminos = []
+    for coeficiente, columna in zip(
+        modelo.coeficientes, modelo.features, strict=True
+    ):
+        terminos.append(
+            (
+                round(coeficiente, decimales) < 0,
+                _numero_sin_signo(coeficiente, decimales),
+                columna,
+            )
+        )
+    independiente = modelo.termino_independiente
+    terminos.append(
+        (
+            round(independiente, decimales) < 0,
+            _numero_sin_signo(independiente, decimales),
+            None,
+        )
     )
-    ejes.scatter(*datos["test"], color="tab:orange", marker="s", label="Test")
-    ejes.plot(
-        *datos["recta"],
-        color="black",
-        linestyle="--",
-        label=datos["etiqueta_recta"],
-    )
-    # Pocas marcas en cada eje: con cifras grandes, si no, se pisan.
-    ejes.locator_params(nbins=5)
-    ejes.set_xlabel(datos["etiqueta_x"])
-    ejes.set_ylabel(datos["etiqueta_y"])
-    ejes.legend()
-    figura.tight_layout()
-
-
-DECIMALES_FORMULA = 4
+    return terminos
 
 
 def formula_texto(modelo, decimales=DECIMALES_FORMULA):
     """Escribe la fórmula del modelo con los nombres de las columnas.
+
+    Formato: ``salida = coef_1 * entrada_1 + coef_2 * entrada_2 + término``.
+    Los coeficientes y el término independiente se redondean a un número
+    fijo de decimales. Los valores negativos se muestran restando
+    (``- 3.0000 * x``) y no como ``+ -3.0000 * x``. Si el primer término es
+    negativo, lleva el signo delante (``y = -3.0000 * x + ...``).
 
     Args:
         modelo: ModeloLineal ya entrenado.
@@ -249,21 +262,11 @@ def formula_texto(modelo, decimales=DECIMALES_FORMULA):
     Returns:
         El texto de la fórmula.
     """
-    # Cada término es (valor, texto sin signo): "3.0000 * x" o "5.0000"
-    terminos = []
-    for coeficiente, columna in zip(
-        modelo.coeficientes, modelo.features, strict=True
-    ):
-        numero = _numero_sin_signo(coeficiente, decimales)
-        terminos.append((coeficiente, f"{numero} * {columna}"))
-    independiente = modelo.termino_independiente
-    terminos.append(
-        (independiente, _numero_sin_signo(independiente, decimales))
-    )
-
     texto = f"{modelo.target} ="
-    for posicion, (valor, cuerpo) in enumerate(terminos):
-        negativo = round(valor, decimales) < 0
+    for posicion, (negativo, numero, columna) in enumerate(
+        terminos_formula(modelo, decimales)
+    ):
+        cuerpo = numero if columna is None else f"{numero} * {columna}"
         if posicion == 0:
             texto += f" -{cuerpo}" if negativo else f" {cuerpo}"
         else:
