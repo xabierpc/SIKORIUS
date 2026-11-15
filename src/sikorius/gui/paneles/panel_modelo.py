@@ -1,5 +1,6 @@
 """Panel para crear y evaluar el modelo de regresión lineal."""
 
+import html
 import math
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from nicegui import ui
 from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes import dialogo_guardado
 from sikorius.gui.paneles.base import Panel
+from sikorius.gui.tema import colores_columnas
 from sikorius.nucleo import modelo
 from sikorius.nucleo.errores import ErrorModelo, ErrorPersistencia
 from sikorius.nucleo.persistencia import EXTENSION
@@ -37,13 +39,15 @@ def texto_metrica(valor):
     return formatear_numero(valor, DECIMALES_METRICAS)
 
 
-def texto_formula(mod):
-    """La fórmula del modelo en una sola línea, lista para mostrar.
+def _formula(mod, marcar):
+    """Construye la fórmula en una sola línea, lista para mostrar.
 
-    Ejemplo: ``y = 2.0000 · x1 − 3.0000 · x2 + 5.0000``. Dentro de cada
-    término los espacios son "espacios duros" (\u00a0): si la fórmula no cabe
-    y se parte en varias líneas, solo se parte entre términos y nunca deja un
-    signo solo al final de una línea.
+    ``marcar`` es la función que recibe el nombre de una columna y devuelve
+    cómo se escribe: tal cual (texto) o con su color (HTML).
+
+    Dentro de cada término los espacios son "espacios duros" (\u00a0): si la
+    fórmula no cabe y se parte en varias líneas, solo se parte entre términos
+    y nunca deja un signo solo al final de una línea.
     """
     duro = "\u00a0"
     terminos = []
@@ -52,14 +56,50 @@ def texto_formula(mod):
     ):
         cuerpo = numero
         if columna is not None:
-            cuerpo += duro + "·" + duro + str(columna)
+            cuerpo += duro + "·" + duro + marcar(str(columna))
         if posicion == 0:
             # El primer término lleva el signo pegado, solo si es negativo
             signo = "−" if negativo else ""
         else:
             signo = ("−" if negativo else "+") + duro
         terminos.append(signo + cuerpo)
-    return str(mod.target) + " = " + " ".join(terminos)
+    return marcar(str(mod.target)) + " = " + " ".join(terminos)
+
+
+def _sin_marcar(nombre):
+    return nombre
+
+
+def texto_formula(mod):
+    """La fórmula del modelo en una sola línea y sin colores.
+
+    Ejemplo: ``y = 2.0000 · x1 − 3.0000 · x2 + 5.0000``.
+    """
+    return _formula(mod, _sin_marcar)
+
+
+def html_formula(mod, colores):
+    """La misma fórmula en HTML, con cada columna de su color.
+
+    ``colores`` es {nombre de columna: color}. Los nombres vienen del
+    usuario, así que se escapan: un nombre como ``<b>`` se ve tal cual y no
+    se interpreta como HTML.
+    """
+
+    def marcar(nombre):
+        seguro = html.escape(nombre)
+        color = colores.get(nombre)
+        if color is None:
+            return seguro
+        return (
+            '<span style="color: '
+            + color
+            + '; font-weight: 700">'
+            + seguro
+            + "</span>"
+        )
+
+    return _formula(mod, marcar)
 
 
 def _dimensiones(datos):
@@ -243,7 +283,7 @@ class PanelModelo(Panel):
             self.resultados = ui.column().classes("w-full mt-4 gap-6")
             with self.resultados:
                 # La fórmula ocupa todo el ancho para que quepa en una línea
-                self.formula = ui.label("").classes(
+                self.formula = ui.html("", sanitize=False).classes(
                     "text-xl text-center w-full break-words"
                 )
                 # Mitad izquierda: gráfico. Mitad derecha: las métricas,
@@ -337,7 +377,9 @@ class PanelModelo(Panel):
         mod = self.sesion.modelo
         entrenamiento, test = self.sesion.conjuntos_actuales()
 
-        self.formula.set_text(texto_formula(mod))
+        # Cada columna con el color que tiene en los selectores y la tabla
+        colores = colores_columnas(self.sesion.dataset.datos.columns)
+        self.formula.set_content(html_formula(mod, colores))
 
         metricas = self.sesion.metricas_modelo()
         for clave, (r2, ecm) in self.metricas.items():

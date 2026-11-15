@@ -4,8 +4,10 @@ uv run pytest tests/gui/test_panel_modelo.py -v
 """
 
 import asyncio
+import html
 import inspect
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -20,11 +22,13 @@ from sikorius.gui.paneles.panel_modelo import (
     PanelModelo,
     aviso_antes_de_guardar,
     destino_inicial,
+    html_formula,
     opciones_grafico,
     texto_estado_guardado,
     texto_formula,
     texto_metrica,
 )
+from sikorius.gui.tema import colores_columnas
 from sikorius.nucleo import modelo as nucleo_modelo
 from sikorius.sesion import Sesion
 
@@ -77,8 +81,10 @@ def avisos(monkeypatch):
 
 
 def formula_visible(panel):
-    """Fórmula que se ve en el panel, con espacios normales."""
-    return panel.formula.text.replace("\u00a0", " ")
+    """Fórmula que se ve en el panel (sin las etiquetas HTML de los
+    colores) y con espacios normales."""
+    texto = re.sub("<[^>]+>", "", panel.formula.content)
+    return html.unescape(texto).replace("\u00a0", " ")
 
 
 # =============================================================================
@@ -162,7 +168,28 @@ def test_muestra_la_formula_con_el_signo_correcto(sesion_lista):
     panel.crear()
     assert formula_visible(panel) == "y = 2.0000 · x1 − 3.0000 · x2 + 5.0000"
     assert "+ -" not in formula_visible(panel)
-    assert "\n" not in panel.formula.text  # todo en una línea
+    assert "\n" not in panel.formula.content  # todo en una línea
+
+
+def test_la_formula_colorea_cada_columna_con_su_color(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    colores = colores_columnas(sesion_lista.dataset.datos.columns)
+    for columna in sesion_lista.modelo.features:
+        assert colores[columna] in panel.formula.content
+    assert colores[sesion_lista.modelo.target] in panel.formula.content
+
+
+def test_html_formula_escapa_los_nombres_de_columna():
+    mod = modelo_de((2.0,), 1.0, features=("<b>x</b>",))
+    texto = html_formula(mod, {"<b>x</b>": "#38bdf8"})
+    assert "<b>" not in texto
+    assert "&lt;b&gt;x&lt;/b&gt;" in texto
+
+
+def test_html_formula_sin_color_no_pone_estilo():
+    texto = html_formula(modelo_de((2.0,), 1.0, features=("x1",)), {})
+    assert "style" not in texto
 
 
 def test_muestra_las_metricas_de_cada_conjunto(sesion_lista):

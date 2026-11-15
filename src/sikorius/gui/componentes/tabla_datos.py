@@ -3,6 +3,12 @@
 import pandas as pd
 from nicegui import ui
 
+from sikorius.gui.tema import tinte
+
+# Opacidad del color de fondo de una columna resaltada: se nota sin tapar
+# los números
+OPACIDAD_TINTE = 0.16
+
 # Tipos que el navegador recibe tal cual; el resto se muestra como texto
 _TIPOS_JSON = (str, int, float, bool)
 
@@ -96,8 +102,9 @@ class TablaDatos:
         # Al pasar el ratón por una cabecera sale el nombre real de la columna
         self.tabla.add_slot(
             "header-cell",
-            '<q-th :props="props" :title="props.col.real">'
-            "{{ props.col.label }}</q-th>",
+            '<q-th :props="props" :title="props.col.real"'
+            ' :style="props.col.color ? {borderBottomColor: props.col.color}'
+            ' : {}">{{ props.col.label }}</q-th>',
         )
         self.tabla.add_slot(
             "no-data",
@@ -110,3 +117,24 @@ class TablaDatos:
         columnas, filas = dataframe_a_tabla(df)
         self.tabla.columns = columnas
         self.tabla.rows = filas
+
+    def colorear(self, colores):
+        """Tiñe las columnas indicadas, {nombre real de columna: color}.
+
+        El resto de columnas se quedan sin color. Cada columna lleva en
+        "style" el fondo de sus celdas y en "color" el color de la línea
+        de su cabecera (ver el slot "header-cell").
+        """
+        columnas = []
+        for columna in self.tabla.columns:
+            nueva = dict(columna)
+            nueva.pop("style", None)
+            nueva.pop("color", None)
+            color = colores.get(columna["real"])
+            if color is not None:
+                nueva["style"] = "background-color: " + tinte(
+                    color, OPACIDAD_TINTE
+                )
+                nueva["color"] = color
+            columnas.append(nueva)
+        self.tabla.columns = columnas

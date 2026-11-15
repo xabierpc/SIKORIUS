@@ -13,6 +13,7 @@ from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
 from sikorius.gui.componentes.tabla_datos import TablaDatos
 from sikorius.gui.paneles.base import Panel
+from sikorius.gui.tema import colores_columnas
 from sikorius.nucleo.errores import ErrorImportacion
 from sikorius.nucleo.importador import importar_datos
 
@@ -51,6 +52,20 @@ def alto_tabla(filas):
     """
     justo = round((filas + 1) * ALTO_FILA) + ALTO_BORDES  # +1: cabecera
     return "min(70vh, " + str(justo) + "px)"
+
+
+def colores_elegidos(sesion):
+    """{columna: color} de las columnas de la selección confirmada.
+
+    Cada columna lleva el mismo color que su "chip" en el panel de columnas.
+    Si todavía no hay selección, el diccionario está vacío.
+    """
+    seleccion = sesion.seleccion
+    if sesion.dataset is None or seleccion is None:
+        return {}
+    todos = colores_columnas(sesion.dataset.datos.columns)
+    elegidas = list(seleccion.features) + [seleccion.target]
+    return {c: todos[c] for c in elegidas if c in todos}
 
 
 def carpeta_inicial(sesion):
@@ -109,6 +124,8 @@ class PanelDataset(Panel):
         # (columnas, separación...), y volver a enviar todas las filas al
         # navegador en cada aviso haría la página muy lenta.
         self._mostrado = None
+        # Colores que lleva ahora la tabla (para no tocarla si no cambian)
+        self._coloreado = {}
         super().__init__(sesion)
 
     def actualizar(self):
@@ -119,9 +136,20 @@ class PanelDataset(Panel):
             self.etiqueta_ruta.set_text("Ningún archivo cargado")
             self.etiqueta_resumen.set_text("")
             return
-        if dataset is self._mostrado:
-            return
+        if dataset is not self._mostrado:
+            self._mostrar_dataset(dataset)
+        # Las columnas elegidas se tiñen; al cambiar la selección (o al
+        # cargar otro dataset, que la borra) se actualizan los colores
+        colores = colores_elegidos(self.sesion)
+        if colores != self._coloreado:
+            self._coloreado = colores
+            self.tabla.colorear(colores)
+
+    def _mostrar_dataset(self, dataset):
+        """Pone el dataset en la tabla (solo cuando es uno nuevo: enviar
+        todas las filas al navegador en cada aviso haría la página lenta)."""
         self._mostrado = dataset
+        self._coloreado = {}
         self.etiqueta_ruta.set_text(dataset.ruta)
         self.etiqueta_resumen.set_text(texto_resumen(dataset.datos))
         self.tabla.mostrar(dataset.datos)

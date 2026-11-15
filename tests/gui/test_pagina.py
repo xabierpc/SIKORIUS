@@ -12,7 +12,9 @@ import pandas as pd
 import pytest
 from nicegui import ui
 
+from sikorius.gui.componentes.selectores import plantilla_chip
 from sikorius.gui.componentes.tabla_datos import (
+    TablaDatos,
     dataframe_a_tabla,
     titulo_columna,
 )
@@ -21,6 +23,7 @@ from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset, alto_tabla
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
+from sikorius.gui.tema import PALETA_COLUMNAS, colores_columnas, tinte
 from sikorius.nucleo.separacion import separar_datos
 
 
@@ -275,3 +278,105 @@ def test_la_tabla_muestra_titulos_legibles_y_guarda_el_nombre_real():
 def test_los_datos_de_la_tabla_van_centrados():
     columnas, _ = dataframe_a_tabla(pd.DataFrame({"a": [1], "b": ["x"]}))
     assert [c["align"] for c in columnas] == ["center", "center"]
+
+
+# =============================================================================
+# Color por columna elegida
+# =============================================================================
+
+
+def test_cada_columna_tiene_su_color_segun_su_posicion():
+    colores = colores_columnas(["a", "b", "c"])
+    assert colores == {
+        "a": PALETA_COLUMNAS[0],
+        "b": PALETA_COLUMNAS[1],
+        "c": PALETA_COLUMNAS[2],
+    }
+
+
+def test_si_hay_mas_columnas_que_colores_se_repiten():
+    nombres = [str(i) for i in range(len(PALETA_COLUMNAS) + 1)]
+    colores = colores_columnas(nombres)
+    assert colores[nombres[-1]] == PALETA_COLUMNAS[0]
+
+
+def test_la_paleta_no_repite_colores():
+    assert len(set(PALETA_COLUMNAS)) == len(PALETA_COLUMNAS)
+
+
+def test_el_chip_usa_el_color_de_su_columna_y_escapa_los_nombres():
+    plantilla = plantilla_chip({'hab"s': "#38bdf8"}, True)
+    assert "#38bdf8" in plantilla
+    assert 'hab"s' not in plantilla  # las comillas van escapadas
+    assert "removable" in plantilla
+
+
+def test_tinte_pasa_de_hex_a_rgba():
+    assert tinte("#38bdf8", 0.2) == "rgba(56, 189, 248, 0.2)"
+
+
+def test_la_tabla_tine_solo_las_columnas_indicadas(datos):
+    tabla = TablaDatos()
+    tabla.mostrar(datos)
+    tabla.colorear({"x2": "#38bdf8"})
+    por_nombre = {c["real"]: c for c in tabla.tabla.columns}
+    assert "rgba(56, 189, 248" in por_nombre["x2"]["style"]
+    assert por_nombre["x2"]["color"] == "#38bdf8"
+    assert "style" not in por_nombre["x1"]
+    tabla.colorear({})
+    assert all("style" not in c for c in tabla.tabla.columns)
+
+
+def colores_de_la_tabla(panel):
+    """{columna: color} de las columnas teñidas de la tabla de datos."""
+    return {
+        c["real"]: c["color"]
+        for c in panel.tabla.tabla.columns
+        if "color" in c
+    }
+
+
+def test_la_tabla_de_datos_tine_las_columnas_confirmadas(sesion, datos):
+    panel = PanelDataset(sesion)
+    sesion.cargar_dataset(datos, "datos.csv")
+    assert colores_de_la_tabla(panel) == {}
+
+    sesion.guardar_seleccion(["x1", "x2"], "y")
+
+    colores = colores_columnas(datos.columns)
+    assert colores_de_la_tabla(panel) == colores
+
+
+def test_la_tabla_de_datos_solo_tine_lo_elegido(sesion, datos):
+    panel = PanelDataset(sesion)
+    sesion.cargar_dataset(datos, "datos.csv")
+    sesion.guardar_seleccion(["x2"], "y")
+    assert set(colores_de_la_tabla(panel)) == {"x2", "y"}
+
+
+def test_al_cargar_otro_dataset_se_quitan_los_colores(sesion, datos):
+    panel = PanelDataset(sesion)
+    sesion.cargar_dataset(datos, "datos.csv")
+    sesion.guardar_seleccion(["x1"], "y")
+
+    sesion.cargar_dataset(datos, "otro.csv")
+
+    assert colores_de_la_tabla(panel) == {}
+
+
+def test_al_recargar_la_pagina_la_tabla_ya_sale_teñida(sesion_separada):
+    panel = PanelDataset(sesion_separada)
+    assert colores_de_la_tabla(panel) != {}
+
+
+def test_la_tabla_no_se_vuelve_a_enviar_si_los_colores_no_cambian(
+    sesion, datos
+):
+    panel = PanelDataset(sesion)
+    sesion.cargar_dataset(datos, "datos.csv")
+    sesion.guardar_seleccion(["x1"], "y")
+    columnas = panel.tabla.tabla.columns
+
+    sesion._avisar()  # un aviso cualquiera de la sesión
+
+    assert panel.tabla.tabla.columns is columnas

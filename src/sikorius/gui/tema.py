@@ -25,10 +25,55 @@ COLORES = {
     "info": "#7dd3fc",
 }
 
+# Un color por columna, para reconocerla de un vistazo en los selectores, en
+# la tabla y en la fórmula. Son tonos claros que se distinguen sobre el fondo
+# oscuro y que no se parecen al morado de marca. Cada columna toma el de su
+# posición en el dataset (si hay más columnas que colores, se repiten), así
+# su color no cambia al elegir o quitar otras.
+PALETA_COLUMNAS = (
+    "#38bdf8",  # azul
+    "#34d399",  # verde
+    "#fbbf24",  # ámbar
+    "#fb7185",  # rosa fuerte
+    "#fb923c",  # naranja
+    "#2dd4bf",  # turquesa
+    "#f472b6",  # rosa
+    "#a3e635",  # lima
+)
+
+
+def colores_columnas(columnas):
+    """Diccionario {nombre de columna: color} con el color de cada una."""
+    colores = {}
+    for posicion, nombre in enumerate(columnas):
+        colores[str(nombre)] = PALETA_COLUMNAS[posicion % len(PALETA_COLUMNAS)]
+    return colores
+
+
+def tinte(color, opacidad):
+    """Versión casi transparente de un color "#rrggbb", para teñir fondos.
+
+    Ejemplo: tinte("#38bdf8", 0.2) -> "rgba(56, 189, 248, 0.2)".
+    """
+    rojo = int(color[1:3], 16)
+    verde = int(color[3:5], 16)
+    azul = int(color[5:7], 16)
+    return (
+        "rgba("
+        + str(rojo)
+        + ", "
+        + str(verde)
+        + ", "
+        + str(azul)
+        + ", "
+        + str(opacidad)
+        + ")"
+    )
+
 
 # Forque (de Tup Wanders, licencia SIL OFL: ver recursos/fuentes/OFL.txt) es
 # la fuente del logo. Solo tiene mayúsculas, sin tildes ni Ñ y sin paréntesis
-# ni barras, así que se usa únicamente en textos fijos (títulos de
+# ni barras, así que se usa únicamente en textos fijos nuestros (títulos de
 # paneles, pestañas y el nombre de la barra), todos escritos sin tildes, y
 # siempre en mayúsculas. Los títulos son las etiquetas "text-lg
 # font-semibold" (y "text-xl font-bold" la de la barra). La fuente solo tiene
