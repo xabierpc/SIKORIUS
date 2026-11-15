@@ -8,9 +8,14 @@ de callbacks como ``al_separar`` o ``al_aplicar``).
 uv run pytest tests/gui/test_pagina.py -v
 """
 
+import pandas as pd
 import pytest
 from nicegui import ui
 
+from sikorius.gui.componentes.tabla_datos import (
+    dataframe_a_tabla,
+    titulo_columna,
+)
 from sikorius.gui.pagina import TITULOS, Pestanas, construir_pagina
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset, alto_tabla
@@ -225,3 +230,41 @@ def test_la_tabla_pequena_no_deja_hueco_debajo():
 
 def test_la_tabla_grande_se_limita_al_70_por_ciento_de_la_pantalla():
     assert alto_tabla(20000).startswith("min(70vh, ")
+
+
+# =============================================================================
+# Tabla visual: títulos de columna y alineación
+# =============================================================================
+
+
+@pytest.mark.parametrize(
+    "nombre, esperado",
+    [
+        ("metros_cuadrados", "Metros cuadrados"),
+        ("precio", "Precio"),
+        ("IVA", "IVA"),  # solo se toca la primera letra
+        ("año_de_venta", "Año de venta"),
+        ("_oculta", "Oculta"),
+        (2020, "2020"),
+        ("", ""),
+    ],
+)
+def test_titulo_columna(nombre, esperado):
+    assert titulo_columna(nombre) == esperado
+
+
+def test_la_tabla_muestra_titulos_legibles_y_guarda_el_nombre_real():
+    df = pd.DataFrame({"metros_cuadrados": [1.0], "precio": [2.0]})
+
+    columnas, filas = dataframe_a_tabla(df)
+
+    assert [c["label"] for c in columnas] == ["Metros cuadrados", "Precio"]
+    assert [c["real"] for c in columnas] == ["metros_cuadrados", "precio"]
+    # Los datos siguen enlazados por la clave interna, no por el título
+    assert filas[0]["c0"] == 1.0
+    assert filas[0]["c1"] == 2.0
+
+
+def test_los_datos_de_la_tabla_van_centrados():
+    columnas, _ = dataframe_a_tabla(pd.DataFrame({"a": [1], "b": ["x"]}))
+    assert [c["align"] for c in columnas] == ["center", "center"]

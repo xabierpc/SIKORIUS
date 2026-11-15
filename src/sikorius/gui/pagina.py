@@ -25,7 +25,7 @@ CSS_PAGINA = """
 
 TITULOS = {
     "datos": "Datos",
-    "variables": "Variables y separación",
+    "variables": "Variables y separacion",
     "preprocesado": "Preprocesado",
     "modelo": "Modelo",
 }

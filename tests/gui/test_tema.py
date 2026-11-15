@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 
 import sikorius.gui
-from sikorius.gui.tema import COLORES
+from sikorius.gui.pagina import TITULOS
+from sikorius.gui.tema import CARPETA_RECURSOS, COLORES, CSS_TEMA
 
 # Clases de Tailwind con un color fijo (text-gray-500, bg-green-100...): no
 # cambian con el tema. Hay que usar las del tema: text-primary, text-warning,
@@ -42,3 +43,58 @@ def test_la_gui_no_usa_colores_fijos_de_tailwind():
                     archivo.name + ":" + str(numero) + " " + coincidencia
                 )
     assert encontrados == []
+
+
+# =============================================================================
+# Fuente de marca
+# =============================================================================
+
+
+def test_la_fuente_de_marca_esta_en_recursos_con_su_licencia():
+    carpeta = CARPETA_RECURSOS / "fuentes"
+    assert (carpeta / "Forque.ttf").is_file()
+    # La OFL obliga a repartir la licencia junto con la fuente
+    assert "SIL OPEN FONT LICENSE" in (carpeta / "OFL.txt").read_text()
+    assert "/recursos/fuentes/Forque.ttf" in CSS_TEMA
+
+
+def test_el_logo_esta_en_recursos():
+    assert (CARPETA_RECURSOS / "logo.svg").is_file()
+
+
+def test_los_titulos_y_las_pestanas_usan_la_fuente_de_marca_en_mayusculas():
+    for selector in (".text-lg.font-semibold", ".q-tab__label"):
+        assert selector in CSS_TEMA
+    assert "text-transform: uppercase" in CSS_TEMA
+
+
+def test_la_fuente_no_se_pide_en_negrita():
+    """Forque solo tiene un grosor: en negrita el navegador la deformaría."""
+    bloque = CSS_TEMA.split("Forque', sans-serif;")[1].split("}")[0]
+    assert "font-weight: 400" in bloque
+
+
+# Caracteres que trae Forque entre los que usamos: letras ASCII, cifras y
+# unos pocos signos. No trae tildes, Ñ, paréntesis, barras ni guiones bajos.
+LETRAS_DE_FORQUE = re.compile(r"[A-Za-z0-9 .,:;!?=+\-]*")
+
+# Etiquetas de título: ui.label("Texto").classes("text-lg font-semibold ...")
+TITULO = re.compile(
+    r'ui\.label\(\s*"([^"]*)"\s*\)\s*\.classes\(\s*"[^"]*'
+    r"text-(?:lg font-semibold|xl font-bold)"
+)
+
+
+def test_los_titulos_fijos_solo_llevan_caracteres_que_trae_forque():
+    carpeta = Path(sikorius.gui.__file__).parent
+    fuera = []
+    for archivo in carpeta.rglob("*.py"):
+        for texto in TITULO.findall(archivo.read_text(encoding="utf-8")):
+            if not LETRAS_DE_FORQUE.fullmatch(texto):
+                fuera.append(archivo.name + ": " + texto)
+    assert fuera == []
+
+
+def test_los_nombres_de_las_pestanas_solo_llevan_caracteres_de_forque():
+    for titulo in TITULOS.values():
+        assert LETRAS_DE_FORQUE.fullmatch(titulo), titulo

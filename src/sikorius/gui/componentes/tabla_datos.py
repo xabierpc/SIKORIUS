@@ -21,12 +21,24 @@ def _valor_para_tabla(valor):
     return str(valor)
 
 
+def titulo_columna(nombre):
+    """Nombre de columna para la cabecera: sin guiones bajos y con la primera
+    letra en mayúscula ("metros_cuadrados" -> "Metros cuadrados").
+
+    Solo se cambia la primera letra: el resto se deja como está para no
+    estropear siglas como "IVA" o "ID".
+    """
+    texto = str(nombre).replace("_", " ").strip()
+    return texto[:1].upper() + texto[1:]
+
+
 def dataframe_a_tabla(df):
     """Convierte un DataFrame en las columnas y filas que usa ui.table.
 
     Cada columna usa una clave interna (c0, c1, ...) porque Quasar interpreta
     los puntos de 'field' como rutas anidadas: una columna llamada 'precio.m2'
-    se mostraría vacía. El nombre real de la columna va en 'label'. Los
+    se mostraría vacía. El nombre de la columna va en 'label' ya arreglado
+    para leerlo (ver titulo_columna) y el nombre real en 'real'. Los
     valores que faltan (NaN) se convierten en None porque NaN no es JSON
     válido.
 
@@ -41,9 +53,10 @@ def dataframe_a_tabla(df):
         columnas.append(
             {
                 "name": campo,
-                "label": str(nombre),
+                "label": titulo_columna(nombre),
+                "real": str(nombre),
                 "field": campo,
-                "align": "left",
+                "align": "center",
                 "sortable": True,
             }
         )
@@ -77,12 +90,18 @@ class TablaDatos:
                 pagination={"rowsPerPage": 0},
             )
             .props("virtual-scroll flat bordered dense hide-pagination")
-            .classes("w-full")
+            .classes("w-full sk-tabla")
             .style("height: 40vh")
+        )
+        # Al pasar el ratón por una cabecera sale el nombre real de la columna
+        self.tabla.add_slot(
+            "header-cell",
+            '<q-th :props="props" :title="props.col.real">'
+            "{{ props.col.label }}</q-th>",
         )
         self.tabla.add_slot(
             "no-data",
-            '<div class="w-full text-center text-secondary">'
+            '<div class="w-full text-center opacity-70">'
             "Todavía no se ha cargado ningún dataset</div>",
         )
 
