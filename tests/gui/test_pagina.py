@@ -116,13 +116,20 @@ def test_al_recargar_cada_panel_muestra_su_paso(sesion, datos):
 
 
 def pestanas_activas(pestanas):
-    return [e for e, p in pestanas.pestanas.items() if p.enabled]
+    return [e for e, p in pestanas.pestanas.items() if p.visible]
 
 
 def test_pestanas_al_empezar_solo_datos(sesion):
     pestanas = Pestanas(sesion)
     assert pestanas_activas(pestanas) == ["datos"]
     assert pestanas.paneles.value == "datos"
+
+
+def test_las_pestanas_bloqueadas_no_se_ven_y_se_animan(sesion):
+    pestanas = Pestanas(sesion)
+    assert not pestanas.pestanas["modelo"].visible
+    for pestana in pestanas.pestanas.values():
+        assert "sk-pestana" in pestana.classes
 
 
 def test_pestanas_se_desbloquean_con_el_flujo(sesion, datos):

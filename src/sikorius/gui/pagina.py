@@ -21,6 +21,22 @@ ui.button.default_props("no-caps")
 # "my-auto" queda con el mismo espacio arriba que abajo.
 CSS_PAGINA = """
 .nicegui-content { min-height: inherit; }
+
+/* Una pestaña que se desbloquea crece desde cero y aparece poco a poco; las
+   que ya estaban se desplazan a la izquierda porque el grupo va pegado a la
+   derecha. La animación se repite cada vez que la pestaña deja de estar
+   oculta (display: none) */
+.sk-pestana {
+    overflow: hidden;
+    animation: sk-pestana 0.45s ease both;
+}
+@keyframes sk-pestana {
+    from { max-width: 0; opacity: 0; }
+    to { max-width: 20rem; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sk-pestana { animation: none; }
+}
 """
 
 TITULOS = {
@@ -34,7 +50,9 @@ TITULOS = {
 class Pestanas(Panel):
     """Pestañas de arriba: cada etapa se abre al completar la anterior.
 
-    Las pestañas no disponibles se ven apagadas y no se pueden pulsar. Si
+    Las pestañas no disponibles no se ven. Como el grupo va pegado a la
+    derecha, al abrirse una nueva las anteriores se desplazan a la
+    izquierda (ver CSS_PAGINA). Si
     una etapa deja de estar disponible mientras el usuario la está viendo
     (por ejemplo, al cargar otro dataset estando en "Modelo"), se le lleva
     a la última etapa que sí lo está.
@@ -50,7 +68,9 @@ class Pestanas(Panel):
             self.pestanas = {}
             with self.tabs:
                 for etapa in ETAPAS:
-                    self.pestanas[etapa] = ui.tab(etapa, label=TITULOS[etapa])
+                    self.pestanas[etapa] = ui.tab(
+                        etapa, label=TITULOS[etapa]
+                    ).classes("sk-pestana")
         # El contenido se coloca después, dentro de self.paneles
         # "my-auto" centra verticalmente el contenido de la pestaña en el
         # espacio que queda libre (ver CSS_PAGINA)
@@ -63,10 +83,7 @@ class Pestanas(Panel):
         self.header.set_value(self.sesion.dataset is not None)
         disponibles = self.sesion.etapas_disponibles()
         for etapa, pestana in self.pestanas.items():
-            if etapa in disponibles:
-                pestana.enable()
-            else:
-                pestana.disable()
+            pestana.set_visibility(etapa in disponibles)
         if self.paneles.value not in disponibles:
             self.paneles.set_value(disponibles[-1])
 
