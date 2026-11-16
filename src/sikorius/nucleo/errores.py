@@ -26,7 +26,7 @@ class ErrorModelo(ErrorSikorius):
 
 
 class ErrorPersistencia(ErrorSikorius):
-    """No se puede guardar el modelo en un archivo."""
+    """No se puede guardar el modelo en un archivo ni cargarlo de él."""
 
 
 class AvisoPreprocesado(ErrorPreprocesado):
