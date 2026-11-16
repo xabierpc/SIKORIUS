@@ -7,6 +7,7 @@ from sikorius.gui.paneles.base import Panel
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset
 from sikorius.gui.paneles.panel_modelo import PanelModelo
+from sikorius.gui.paneles.panel_prediccion import PanelPrediccion
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 from sikorius.gui.tema import aplicar_tema
@@ -100,5 +101,6 @@ def construir_pagina(sesion):
                 PanelSeparacion(sesion)
         with ui.tab_panel("preprocesado"):
             PanelPreprocesado(sesion)
-        with ui.tab_panel("modelo"):
+        with ui.tab_panel("modelo"), ui.column().classes("w-full gap-4"):
             PanelModelo(sesion)
+            PanelPrediccion(sesion)
