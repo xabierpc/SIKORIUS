@@ -21,6 +21,7 @@ from sikorius.dominio.errores import (
     ErrorImportacion,
     ErrorModelo,
     ErrorPersistencia,
+    ErrorPrediccion,
     ErrorPreprocesado,
     ErrorSeleccion,
     ErrorSeparacion,
@@ -1074,3 +1075,33 @@ def test_hay_cambios_sin_guardar(sesion, tmp_path):
     assert not sesion.hay_cambios_sin_guardar()
     sesion.guardar_descripcion("otra")
     assert sesion.hay_cambios_sin_guardar()
+
+
+# =============================================================================
+# predecir
+# =============================================================================
+
+
+def test_predecir_sin_modelo(sesion):
+    with pytest.raises(ErrorPrediccion, match="Crea o carga primero"):
+        sesion.predecir({"x": "1"})
+
+
+def test_predecir_con_modelo_creado_y_cargado(sesion, tmp_path):
+    ruta, origen = guardar_un_modelo(tmp_path)
+    valores = {c: "2,5" for c in origen.modelo.features}
+    esperado = origen.predecir(valores)
+
+    sesion.cargar_modelo(ruta)
+
+    assert sesion.predecir(valores) == esperado
+
+
+def test_predecir_no_cambia_la_sesion(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+    sesion.predecir({c: "1" for c in sesion.modelo.features})
+    assert avisos == []
+    assert sesion.modelo_sin_guardar

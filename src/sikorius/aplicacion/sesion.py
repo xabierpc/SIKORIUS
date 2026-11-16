@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from sikorius.datos import importador, persistencia
-from sikorius.dominio import modelo, preprocesado, separacion
+from sikorius.dominio import modelo, prediccion, preprocesado, separacion
 from sikorius.dominio.columnas import resolver_columnas, validar_seleccion
 from sikorius.dominio.errores import (
     ErrorModelo,
@@ -369,6 +369,25 @@ class Sesion:
         self._ruta_modelo = str(Path(ruta).resolve())
         self._avisar()
         return cargado
+
+    def predecir(self, valores):
+        """Predice la salida con el modelo actual, creado o cargado.
+
+        No cambia la sesión: se puede llamar las veces que se quiera.
+
+        Args:
+            valores: Diccionario ``{columna: valor}`` con un valor por cada
+                columna de entrada del modelo, como número o como texto
+                ("3.5" o "3,5").
+
+        Returns:
+            El valor predicho, como float, sin redondear.
+
+        Raises:
+            ErrorPrediccion: Si no hay modelo, falta algún valor o alguno
+                no es un número.
+        """
+        return prediccion.predecir(self.modelo, valores)
 
     # --- Consultas ---
 

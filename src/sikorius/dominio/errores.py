@@ -35,6 +35,10 @@ class ErrorPersistencia(ErrorSikorius):
     """No se puede guardar el modelo en un archivo ni cargarlo de él."""
 
 
+class ErrorPrediccion(ErrorSikorius):
+    """No se puede hacer la predicción con los valores introducidos."""
+
+
 class AvisoPreprocesado(ErrorPreprocesado):
     """El preprocesado se podría hacer, pero el resultado no sería válido."""
 
