@@ -1001,3 +1001,160 @@ def test_si_el_modelo_se_borra_con_el_dialogo_abierto_no_se_guarda(
     assert not (tmp_path / "m.json").exists()
     assert avisos[0][1] == "negative"
     assert not panel.boton_guardar.enabled
+
+
+# =============================================================================
+# Modelo cargado de un archivo (historia #24)
+# =============================================================================
+
+
+def sin_duros(texto):
+    return texto.replace("\u00a0", " ")
+
+
+def sesion_con_modelo_cargado(tmp_path, descripcion="Para probar"):
+    """Guarda un modelo desde otra sesión y lo carga en una nueva."""
+    origen = crear_sesion()
+    origen.crear_modelo()
+    origen.guardar_descripcion(descripcion)
+    ruta = origen.guardar_modelo(tmp_path / "guardado.json")
+    sesion = Sesion()
+    sesion.cargar_modelo(ruta)
+    return sesion, origen
+
+
+def test_cargado_muestra_formula_metricas_y_descripcion(tmp_path):
+    sesion, origen = sesion_con_modelo_cargado(tmp_path)
+
+    panel = PanelModelo(sesion)
+
+    assert panel.resultados.visible
+    assert formula_visible(panel) == sin_duros(texto_formula(origen.modelo))
+    metricas = origen.metricas_modelo()
+    for clave, (r2, ecm) in panel.metricas.items():
+        assert r2.text == texto_metrica(metricas[clave]["r2"])
+        assert ecm.text == texto_metrica(metricas[clave]["ecm"])
+    assert panel.descripcion.value == "Para probar"
+
+
+def test_cargado_sin_descripcion_deja_el_campo_vacio(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path, descripcion="")
+    panel = PanelModelo(sesion)
+    assert panel.descripcion.value == ""
+
+
+def test_cargado_no_tiene_grafico_ni_boton_de_crear(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+    assert not panel.grafico.visible
+    assert not panel.boton.visible
+    assert not panel.aviso.visible
+
+
+def test_cargado_colorea_la_formula_con_sus_columnas(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+    colores = colores_columnas(["x1", "x2", "y"])
+    assert panel.formula.content == html_formula(sesion.modelo, colores)
+
+
+def test_cargado_metrica_no_calculable(tmp_path):
+    ruta = tmp_path / "m.json"
+    datos = {
+        "formato": "sikorius-modelo",
+        "version_formato": 1,
+        "descripcion": "",
+        "formula": "",
+        "modelo": {
+            "features": ["x"],
+            "target": "y",
+            "coeficientes": [2.0],
+            "termino_independiente": 1.0,
+        },
+        "metricas": {
+            "entrenamiento": {"r2": 1.0, "ecm": 0.0},
+            "test": {"r2": None, "ecm": 0.5},
+        },
+    }
+    ruta.write_text(json.dumps(datos), encoding="utf-8")
+    sesion = Sesion()
+    sesion.cargar_modelo(ruta)
+    panel = PanelModelo(sesion)
+    assert panel.metricas["test"][0].text == "no calculable"
+
+
+def test_cargado_se_ve_al_cargarlo_con_el_panel_abierto(
+    sesion_lista, tmp_path
+):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    ruta = tmp_path / "otro.json"
+    origen = crear_sesion(features=("x1",))
+    origen.crear_modelo()
+    origen.guardar_modelo(ruta)
+
+    sesion_lista.cargar_modelo(ruta)
+
+    assert formula_visible(panel) == sin_duros(texto_formula(origen.modelo))
+    assert not panel.grafico.visible
+    assert not panel.boton.visible
+
+
+def test_al_volver_a_crear_se_ve_el_grafico_y_el_boton(tmp_path, datos):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+    df = datos_lineales()
+    sesion.cargar_dataset(df, "datos.csv")
+    sesion.guardar_seleccion(["x1", "x2"], "y")
+    sesion.guardar_separacion(df.iloc[:15], df.iloc[15:], 20, 42)
+
+    panel.crear()
+
+    assert panel.boton.visible
+    assert panel.boton.enabled
+    assert panel.grafico.visible
+
+
+def test_cargado_la_descripcion_es_editable(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+
+    panel.descripcion.set_value("Descripción nueva")
+
+    assert sesion.modelo.descripcion == "Descripción nueva"
+    assert sesion.modelo_sin_guardar
+    assert panel.estado_guardado.text.startswith("Cambios sin guardar")
+
+
+def test_cargado_se_puede_guardar_y_propone_su_archivo(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+    assert panel.boton_guardar.enabled
+    assert panel.estado_guardado.text == "Guardado en " + str(
+        (tmp_path / "guardado.json").resolve()
+    )
+    assert destino_inicial(sesion) == (
+        (tmp_path / "guardado.json").resolve().parent,
+        "guardado.json",
+    )
+
+
+def test_guardar_el_cargado_conserva_todo_menos_la_descripcion(
+    tmp_path, monkeypatch, avisos
+):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    ruta = tmp_path / "guardado.json"
+    antes = leer_json(ruta)
+    panel = PanelModelo(sesion)
+    panel.descripcion.set_value("Revisada")
+    elegir_al_guardar(monkeypatch, ruta)
+
+    asyncio.run(panel.guardar())
+
+    despues = leer_json(ruta)
+    assert despues["descripcion"] == "Revisada"
+    antes.pop("descripcion")
+    despues.pop("descripcion")
+    assert despues == antes
+    assert not sesion.modelo_sin_guardar
+    assert avisos[-1][1] == "positive"
