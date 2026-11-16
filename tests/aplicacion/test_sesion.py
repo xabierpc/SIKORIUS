@@ -425,7 +425,7 @@ def test_crear_modelo_error_conserva_el_anterior(sesion):
     sesion_lineal(sesion)
     anterior = sesion.crear_modelo()
     constante = sesion.separacion.entrenamiento.assign(x1=1.0)
-    sesion.separacion = replace(sesion.separacion, entrenamiento=constante)
+    sesion._separacion = replace(sesion.separacion, entrenamiento=constante)
     avisos = []
     sesion.al_cambiar(lambda: avisos.append("cambio"))
     with pytest.raises(ErrorModelo, match="modelo único"):
@@ -845,3 +845,61 @@ def test_datos_ajuste_del_modelo_actual(sesion):
     assert datos["tipo"] == "multiple"
     assert len(datos["entrenamiento"][0]) == 15
     assert len(datos["test"][0]) == 5
+
+
+# =============================================================================
+# Estado de solo lectura, preprocesar y crear, cambios sin guardar
+# =============================================================================
+
+
+@pytest.mark.parametrize(
+    "atributo",
+    [
+        "dataset",
+        "seleccion",
+        "separacion",
+        "preprocesado",
+        "modelo",
+        "ruta_modelo",
+        "modelo_sin_guardar",
+    ],
+)
+def test_el_estado_no_se_puede_cambiar_desde_fuera(sesion, atributo):
+    with pytest.raises(AttributeError):
+        setattr(sesion, atributo, None)
+
+
+def test_borrar_desde_un_paso_que_no_existe(sesion):
+    with pytest.raises(ValueError):
+        sesion._borrar_desde("no_existe")
+
+
+def test_preprocesar_y_crear_modelo(sesion_con_nulos):
+    resumen, error = sesion_con_nulos.preprocesar_y_crear_modelo(
+        ESTRATEGIAS[0]
+    )
+    assert error is None
+    assert sesion_con_nulos.preprocesado.resumen == resumen
+    assert sesion_con_nulos.modelo is not None
+
+
+def test_preprocesar_y_crear_modelo_si_el_modelo_falla(sesion_con_nulos):
+    """El preprocesado se conserva aunque el modelo no se pueda crear."""
+    separacion = sesion_con_nulos.separacion
+    constante = separacion.entrenamiento.assign(x=1.0)
+    sesion_con_nulos._separacion = replace(separacion, entrenamiento=constante)
+    _, error = sesion_con_nulos.preprocesar_y_crear_modelo("media")
+    assert isinstance(error, ErrorModelo)
+    assert sesion_con_nulos.preprocesado is not None
+    assert sesion_con_nulos.modelo is None
+
+
+def test_hay_cambios_sin_guardar(sesion, tmp_path):
+    assert not sesion.hay_cambios_sin_guardar()
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    assert sesion.hay_cambios_sin_guardar()
+    sesion.guardar_modelo(tmp_path / "m.json")
+    assert not sesion.hay_cambios_sin_guardar()
+    sesion.guardar_descripcion("otra")
+    assert sesion.hay_cambios_sin_guardar()

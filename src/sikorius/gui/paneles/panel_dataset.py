@@ -14,29 +14,12 @@ from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
 from sikorius.gui.componentes.tabla_datos import TablaDatos
 from sikorius.gui.paneles.base import Panel
-from sikorius.gui.tema import colores_columnas
+from sikorius.gui.tema import CARPETA_RECURSOS, colores_columnas
 
 # El logo es un SVG con su animación dentro (ver recursos/logo.svg). Se
 # incrusta como HTML y no con ui.image porque una imagen no deja que el CSS
 # anime sus piezas.
-RUTA_LOGO = Path(__file__).parent.parent / "recursos" / "logo.svg"
-
-# El botón aparece cuando el logo termina de escribirse (2.5 s). Hasta
-# entonces ni se ve ni se puede pulsar.
-CSS_INICIO = """
-.sk-aparecer {
-    opacity: 0;
-    pointer-events: none;
-    animation: sk-aparecer 0.6s ease 2.5s forwards;
-}
-@keyframes sk-aparecer {
-    to { opacity: 1; pointer-events: auto; }
-}
-@media (prefers-reduced-motion: reduce) {
-    .sk-aparecer { animation: none; opacity: 1; pointer-events: auto; }
-}
-"""
-
+RUTA_LOGO = CARPETA_RECURSOS / "logo.svg"
 
 # Alto en píxeles de cada fila de la tabla (modo "dense") y de sus bordes
 ALTO_FILA = 28.5
@@ -85,7 +68,6 @@ class PanelDataset(Panel):
     """Pantalla de inicio (sin dataset) o tabla grande (con dataset)."""
 
     def __init__(self, sesion):
-        ui.add_css(CSS_INICIO)
 
         self.inicio = ui.column().classes("w-full items-center gap-6")
         with self.inicio:

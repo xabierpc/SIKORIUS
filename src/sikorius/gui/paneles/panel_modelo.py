@@ -1,6 +1,10 @@
-"""Panel para crear y evaluar el modelo de regresión lineal."""
+"""Panel para crear y evaluar el modelo de regresión lineal.
 
-import html
+Junta los botones de crear y guardar, la fórmula, las métricas, el gráfico
+del ajuste y la descripción. La fórmula y el gráfico son componentes
+(``componentes/formula.py`` y ``componentes/grafico_ajuste.py``).
+"""
+
 import math
 from pathlib import Path
 
@@ -8,23 +12,15 @@ from nicegui import ui
 
 from sikorius.aplicacion import EXTENSION
 from sikorius.dominio.errores import ErrorModelo, ErrorPersistencia
-from sikorius.dominio.modelo import terminos_formula
 from sikorius.dominio.texto import formatear_numero
 from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes import dialogo_guardado
+from sikorius.gui.componentes.formula import html_formula
+from sikorius.gui.componentes.grafico_ajuste import opciones_grafico
 from sikorius.gui.paneles.base import Panel
 from sikorius.gui.tema import colores_columnas
 
 DECIMALES_METRICAS = 4
-
-# Colores del gráfico: los mismos de la marca (ver tema.py)
-COLOR_ENTRENAMIENTO = "#8b5cf6"
-COLOR_TEST = "#7dd3fc"
-COLOR_RECTA = "#eeeeee"
-COLOR_TEXTO = "#c9c4e0"
-COLOR_LINEAS = "rgba(255, 255, 255, 0.12)"
-COLOR_FONDO_TOOLTIP = "#1b1730"
-COLOR_TEXTO_CLARO = "#eeeeee"
 
 AVISO_SIN_DESCRIPCION = (
     "El modelo no tiene descripción. Puedes guardarlo igualmente, pero "
@@ -37,186 +33,6 @@ def texto_metrica(valor):
     if math.isnan(valor):
         return "no calculable"
     return formatear_numero(valor, DECIMALES_METRICAS)
-
-
-def _formula(mod, marcar):
-    """Construye la fórmula en una sola línea, lista para mostrar.
-
-    ``marcar`` es la función que recibe el nombre de una columna y devuelve
-    cómo se escribe: tal cual (texto) o con su color (HTML).
-
-    Dentro de cada término los espacios son "espacios duros" (\u00a0): si la
-    fórmula no cabe y se parte en varias líneas, solo se parte entre términos
-    y nunca deja un signo solo al final de una línea.
-    """
-    duro = "\u00a0"
-    terminos = []
-    for posicion, (negativo, numero, columna) in enumerate(
-        terminos_formula(mod)
-    ):
-        cuerpo = numero
-        if columna is not None:
-            cuerpo += duro + "·" + duro + marcar(str(columna))
-        if posicion == 0:
-            # El primer término lleva el signo pegado, solo si es negativo
-            signo = "−" if negativo else ""
-        else:
-            signo = ("−" if negativo else "+") + duro
-        terminos.append(signo + cuerpo)
-    return marcar(str(mod.target)) + " = " + " ".join(terminos)
-
-
-def _sin_marcar(nombre):
-    return nombre
-
-
-def texto_formula(mod):
-    """La fórmula del modelo en una sola línea y sin colores.
-
-    Ejemplo: ``y = 2.0000 · x1 − 3.0000 · x2 + 5.0000``.
-    """
-    return _formula(mod, _sin_marcar)
-
-
-def html_formula(mod, colores):
-    """La misma fórmula en HTML, con cada columna de su color.
-
-    ``colores`` es {nombre de columna: color}. Los nombres vienen del
-    usuario, así que se escapan: un nombre como ``<b>`` se ve tal cual y no
-    se interpreta como HTML.
-    """
-
-    def marcar(nombre):
-        seguro = html.escape(nombre)
-        color = colores.get(nombre)
-        if color is None:
-            return seguro
-        return (
-            '<span style="color: '
-            + color
-            + '; font-weight: 700">'
-            + seguro
-            + "</span>"
-        )
-
-    return _formula(mod, marcar)
-
-
-def _dimensiones(datos):
-    """Nombres de las dos coordenadas de cada punto, para el tooltip."""
-    return [str(datos["etiqueta_x"]), str(datos["etiqueta_y"])]
-
-
-def _puntos(par):
-    """Pareja (xs, ys) como lista de [x, y], que es lo que lee ECharts."""
-    return [
-        [x, y] for x, y in zip(par[0].tolist(), par[1].tolist(), strict=True)
-    ]
-
-
-def _eje(nombre, vertical):
-    """Eje numérico. El nombre del eje vertical va horizontal, encima del
-    eje: a su lado van las cifras, y como cambian de largo según el
-    modelo, un nombre allí acabaría pisándolas."""
-    if vertical:
-        nombre_eje = {
-            "nameLocation": "end",
-            "nameGap": 14,
-            "nameTextStyle": {"color": COLOR_TEXTO, "align": "left"},
-        }
-    else:
-        nombre_eje = {
-            "nameLocation": "middle",
-            "nameGap": 32,
-            "nameTextStyle": {"color": COLOR_TEXTO},
-        }
-    return {
-        "type": "value",
-        "name": str(nombre),
-        **nombre_eje,
-        "scale": True,  # no obliga a que el eje empiece en 0
-        "axisLabel": {"color": COLOR_TEXTO},
-        "axisLine": {"lineStyle": {"color": COLOR_LINEAS}},
-        "splitLine": {"lineStyle": {"color": COLOR_LINEAS}},
-    }
-
-
-# Al pasar el ratón por un punto: nombre del conjunto y las dos coordenadas,
-# cada una con el nombre de su eje. Es JavaScript (la clave empieza por ":"
-# para que NiceGUI lo envíe como función y no como texto). Los nombres de
-# los ejes llegan en "dimensionNames", que sale de "dimensions" de la serie.
-JS_TOOLTIP = """
-(punto) => {
-    const numero = (v) => Number(v).toLocaleString(
-        'en-US', {maximumFractionDigits: 4}
-    );
-    return '<b>' + punto.seriesName + '</b><br/>'
-        + punto.dimensionNames[0] + ': ' + numero(punto.value[0]) + '<br/>'
-        + punto.dimensionNames[1] + ': ' + numero(punto.value[1]);
-}
-"""
-
-
-def opciones_grafico(datos):
-    """Opciones de ECharts para el gráfico del ajuste.
-
-    Args:
-        datos: Diccionario devuelto por ``Sesion.datos_ajuste``.
-
-    Returns:
-        Diccionario de opciones para ``ui.echart``.
-    """
-    return {
-        "backgroundColor": "transparent",
-        "tooltip": {
-            "trigger": "item",
-            ":formatter": JS_TOOLTIP,
-            "backgroundColor": COLOR_FONDO_TOOLTIP,
-            "borderColor": COLOR_LINEAS,
-            "textStyle": {"color": COLOR_TEXTO_CLARO},
-        },
-        "legend": {
-            "top": 0,
-            "textStyle": {"color": COLOR_TEXTO},
-        },
-        "grid": {
-            "left": 16,
-            "right": 24,
-            "top": 72,
-            "bottom": 40,
-            "containLabel": True,
-        },
-        "xAxis": _eje(datos["etiqueta_x"], vertical=False),
-        "yAxis": _eje(datos["etiqueta_y"], vertical=True),
-        "series": [
-            {
-                "name": "Entrenamiento",
-                "dimensions": _dimensiones(datos),
-                "type": "scatter",
-                "symbolSize": 9,
-                "itemStyle": {"color": COLOR_ENTRENAMIENTO},
-                "data": _puntos(datos["entrenamiento"]),
-            },
-            {
-                "name": "Test",
-                "dimensions": _dimensiones(datos),
-                "type": "scatter",
-                "symbol": "diamond",
-                "symbolSize": 11,
-                "itemStyle": {"color": COLOR_TEST},
-                "data": _puntos(datos["test"]),
-            },
-            {
-                "name": datos["etiqueta_recta"],
-                "dimensions": _dimensiones(datos),
-                "type": "line",
-                "showSymbol": False,
-                "lineStyle": {"type": "dashed", "color": COLOR_RECTA},
-                "itemStyle": {"color": COLOR_RECTA},
-                "data": _puntos(datos["recta"]),
-            },
-        ],
-    }
 
 
 def destino_inicial(sesion):

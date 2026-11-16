@@ -63,20 +63,62 @@ class Preprocesado:
 
 
 class Sesion:
-    """Resultado de cada paso del flujo y aviso de cambios a la interfaz."""
+    """Resultado de cada paso del flujo y aviso de cambios a la interfaz.
+
+    El estado se lee con propiedades (``sesion.modelo``, ``sesion.dataset``…)
+    pero solo se cambia con los métodos de cada paso. Así nadie se puede
+    saltar el borrado de los pasos posteriores ni el aviso a la interfaz.
+    """
 
     def __init__(self):
-        self.dataset = None
-        self.seleccion = None
-        self.separacion = None
-        self.preprocesado = None
-        self.modelo = None
+        self._dataset = None
+        self._seleccion = None
+        self._separacion = None
+        self._preprocesado = None
+        self._modelo = None
         # Archivo en el que se guardó el modelo actual por última vez, y si
         # ha cambiado desde entonces (un modelo recién creado aún no se ha
         # guardado; cambiar la descripción también es un cambio).
-        self.ruta_modelo = None
-        self.modelo_sin_guardar = False
+        self._ruta_modelo = None
+        self._modelo_sin_guardar = False
         self._oyentes = []
+
+    # --- Estado (solo lectura) ---
+
+    @property
+    def dataset(self):
+        """Dataset cargado (``Dataset``) o None."""
+        return self._dataset
+
+    @property
+    def seleccion(self):
+        """Columnas confirmadas (``Seleccion``) o None."""
+        return self._seleccion
+
+    @property
+    def separacion(self):
+        """Conjuntos de entrenamiento y test (``Separacion``) o None."""
+        return self._separacion
+
+    @property
+    def preprocesado(self):
+        """Preprocesado aplicado (``Preprocesado``) o None."""
+        return self._preprocesado
+
+    @property
+    def modelo(self):
+        """Modelo actual (``ModeloLineal``) o None."""
+        return self._modelo
+
+    @property
+    def ruta_modelo(self):
+        """Archivo en el que se guardó el modelo por última vez, o None."""
+        return self._ruta_modelo
+
+    @property
+    def modelo_sin_guardar(self):
+        """True si el modelo actual tiene cambios que no están guardados."""
+        return self._modelo_sin_guardar
 
     # --- Avisos ---
 
@@ -99,12 +141,26 @@ class Sesion:
             funcion()
 
     def _borrar_desde(self, paso):
-        """Borra paso y todos los que van detrás en el flujo."""
-        for nombre in PASOS[PASOS.index(paso) :]:
-            setattr(self, nombre, None)
-        # Sin modelo no hay nada que guardar
-        self.ruta_modelo = None
-        self.modelo_sin_guardar = False
+        """Borra paso y todos los que van detrás en el flujo.
+
+        Cada paso se borra con su propia línea (y no con ``setattr`` y el
+        nombre en texto) para que, si se renombra un atributo, el error
+        salte al momento en vez de dejar de borrarse sin avisar.
+        """
+        desde = PASOS.index(paso)  # ValueError si el paso no existe
+        if desde <= PASOS.index("dataset"):
+            self._dataset = None
+        if desde <= PASOS.index("seleccion"):
+            self._seleccion = None
+        if desde <= PASOS.index("separacion"):
+            self._separacion = None
+        if desde <= PASOS.index("preprocesado"):
+            self._preprocesado = None
+        # El modelo va siempre detrás: cualquier cambio lo borra, y sin
+        # modelo no hay nada que guardar
+        self._modelo = None
+        self._ruta_modelo = None
+        self._modelo_sin_guardar = False
 
     # --- Pasos del flujo ---
 
@@ -121,7 +177,7 @@ class Sesion:
     def cargar_dataset(self, datos, ruta):
         """Sustituye el dataset. Las columnas elegidas antes ya no valen."""
         self._borrar_desde("seleccion")
-        self.dataset = Dataset(datos, str(Path(ruta).resolve()))
+        self._dataset = Dataset(datos, str(Path(ruta).resolve()))
         self._avisar()
 
     def confirmar_seleccion(self, features, target):
@@ -140,7 +196,7 @@ class Sesion:
     def guardar_seleccion(self, features, target):
         """Guarda una selección ya validada. Obliga a repetir la separación."""
         self._borrar_desde("separacion")
-        self.seleccion = Seleccion(tuple(features), target)
+        self._seleccion = Seleccion(tuple(features), target)
         self._avisar()
 
     def guardar_separacion(
@@ -148,7 +204,7 @@ class Sesion:
     ):
         """Guarda los conjuntos y borra el preprocesado y el modelo."""
         self._borrar_desde("preprocesado")
-        self.separacion = Separacion(
+        self._separacion = Separacion(
             entrenamiento, test, porcentaje_test, semilla
         )
         self._avisar()
@@ -194,11 +250,32 @@ class Sesion:
             constante,
         )
         self._borrar_desde("preprocesado")
-        self.preprocesado = Preprocesado(
+        self._preprocesado = Preprocesado(
             entrenamiento, test, estrategia, resumen
         )
         self._avisar()
         return resumen
+
+    def preprocesar_y_crear_modelo(self, estrategia, constante=None):
+        """Aplica el preprocesado y, con los datos ya tratados, crea el
+        modelo.
+
+        Returns:
+            Tupla ``(resumen, error)``. ``resumen`` es el de
+            ``aplicar_preprocesado``. ``error`` es None si el modelo se ha
+            creado, o el ``ErrorModelo`` que explica por qué no: en ese
+            caso el preprocesado sí se conserva.
+
+        Raises:
+            ErrorPreprocesado: Si el preprocesado no se puede aplicar (o
+                ``AvisoPreprocesado``). En ese caso la sesión no cambia.
+        """
+        resumen = self.aplicar_preprocesado(estrategia, constante)
+        try:
+            self.crear_modelo()
+        except ErrorModelo as error:
+            return resumen, error
+        return resumen, None
 
     def crear_modelo(self):
         """Entrena el modelo con el entrenamiento actual y lo guarda.
@@ -218,9 +295,9 @@ class Sesion:
             raise ErrorModelo(motivo)
         entrenamiento, _ = self.conjuntos_actuales()
         *features, target = self.columnas_modelo()
-        self.modelo = modelo.entrenar_modelo(entrenamiento, features, target)
-        self.ruta_modelo = None
-        self.modelo_sin_guardar = True
+        self._modelo = modelo.entrenar_modelo(entrenamiento, features, target)
+        self._ruta_modelo = None
+        self._modelo_sin_guardar = True
         self._avisar()
         return self.modelo
 
@@ -237,7 +314,7 @@ class Sesion:
         texto = str(texto)
         if texto != self.modelo.descripcion:
             self.modelo.descripcion = texto
-            self.modelo_sin_guardar = True
+            self._modelo_sin_guardar = True
 
     def guardar_modelo(self, ruta):
         """Guarda el modelo actual, con sus métricas, en un archivo JSON.
@@ -259,8 +336,8 @@ class Sesion:
         guardada = persistencia.guardar_modelo(
             self.modelo, self.metricas_modelo(), ruta
         )
-        self.ruta_modelo = str(guardada)
-        self.modelo_sin_guardar = False
+        self._ruta_modelo = str(guardada)
+        self._modelo_sin_guardar = False
         self._avisar()
         return guardada
 
@@ -325,6 +402,12 @@ class Sesion:
             return None
         entrenamiento, test = self.conjuntos_actuales()
         return modelo.datos_ajuste(self.modelo, entrenamiento, test)
+
+    def hay_cambios_sin_guardar(self):
+        """True si hay un modelo con cambios que se perderían al cargar otro
+        dataset u otro modelo (recién creado o con la descripción cambiada).
+        """
+        return self._modelo is not None and self._modelo_sin_guardar
 
     def puede_crear_modelo(self):
         """True si hay separación y no quedan valores inexistentes."""

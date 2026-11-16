@@ -92,6 +92,15 @@ DF_UNO = pd.DataFrame({"a": [1]})
 # =============================================================================
 
 
+def espiar_lector(monkeypatch, nombre, espia):
+    """Sustituye un lector por un espía, también en la tabla LECTORES."""
+    original = getattr(importador, nombre)
+    monkeypatch.setattr(importador, nombre, espia)
+    for extension, lector in list(importador.LECTORES.items()):
+        if lector is original:
+            monkeypatch.setitem(importador.LECTORES, extension, espia)
+
+
 @pytest.fixture
 def espias_lectores(monkeypatch):
     """Sustituye los tres lectores por espías que devuelven DF_UNO."""
@@ -101,7 +110,7 @@ def espias_lectores(monkeypatch):
         "_leer_sqlite": Espia(DF_UNO.copy()),
     }
     for nombre, espia in espias.items():
-        monkeypatch.setattr(importador, nombre, espia)
+        espiar_lector(monkeypatch, nombre, espia)
     return espias
 
 
@@ -197,7 +206,7 @@ def test_I5_extension_no_soportada(tmp_path, espias_lectores, nombre):
     ],
 )
 def test_I6_lector_devuelve_vacio(tmp_path, monkeypatch, vacio):
-    monkeypatch.setattr(importador, "_leer_csv", Espia(vacio))
+    espiar_lector(monkeypatch, "_leer_csv", Espia(vacio))
     espia_conv = Espia(DF_UNO)
     monkeypatch.setattr(importador, "_convertir_numericas", espia_conv)
     with pytest.raises(ErrorImportacion, match="no contiene datos"):
@@ -208,7 +217,7 @@ def test_I6_lector_devuelve_vacio(tmp_path, monkeypatch, vacio):
 def test_I7_devuelve_resultado_de_convertir(tmp_path, monkeypatch):
     leido = pd.DataFrame({"a": ["1"]})
     convertido = pd.DataFrame({"a": [1]})
-    monkeypatch.setattr(importador, "_leer_csv", Espia(leido))
+    espiar_lector(monkeypatch, "_leer_csv", Espia(leido))
     espia_conv = Espia(convertido)
     monkeypatch.setattr(importador, "_convertir_numericas", espia_conv)
     assert importar_datos(escribir(tmp_path / "a.csv", "x")) is convertido
@@ -1079,3 +1088,36 @@ def test_los_errores_envueltos_conservan_la_causa(tmp_path):
         with pytest.raises(ErrorImportacion) as info:
             importar_datos(ruta)
         assert info.value.__cause__ is not None, ruta.name
+
+
+# =============================================================================
+# Celdas en blanco y lectores por extensión
+# =============================================================================
+
+
+def test_celdas_con_espacios_son_valores_inexistentes(tmp_path):
+    """Una celda con solo espacios no convierte la columna en texto."""
+    from sikorius.datos.importador import importar_datos
+
+    ruta = tmp_path / "huecos.csv"
+    ruta.write_text("x,y\n1,2\n2,  \n3,6\n", encoding="utf-8")
+    df = importar_datos(ruta)
+    assert pd.api.types.is_numeric_dtype(df["y"])
+    assert df["y"].isna().sum() == 1
+
+
+def test_celdas_con_espacios_en_columna_de_texto(tmp_path):
+    from sikorius.datos.importador import importar_datos
+
+    ruta = tmp_path / "texto.csv"
+    ruta.write_text("nombre,y\nana,1\n   ,2\nluis,3\n", encoding="utf-8")
+    df = importar_datos(ruta)
+    assert df["nombre"].isna().sum() == 1
+    assert df["nombre"].iloc[0] == "ana"
+
+
+def test_hay_un_lector_por_cada_extension_admitida():
+    from sikorius.datos.formatos import EXTENSIONES_ADMITIDAS
+    from sikorius.datos.importador import LECTORES
+
+    assert set(LECTORES) == set(EXTENSIONES_ADMITIDAS)

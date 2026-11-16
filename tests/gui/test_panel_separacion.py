@@ -206,8 +206,8 @@ def test_panel_error_conserva_separacion_anterior(sesion_100, avisos):
 def test_panel_repetir_separacion_descarta_preprocesado(sesion_100):
     panel = PanelSeparacion(sesion_100)
     panel.separar()
-    sesion_100.preprocesado = "preprocesado anterior"
-    sesion_100.modelo = "modelo anterior"
+    sesion_100._preprocesado = "preprocesado anterior"
+    sesion_100._modelo = "modelo anterior"
     panel.entrada_semilla.set_value("1")
     panel.separar()
     assert sesion_100.preprocesado is None

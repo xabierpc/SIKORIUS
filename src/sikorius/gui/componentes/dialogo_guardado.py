@@ -16,11 +16,7 @@ from nicegui import ui
 from sikorius.aplicacion import EXTENSION, ruta_con_extension
 from sikorius.gui.avisos import notificar_error
 from sikorius.gui.componentes.confirmacion import confirmar
-from sikorius.gui.componentes.explorador_archivos import (
-    listar_carpeta,
-    nombre_unidad,
-    unidades_disponibles,
-)
+from sikorius.gui.componentes.explorador_archivos import NavegadorCarpetas
 
 # Caracteres que Windows no admite en un nombre de archivo. Se rechazan en
 # todos los sistemas para que los modelos se puedan copiar a cualquiera.
@@ -138,7 +134,6 @@ class DialogoGuardado:
             preguntar = confirmar
         self._preguntar = preguntar
         self.resultado = None
-        self.carpeta = None
         # Mientras se comprueba el nombre (y se pregunta si sobrescribir),
         # otro Enter o clic en "Guardar" no hace nada: así no se abren dos
         # preguntas a la vez.
@@ -160,21 +155,13 @@ class DialogoGuardado:
             else:
                 self.aviso.set_visibility(False)
 
-            with ui.row().classes("w-full items-center no-wrap"):
-                ui.button(
-                    icon="home", on_click=lambda: self.mostrar(Path.home())
-                ).props("flat round dense").tooltip("Carpeta personal")
-                for unidad in unidades_disponibles():
-                    ui.button(
-                        nombre_unidad(unidad), on_click=self._ir_a(unidad)
-                    ).props("flat dense no-caps").tooltip(
-                        "Unidad " + nombre_unidad(unidad)
-                    )
-                self.etiqueta_carpeta = ui.label().classes("text-sm break-all")
-            with ui.scroll_area().classes("w-full h-64 border rounded"):
-                self.lista = (
-                    ui.list().classes("w-full").props("dense separator")
-                )
+            self.navegador = NavegadorCarpetas(
+                es_modelo,
+                lambda ruta: self.nombre.set_value(ruta.name),
+                "No hay carpetas ni modelos",
+                al_cambiar_carpeta=self._actualizar_destino,
+                alto="h-64",
+            )
 
             # Enter en el campo equivale a pulsar "Guardar"
             self.nombre = ui.input(
@@ -196,64 +183,27 @@ class DialogoGuardado:
 
         self.mostrar(carpeta_valida(carpeta_inicial))
 
-    # --- Navegación ---
+    # --- Navegación (la hace NavegadorCarpetas) ---
 
-    def _ir_a(self, carpeta):
-        # Cada botón necesita su propia función: una lambda escrita en el
-        # bucle de las unidades se quedaría con la última para todos
-        return lambda: self.mostrar(carpeta)
+    @property
+    def carpeta(self):
+        """Carpeta que se está mostrando, como ``Path``."""
+        return self.navegador.carpeta
 
-    def _al_pulsar(self, ruta):
-        return lambda: self._abrir(ruta)
+    @property
+    def etiqueta_carpeta(self):
+        return self.navegador.etiqueta_carpeta
 
-    def _abrir(self, ruta):
-        """Una carpeta se abre; un archivo pone su nombre en el campo."""
-        if ruta.is_dir():
-            self.mostrar(ruta)
-        else:
-            self.nombre.set_value(ruta.name)
-
-    def _anadir_entrada(self, ruta, icono, texto):
-        with ui.item(on_click=self._al_pulsar(ruta)):
-            with ui.item_section().props("avatar"):
-                ui.icon(icono)
-            with ui.item_section():
-                ui.item_label(texto)
+    @property
+    def lista(self):
+        return self.navegador.lista
 
     def mostrar(self, carpeta):
         """Lista las subcarpetas y los modelos (.json) de carpeta.
 
         Si no se puede abrir, avisa y se queda en la carpeta anterior.
         """
-        carpeta = Path(carpeta)
-        try:
-            entradas = listar_carpeta(carpeta, es_modelo)
-        except PermissionError:
-            notificar_error("Sin permiso para abrir " + str(carpeta))
-            return
-        except OSError as error:
-            notificar_error(
-                "No se puede abrir " + str(carpeta) + ": " + str(error)
-            )
-            return
-
-        self.carpeta = carpeta
-        self.etiqueta_carpeta.set_text(str(carpeta))
-        self._actualizar_destino()
-        self.lista.clear()
-        with self.lista:
-            if carpeta.parent != carpeta:
-                self._anadir_entrada(carpeta.parent, "arrow_upward", "..")
-            for ruta in entradas:
-                if ruta.is_dir():
-                    self._anadir_entrada(ruta, "folder", ruta.name)
-                else:
-                    self._anadir_entrada(ruta, "description", ruta.name)
-            if len(entradas) == 0:
-                with ui.item():
-                    ui.item_label("No hay carpetas ni modelos").classes(
-                        "text-secondary"
-                    )
+        self.navegador.mostrar(carpeta)
 
     def texto_destino(self):
         """Dónde se guardará con el nombre escrito, o por qué no se puede."""
@@ -265,8 +215,7 @@ class DialogoGuardado:
         )
 
     def _actualizar_destino(self):
-        # Al crear el diálogo, mostrar() se llama antes de que exista la
-        # carpeta; hasta entonces no hay nada que enseñar
+        # Hasta que se muestra la primera carpeta no hay nada que enseñar
         if self.carpeta is not None:
             self.destino.set_text(self.texto_destino())
 

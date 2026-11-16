@@ -13,7 +13,6 @@ from nicegui import ui
 
 from sikorius.dominio.errores import (
     AvisoPreprocesado,
-    ErrorModelo,
     ErrorPreprocesado,
 )
 from sikorius.dominio.preprocesado import (
@@ -196,10 +195,11 @@ class PanelPreprocesado(Panel):
         self._mostrar_aplicado()
 
     def aplicar(self):
-        """Aplica la estrategia elegida. Si falla, la sesión no cambia y se
-        puede volver a intentar con otras opciones."""
+        """Aplica la estrategia elegida y crea el modelo. Si el
+        preprocesado falla, la sesión no cambia y se puede volver a intentar
+        con otras opciones."""
         try:
-            resumen = self.sesion.aplicar_preprocesado(
+            resumen, error_modelo = self.sesion.preprocesar_y_crear_modelo(
                 self.estrategia.value, self.constante.value
             )
         except AvisoPreprocesado as aviso:
@@ -209,14 +209,8 @@ class PanelPreprocesado(Panel):
             notificar_error(error)
             return
         notificar_exito(texto_resumen(resumen))
-        self._crear_modelo()
-
-    def _crear_modelo(self):
-        """Crea el modelo con los datos recién preprocesados. Si falla, el
-        preprocesado se conserva y se avisa del error."""
-        try:
-            self.sesion.crear_modelo()
-        except ErrorModelo as error:
-            notificar_error(error)
-            return
-        notificar_exito("Modelo creado correctamente.")
+        # Si el modelo no se puede crear, el preprocesado se conserva
+        if error_modelo is not None:
+            notificar_error(error_modelo)
+        else:
+            notificar_exito("Modelo creado correctamente.")

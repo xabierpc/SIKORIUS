@@ -1,9 +1,9 @@
 """Importación de datasets desde archivos CSV, Excel y SQLite.
 
 La única función pública es ``importar_datos``: elige el lector según la
-extensión del archivo y devuelve un DataFrame de pandas. Cualquier problema
-con el archivo se comunica con ``ErrorImportacion``, cuyo mensaje se puede
-mostrar tal cual al usuario.
+extensión del archivo (tabla ``LECTORES``) y devuelve un DataFrame de
+pandas. Cualquier problema con el archivo se comunica con
+``ErrorImportacion``, cuyo mensaje se puede mostrar tal cual al usuario.
 """
 
 import csv
@@ -58,22 +58,37 @@ def importar_datos(ruta_archivo) -> pd.DataFrame:
 
     tipo = extension(ruta)
 
-    # Lectura del archivo
-    if tipo in EXTENSIONES_CSV:
-        df = _leer_csv(ruta)
-    elif tipo in EXTENSIONES_EXCEL:
-        df = _leer_excel(ruta)
-    elif tipo in EXTENSIONES_SQLITE:
-        df = _leer_sqlite(ruta)
-    else:
+    lector = LECTORES.get(tipo)
+    if lector is None:
         raise ErrorImportacion("Extensión no soportada '" + tipo + "'")
+    df = lector(ruta)
 
     # Un archivo cuyas filas no tienen ningún valor (',,') tampoco tiene
     # datos, aunque el DataFrame no esté vacío
     if df.dropna(how="all").empty:
         raise ErrorImportacion("El archivo no contiene datos: " + ruta.name)
 
-    return _convertir_numericas(df)
+    return _convertir_numericas(_vaciar_celdas_en_blanco(df))
+
+
+def _vaciar_celdas_en_blanco(df) -> pd.DataFrame:
+    """Convierte en NaN las celdas de texto vacías o con solo espacios.
+
+    Así una celda "  " cuenta como valor inexistente: la columna se puede
+    convertir a número y el preprocesado la trata como cualquier otro
+    hueco, en vez de dejar toda la columna como texto.
+    """
+    for columna in df.columns:
+        serie = df[columna]
+        if pd.api.types.is_object_dtype(serie) or pd.api.types.is_string_dtype(
+            serie
+        ):
+            en_blanco = serie.map(
+                lambda valor: isinstance(valor, str) and valor.strip() == ""
+            ).astype(bool)
+            if en_blanco.any():
+                df[columna] = serie.mask(en_blanco)
+    return df
 
 
 def _convertir_numericas(df) -> pd.DataFrame:
@@ -258,3 +273,12 @@ def _leer_sqlite(ruta) -> pd.DataFrame:
         raise ErrorImportacion(
             "No se pudo leer la tabla de la base de datos: " + ruta.name
         ) from e
+
+
+# Lector de cada extensión. Tiene que haber uno por cada extensión de
+# ``formatos.EXTENSIONES_ADMITIDAS`` (lo comprueba un test).
+LECTORES = {
+    **dict.fromkeys(EXTENSIONES_CSV, _leer_csv),
+    **dict.fromkeys(EXTENSIONES_EXCEL, _leer_excel),
+    **dict.fromkeys(EXTENSIONES_SQLITE, _leer_sqlite),
+}

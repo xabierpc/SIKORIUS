@@ -21,7 +21,7 @@ from sikorius.dominio.preprocesado import (
     MEDIA,
     MEDIANA,
     AvisoPreprocesado,
-    ColumnasNoEncontradasError,
+    ErrorColumnasNoEncontradas,
     ErrorPreprocesado,
     aplicar_preprocesado,
     detectar_nulos,
@@ -79,8 +79,8 @@ def test_jerarquia_de_errores():
     """La GUI captura ErrorPreprocesado: los demás errores deben heredar
     de él."""
     assert issubclass(AvisoPreprocesado, ErrorPreprocesado)
-    assert issubclass(ColumnasNoEncontradasError, ErrorPreprocesado)
-    assert issubclass(ColumnasNoEncontradasError, ValueError)
+    assert issubclass(ErrorColumnasNoEncontradas, ErrorPreprocesado)
+    assert issubclass(ErrorColumnasNoEncontradas, ValueError)
 
 
 # =============================================================================
@@ -118,7 +118,7 @@ def test_normalizar_no_modifica_el_original():
 
 
 def test_normalizar_columna_inexistente():
-    with pytest.raises(ColumnasNoEncontradasError, match="no_existe"):
+    with pytest.raises(ErrorColumnasNoEncontradas, match="no_existe"):
         normalizar_espacios_vacios(crear_train(), ["x", "no_existe"])
 
 
@@ -159,7 +159,7 @@ def test_detectar_cabecera_no_texto():
 
 
 def test_detectar_columnas_inexistentes_las_nombra_todas():
-    with pytest.raises(ColumnasNoEncontradasError) as error:
+    with pytest.raises(ErrorColumnasNoEncontradas) as error:
         detectar_nulos(crear_train(), ["a", "x", "b"])
     assert "a, b" in str(error.value)
 
@@ -429,7 +429,7 @@ def test_no_modifica_los_conjuntos_originales(estrategia):
 
 @pytest.mark.parametrize("estrategia", ESTRATEGIAS)
 def test_columna_inexistente(estrategia):
-    with pytest.raises(ColumnasNoEncontradasError):
+    with pytest.raises(ErrorColumnasNoEncontradas):
         aplicar_preprocesado(
             crear_train(), crear_test(), ["x", "z"], estrategia, 1
         )

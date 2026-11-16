@@ -210,7 +210,7 @@ def test_entrar_en_una_subcarpeta(tmp_path):
     (tmp_path / "sub" / "dentro.json").write_text("{}", encoding="utf-8")
     dialogo = DialogoGuardado(tmp_path, "m.json")
 
-    dialogo._abrir(tmp_path / "sub")
+    dialogo.navegador._abrir(tmp_path / "sub")
 
     assert dialogo.carpeta == tmp_path / "sub"
     assert "dentro.json" in nombres_lista(dialogo)
@@ -220,7 +220,7 @@ def test_pulsar_un_modelo_pone_su_nombre(tmp_path):
     (tmp_path / "viejo.json").write_text("{}", encoding="utf-8")
     dialogo = DialogoGuardado(tmp_path, "m.json")
 
-    dialogo._abrir(tmp_path / "viejo.json")
+    dialogo.navegador._abrir(tmp_path / "viejo.json")
 
     assert dialogo.nombre.value == "viejo.json"
     assert dialogo.carpeta == tmp_path.resolve()
@@ -235,7 +235,7 @@ def test_carpeta_sin_permiso_avisa_y_no_se_mueve(
         raise PermissionError
 
     monkeypatch.setattr(
-        "sikorius.gui.componentes.dialogo_guardado.listar_carpeta",
+        "sikorius.gui.componentes.explorador_archivos.listar_carpeta",
         sin_permiso,
     )
     dialogo.mostrar(tmp_path / "bloqueada")

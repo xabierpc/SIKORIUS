@@ -19,15 +19,14 @@ from nicegui import ui
 from sikorius.aplicacion.sesion import Sesion
 from sikorius.dominio import modelo as modelo_dominio
 from sikorius.gui.componentes import dialogo_guardado
+from sikorius.gui.componentes.formula import html_formula, texto_formula
+from sikorius.gui.componentes.grafico_ajuste import opciones_grafico
 from sikorius.gui.paneles.panel_modelo import (
     AVISO_SIN_DESCRIPCION,
     PanelModelo,
     aviso_antes_de_guardar,
     destino_inicial,
-    html_formula,
-    opciones_grafico,
     texto_estado_guardado,
-    texto_formula,
     texto_metrica,
 )
 from sikorius.gui.tema import colores_columnas
@@ -322,7 +321,7 @@ def test_crear_otra_vez_sustituye_al_modelo(sesion_lista, avisos):
 
 def test_error_al_crear_avisa_y_no_cambia_nada(sesion_lista, avisos):
     constante = sesion_lista.separacion.entrenamiento.assign(x1=1.0)
-    sesion_lista.separacion = replace(
+    sesion_lista._separacion = replace(
         sesion_lista.separacion, entrenamiento=constante
     )
     panel = PanelModelo(sesion_lista)
@@ -471,13 +470,18 @@ def test_al_recargar_la_pagina_se_ve_el_modelo(sesion_lista):
 
 
 def test_no_contiene_logica_del_modelo():
+    import sikorius.gui.componentes.formula as formula
+    import sikorius.gui.componentes.grafico_ajuste as grafico
     import sikorius.gui.paneles.panel_modelo as panel
 
     codigo = inspect.getsource(panel)
-    for llamada in ("terminos_formula(", "metricas_modelo(", "datos_ajuste("):
+    for llamada in ("html_formula(", "metricas_modelo(", "datos_ajuste("):
         assert llamada in codigo
-    for prohibido in ("lstsq", "polyfit", "numpy", "np.", "mean("):
-        assert prohibido not in codigo
+    assert "terminos_formula(" in inspect.getsource(formula)
+    for modulo in (panel, formula, grafico):
+        codigo = inspect.getsource(modulo)
+        for prohibido in ("lstsq", "polyfit", "numpy", "np.", "mean("):
+            assert prohibido not in codigo
 
 
 # =============================================================================
