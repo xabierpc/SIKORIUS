@@ -1,6 +1,6 @@
 """Tests del guardado del modelo en archivo JSON (#21, tarea #138).
 
-uv run pytest tests/nucleo/test_persistencia.py -v
+uv run pytest tests/datos/test_persistencia.py -v
 """
 
 import json
@@ -11,20 +11,21 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.errores import ErrorPersistencia, ErrorSikorius
-from sikorius.nucleo.modelo import (
+from sikorius.datos.persistencia import (
+    EXTENSION,
+    FORMATO,
+    VERSION_FORMATO,
+    cargar_modelo,
+    guardar_modelo,
+    modelo_a_diccionario,
+    ruta_con_extension,
+)
+from sikorius.dominio.errores import ErrorPersistencia, ErrorSikorius
+from sikorius.dominio.modelo import (
     ModeloLineal,
     entrenar_modelo,
     formula_texto,
     metricas_modelo,
-)
-from sikorius.nucleo.persistencia import (
-    EXTENSION,
-    FORMATO,
-    VERSION_FORMATO,
-    guardar_modelo,
-    modelo_a_diccionario,
-    ruta_con_extension,
 )
 
 # =============================================================================
@@ -550,3 +551,123 @@ def test_diccionario_usa_listas_y_floats(entrenado):
     for valor in datos["modelo"]["coeficientes"]:
         assert type(valor) is float
     assert type(datos["modelo"]["termino_independiente"]) is float
+
+
+# =============================================================================
+# Carga del modelo
+# =============================================================================
+
+
+def test_guardar_y_cargar_conserva_toda_la_informacion(entrenado, tmp_path):
+    modelo, metricas, entrenamiento, test = entrenado
+    ruta = guardar_modelo(modelo, metricas, tmp_path / "modelo ñ.json")
+
+    cargado, metricas_cargadas = cargar_modelo(ruta)
+
+    assert cargado.features == modelo.features
+    assert cargado.target == modelo.target
+    assert cargado.coeficientes == modelo.coeficientes
+    assert cargado.termino_independiente == modelo.termino_independiente
+    assert cargado.descripcion == modelo.descripcion
+    assert metricas_cargadas == metricas
+    np.testing.assert_array_equal(
+        cargado.predecir(test), modelo.predecir(test)
+    )
+
+
+def test_cargar_con_descripcion_vacia(entrenado, tmp_path):
+    modelo, metricas, _, _ = entrenado
+    modelo.descripcion = ""
+    cargado, _ = cargar_modelo(
+        guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    )
+    assert cargado.descripcion == ""
+
+
+def test_cambiar_la_descripcion_y_volver_a_guardar(entrenado, tmp_path):
+    modelo, metricas, _, _ = entrenado
+    ruta = guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    cargado, metricas_cargadas = cargar_modelo(ruta)
+    cargado.descripcion = "Nueva descripción"
+    guardar_modelo(cargado, metricas_cargadas, ruta)
+
+    otra_vez, metricas_otra_vez = cargar_modelo(ruta)
+    assert otra_vez.descripcion == "Nueva descripción"
+    assert otra_vez.coeficientes == modelo.coeficientes
+    assert otra_vez.features == modelo.features
+    assert metricas_otra_vez == metricas
+
+
+def test_cargar_metricas_no_calculables(entrenado, tmp_path):
+    modelo, _, _, _ = entrenado
+    metricas = {
+        "entrenamiento": {"r2": 0.9, "ecm": 1.0},
+        "test": {"r2": float("nan"), "ecm": 2.0},
+    }
+    _, cargadas = cargar_modelo(
+        guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    )
+    assert np.isnan(cargadas["test"]["r2"])
+
+
+def test_cargar_columnas_con_nombre_numerico(tmp_path):
+    modelo = ModeloLineal((2020, 2021), "y", (1.0, 2.0), 3.0)
+    ruta = guardar_modelo(modelo, metricas_fijas(), tmp_path / "m.json")
+    cargado, _ = cargar_modelo(ruta)
+    assert cargado.features == (2020, 2021)
+
+
+@pytest.mark.parametrize(
+    ("contenido", "mensaje"),
+    [
+        ("no es json", "dañado"),
+        ("[]", "no es un modelo"),
+        ('{"formato": "otro"}', "no es un modelo"),
+        ('{"formato": "sikorius-modelo", "version_formato": 99}', "versión"),
+        (
+            '{"formato": "sikorius-modelo", "version_formato": 1}',
+            "faltan los datos del modelo",
+        ),
+    ],
+)
+def test_cargar_archivo_no_valido(tmp_path, contenido, mensaje):
+    ruta = tmp_path / "malo.json"
+    ruta.write_text(contenido, encoding="utf-8")
+    with pytest.raises(ErrorPersistencia, match=mensaje):
+        cargar_modelo(ruta)
+
+
+@pytest.mark.parametrize(
+    ("campo", "valor"),
+    [
+        ("features", []),
+        ("features", [True]),
+        ("target", None),
+        ("coeficientes", [1.0]),
+        ("coeficientes", ["2", 1.0]),
+        ("termino_independiente", None),
+    ],
+)
+def test_cargar_modelo_con_datos_mal(entrenado, tmp_path, campo, valor):
+    modelo, metricas, _, _ = entrenado
+    ruta = guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    datos = leer_json(ruta)
+    datos["modelo"][campo] = valor
+    ruta.write_text(json.dumps(datos), encoding="utf-8")
+    with pytest.raises(ErrorPersistencia):
+        cargar_modelo(ruta)
+
+
+def test_cargar_sin_metricas(entrenado, tmp_path):
+    modelo, metricas, _, _ = entrenado
+    ruta = guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    datos = leer_json(ruta)
+    del datos["metricas"]["test"]["ecm"]
+    ruta.write_text(json.dumps(datos), encoding="utf-8")
+    with pytest.raises(ErrorPersistencia, match="ecm"):
+        cargar_modelo(ruta)
+
+
+def test_cargar_archivo_que_no_existe(tmp_path):
+    with pytest.raises(ErrorPersistencia, match="no existe"):
+        cargar_modelo(tmp_path / "nada.json")

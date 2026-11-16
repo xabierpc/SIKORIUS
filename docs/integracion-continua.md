@@ -72,8 +72,8 @@ evitarlas:
   en Windows pero no en Linux. Se usa `pathlib.Path`, relativa al archivo o
   a `tmp_path`.
 - **Interfaz gráfica sin pantalla.** El servidor de GitHub no tiene pantalla.
-  Los módulos de `nucleo/` no importan NiceGUI, y `tests/test_arquitectura.py`
-  lo comprueba. Las pruebas de `tests/gui/` crean los paneles sin arrancar
+  Solo `gui/` importa NiceGUI (ni `aplicacion/`, ni `datos/`, ni `dominio/`),
+  y `tests/test_arquitectura.py` lo comprueba. Las pruebas de `tests/gui/` crean los paneles sin arrancar
   el servidor ni abrir el navegador, y sustituyen con `monkeypatch` lo que
   necesitaría una página real (como `ui.notify`).
 - **`uv.lock` desactualizado.** `uv sync --locked` falla si se añade una

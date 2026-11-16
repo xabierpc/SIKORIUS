@@ -67,22 +67,28 @@ Los datasets y los modelos generados **no se suben al repositorio**. Cada desarr
 
 ## Estructura
 
+Arquitectura en capas: `gui → aplicacion → datos → dominio`. Cada capa solo
+importa las que tiene por debajo, y `tests/test_arquitectura.py` lo comprueba.
+
 ```
 SIKORIUS/
 ├── src/sikorius/
-│   ├── nucleo/          # Lógica sin interfaz: importar, columnas,
-│   │                    # separación, preprocesado, modelo
-│   ├── gui/
+│   ├── gui/             # Presentación (NiceGUI). Solo habla con la sesión
 │   │   ├── componentes/ # Piezas reutilizables: tabla, explorador...
 │   │   ├── paneles/     # Un panel por paso de la aplicación
 │   │   └── pagina.py    # Coloca los paneles en la página
-│   ├── sesion.py        # Estado de la sesión de trabajo
+│   ├── aplicacion/      # Sesión: estado del flujo y operaciones de la GUI
+│   ├── datos/           # Importar datasets y guardar modelos
+│   ├── dominio/         # Lógica sin interfaz ni archivos: columnas,
+│   │                    # separación, preprocesado, modelo
 │   └── app.py           # Punto de entrada
-├── tests/
-│   ├── nucleo/          # Tests de la lógica
+├── tests/               # Misma estructura que src/sikorius
+│   ├── aplicacion/      # Tests de la sesión
+│   ├── datos/           # Tests de importación y persistencia
+│   ├── dominio/         # Tests de la lógica
 │   ├── gui/             # Tests de la interfaz
 │   ├── conftest.py      # Datos y sesiones comunes a los tests
-│   └── test_*.py        # Tests de la sesión y de la separación en capas
+│   └── test_arquitectura.py  # Vigila la separación en capas
 ├── docs/                # Documentación del proyecto
 ├── data/                # Datos locales (no se sube)
 ├── .github/workflows/   # Integración continua (GitHub Actions)

@@ -1,6 +1,6 @@
 """Tests de la lógica del modelo de regresión lineal (#121).
 
-uv run pytest tests/nucleo/test_modelo.py -v
+uv run pytest tests/dominio/test_modelo.py -v
 """
 
 import inspect
@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.errores import ErrorModelo
-from sikorius.nucleo.modelo import (
+from sikorius.dominio.errores import ErrorModelo
+from sikorius.dominio.modelo import (
     ModeloLineal,
     calcular_ecm,
     calcular_r2,
@@ -408,3 +408,31 @@ def test_las_metricas_tienen_la_estructura_del_archivo():
 def test_la_formula_es_un_texto():
     modelo = entrenar_modelo(datos_lineales(), ["x1", "x2"], "y")
     assert isinstance(formula_texto(modelo), str)
+
+
+# =============================================================================
+# Predicción con datos no válidos
+# =============================================================================
+
+
+def test_predecir_sin_una_columna_de_entrada():
+    modelo = ModeloLineal(("x1", "x2"), "y", (1.0, 2.0), 0.0)
+    with pytest.raises(ErrorModelo, match="x2"):
+        modelo.predecir(pd.DataFrame({"x1": [1.0]}))
+
+
+def test_predecir_con_valores_inexistentes():
+    modelo = ModeloLineal(("x",), "y", (2.0,), 1.0)
+    with pytest.raises(ErrorModelo, match="inexistentes"):
+        modelo.predecir(pd.DataFrame({"x": [1.0, None]}))
+
+
+def test_predecir_con_texto():
+    modelo = ModeloLineal(("x",), "y", (2.0,), 1.0)
+    with pytest.raises(ErrorModelo, match="no es numérica"):
+        modelo.predecir(pd.DataFrame({"x": ["a", "b"]}))
+
+
+def test_predecir_sin_filas():
+    modelo = ModeloLineal(("x",), "y", (2.0,), 1.0)
+    assert len(modelo.predecir(pd.DataFrame({"x": []}, dtype=float))) == 0

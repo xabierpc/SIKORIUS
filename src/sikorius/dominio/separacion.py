@@ -9,8 +9,8 @@ from fractions import Fraction
 
 import numpy as np
 
-from sikorius.nucleo.errores import ErrorSeparacion
-from sikorius.nucleo.texto import formatear_numero
+from sikorius.dominio.errores import ErrorSeparacion
+from sikorius.dominio.texto import formatear_numero
 
 PORCENTAJE_TEST_DEFECTO = 20
 SEMILLA_DEFECTO = 42

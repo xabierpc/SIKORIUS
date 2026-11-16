@@ -12,9 +12,9 @@ import math
 
 import pandas as pd
 
-from sikorius.nucleo.errores import (
+from sikorius.dominio.errores import (
     AvisoPreprocesado,
-    ColumnasNoEncontradasError,
+    ErrorColumnasNoEncontradas,
     ErrorPreprocesado,
 )
 
@@ -28,7 +28,7 @@ ESTRATEGIAS = (ELIMINAR, MEDIA, MEDIANA, CONSTANTE)
 def _comprobar_columnas(df, columnas):
     faltan = [c for c in columnas if c not in df.columns]
     if faltan:
-        raise ColumnasNoEncontradasError(
+        raise ErrorColumnasNoEncontradas(
             "Columnas no encontradas: " + ", ".join(map(str, faltan))
         )
 
@@ -59,7 +59,7 @@ def normalizar_espacios_vacios(
         Copia del DataFrame con esas celdas como NaN.
 
     Raises:
-        ColumnasNoEncontradasError: Si alguna columna no existe.
+        ErrorColumnasNoEncontradas: Si alguna columna no existe.
     """
     _comprobar_columnas(df, columnas)
     copia = df.copy()
@@ -79,7 +79,7 @@ def detectar_nulos(df: pd.DataFrame, columnas: list) -> dict:
         Diccionario {columna: número de valores inexistentes}.
 
     Raises:
-        ColumnasNoEncontradasError: Si alguna columna no existe.
+        ErrorColumnasNoEncontradas: Si alguna columna no existe.
     """
     _comprobar_columnas(df, columnas)
     num_nulos = {}

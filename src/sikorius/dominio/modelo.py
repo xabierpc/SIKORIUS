@@ -5,11 +5,14 @@ conocen la sesión ni la interfaz gráfica. Quien guarda el modelo y avisa a
 la interfaz es ``Sesion.crear_modelo``.
 """
 
+from dataclasses import dataclass
+
 import numpy as np
 
-from sikorius.nucleo.errores import ErrorModelo
+from sikorius.dominio.errores import ErrorModelo
 
 
+@dataclass(eq=False)
 class ModeloLineal:
     """Modelo de regresión lineal ya entrenado.
 
@@ -24,19 +27,15 @@ class ModeloLineal:
             cuando se quiera.
     """
 
-    def __init__(
-        self,
-        features,
-        target,
-        coeficientes,
-        termino_independiente,
-        descripcion="",
-    ):
-        self.features = tuple(features)
-        self.target = target
-        self.coeficientes = tuple(coeficientes)
-        self.termino_independiente = termino_independiente
-        self.descripcion = descripcion
+    features: tuple
+    target: str
+    coeficientes: tuple
+    termino_independiente: float
+    descripcion: str = ""
+
+    def __post_init__(self):
+        self.features = tuple(self.features)
+        self.coeficientes = tuple(self.coeficientes)
 
     def predecir(self, df):
         """Calcula la salida que predice el modelo para cada fila.
@@ -46,8 +45,15 @@ class ModeloLineal:
 
         Returns:
             Array de numpy con una predicción por fila.
+
+        Raises:
+            ErrorModelo: Si falta alguna columna de entrada, no es numérica
+                o tiene valores inexistentes o infinitos.
         """
-        entrada = df[list(self.features)].to_numpy(dtype=float)
+        columnas = [_columna_numerica(df, c) for c in self.features]
+        if not columnas:
+            raise ErrorModelo("El modelo no tiene columnas de entrada.")
+        entrada = np.column_stack(columnas)
         return entrada @ np.array(self.coeficientes) + (
             self.termino_independiente
         )

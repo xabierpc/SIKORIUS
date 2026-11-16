@@ -13,7 +13,8 @@ from pathlib import Path
 
 from nicegui import ui
 
-from sikorius.nucleo.formatos import EXTENSIONES_ADMITIDAS, es_admitido
+from sikorius.aplicacion import EXTENSIONES_ADMITIDAS, es_admitido
+from sikorius.gui.avisos import notificar_error
 
 
 def _es_windows():
@@ -73,6 +74,121 @@ def listar_carpeta(carpeta, admitido=es_admitido):
     return entradas
 
 
+class NavegadorCarpetas:
+    """Lista de carpetas y archivos para moverse por el disco.
+
+    Lo usan el explorador de datasets y el diálogo de guardado del modelo.
+    Arriba lleva el botón de la carpeta personal, un botón por unidad de
+    disco (en Windows) y la carpeta actual; debajo, la lista con ".." para
+    subir. Una carpeta se abre al pulsarla; un archivo se le pasa a
+    ``al_elegir_archivo``.
+
+    Attributes:
+        carpeta: Carpeta que se está mostrando (``Path``), o None antes de
+            mostrar la primera.
+        etiqueta_carpeta: Etiqueta con la ruta de la carpeta actual.
+        lista: Lista de NiceGUI con las entradas.
+    """
+
+    def __init__(
+        self,
+        admitido,
+        al_elegir_archivo,
+        texto_vacio,
+        al_cambiar_carpeta=None,
+        alto="h-80",
+    ):
+        """Crea los controles en el contenedor actual, sin mostrar nada.
+
+        Args:
+            admitido: Función que recibe la ruta de un archivo y dice si se
+                muestra.
+            al_elegir_archivo: Función que recibe el ``Path`` del archivo
+                pulsado.
+            texto_vacio: Texto que se ve si no hay nada que mostrar.
+            al_cambiar_carpeta: Función opcional, sin argumentos, que se
+                llama cada vez que se muestra otra carpeta.
+            alto: Clase de Tailwind con la altura de la lista.
+        """
+        self._admitido = admitido
+        self._al_elegir_archivo = al_elegir_archivo
+        self._texto_vacio = texto_vacio
+        self._al_cambiar_carpeta = al_cambiar_carpeta
+        self.carpeta = None
+
+        with ui.row().classes("w-full items-center no-wrap"):
+            ui.button(
+                icon="home", on_click=lambda: self.mostrar(Path.home())
+            ).props("flat round dense").tooltip("Carpeta personal")
+            for unidad in unidades_disponibles():
+                ui.button(
+                    nombre_unidad(unidad), on_click=self._ir_a(unidad)
+                ).props("flat dense no-caps").tooltip(
+                    "Unidad " + nombre_unidad(unidad)
+                )
+            self.etiqueta_carpeta = ui.label().classes("text-sm break-all")
+        with ui.scroll_area().classes("w-full " + alto + " border rounded"):
+            self.lista = ui.list().classes("w-full").props("dense separator")
+
+    def _ir_a(self, carpeta):
+        # Cada botón necesita su propia función: una lambda escrita en el
+        # bucle de las unidades se quedaría con la última para todos
+        return lambda: self.mostrar(carpeta)
+
+    def _al_pulsar(self, ruta):
+        return lambda: self._abrir(ruta)
+
+    def _abrir(self, ruta):
+        if ruta.is_dir():
+            self.mostrar(ruta)
+        else:
+            self._al_elegir_archivo(ruta)
+
+    def _anadir_entrada(self, ruta, icono, texto):
+        with ui.item(on_click=self._al_pulsar(ruta)):
+            with ui.item_section().props("avatar"):
+                ui.icon(icono)
+            with ui.item_section():
+                ui.item_label(texto)
+
+    def mostrar(self, carpeta):
+        """Lista la carpeta. Si no se puede abrir, avisa y se queda en la
+        anterior.
+
+        Returns:
+            True si se ha mostrado la carpeta.
+        """
+        carpeta = Path(carpeta)
+        try:
+            entradas = listar_carpeta(carpeta, self._admitido)
+        except PermissionError:
+            notificar_error("Sin permiso para abrir " + str(carpeta))
+            return False
+        except OSError as error:
+            notificar_error(
+                "No se puede abrir " + str(carpeta) + ": " + str(error)
+            )
+            return False
+
+        self.carpeta = carpeta
+        self.etiqueta_carpeta.set_text(str(carpeta))
+        self.lista.clear()
+        with self.lista:
+            if carpeta.parent != carpeta:
+                self._anadir_entrada(carpeta.parent, "arrow_upward", "..")
+            for ruta in entradas:
+                if ruta.is_dir():
+                    self._anadir_entrada(ruta, "folder", ruta.name)
+                else:
+                    self._anadir_entrada(ruta, "description", ruta.name)
+            if len(entradas) == 0:
+                with ui.item():
+                    ui.item_label(self._texto_vacio).classes("text-secondary")
+        if self._al_cambiar_carpeta is not None:
+            self._al_cambiar_carpeta()
+        return True
+
+
 async def seleccionar_archivo(carpeta_inicial):
     """Abre el explorador y espera a que el usuario elija un archivo.
 
@@ -85,81 +201,23 @@ async def seleccionar_archivo(carpeta_inicial):
     """
     tipos = ", ".join(EXTENSIONES_ADMITIDAS)
 
-    # Cada botón necesita su propia función: una lambda escrita dentro del
-    # bucle de las unidades se quedaría con la última unidad para todos
-    def ir_a(carpeta):
-        return lambda: mostrar(carpeta)
-
     with ui.dialog() as dialogo, ui.card().classes("w-[650px] max-w-full"):
         ui.label("Selecciona un dataset").classes("text-lg font-semibold")
         ui.label("Tipos admitidos: " + tipos).classes("text-sm text-secondary")
-        with ui.row().classes("w-full items-center no-wrap"):
-            ui.button(
-                icon="home", on_click=lambda: mostrar(Path.home())
-            ).props("flat round dense").tooltip("Carpeta personal")
-            for unidad in unidades_disponibles():
-                ui.button(nombre_unidad(unidad), on_click=ir_a(unidad)).props(
-                    "flat dense no-caps"
-                ).tooltip("Unidad " + nombre_unidad(unidad))
-            etiqueta_carpeta = ui.label().classes("text-sm break-all")
-        with ui.scroll_area().classes("w-full h-80 border rounded"):
-            lista = ui.list().classes("w-full").props("dense separator")
+        navegador = NavegadorCarpetas(
+            es_admitido,
+            lambda ruta: dialogo.submit(str(ruta.resolve())),
+            "No hay carpetas ni archivos compatibles",
+        )
         with ui.row().classes("w-full justify-end"):
             ui.button("Cancelar", on_click=lambda: dialogo.submit(None)).props(
                 "flat"
             )
 
-    def accion(ruta):
-        return lambda: abrir(ruta)
-
-    def abrir(ruta):
-        if ruta.is_dir():
-            mostrar(ruta)
-        else:
-            dialogo.submit(str(ruta.resolve()))
-
-    def anadir_entrada(ruta, icono, texto):
-        with ui.item(on_click=accion(ruta)):
-            with ui.item_section().props("avatar"):
-                ui.icon(icono)
-            with ui.item_section():
-                ui.item_label(texto)
-
-    def mostrar(carpeta):
-        try:
-            entradas = listar_carpeta(carpeta)
-        except PermissionError:
-            ui.notify(
-                "Sin permiso para abrir " + str(carpeta), type="negative"
-            )
-            return
-        except OSError as error:
-            ui.notify(
-                "No se puede abrir " + str(carpeta) + ": " + str(error),
-                type="negative",
-            )
-            return
-
-        etiqueta_carpeta.set_text(str(carpeta))
-        lista.clear()
-        with lista:
-            if carpeta.parent != carpeta:
-                anadir_entrada(carpeta.parent, "arrow_upward", "..")
-            for ruta in entradas:
-                if ruta.is_dir():
-                    anadir_entrada(ruta, "folder", ruta.name)
-                else:
-                    anadir_entrada(ruta, "description", ruta.name)
-            if len(entradas) == 0:
-                with ui.item():
-                    ui.item_label(
-                        "No hay carpetas ni archivos compatibles"
-                    ).classes("text-secondary")
-
     inicio = Path(carpeta_inicial).resolve()
     if not inicio.is_dir():
         inicio = Path.home()
-    mostrar(inicio)
+    navegador.mostrar(inicio)
 
     ruta = await dialogo
     dialogo.delete()

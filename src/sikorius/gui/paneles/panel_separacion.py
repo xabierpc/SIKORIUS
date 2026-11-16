@@ -1,23 +1,20 @@
 """Separación del dataset en entrenamiento y test.
 
-El panel solo recoge el porcentaje de test y la semilla, llama a
-``sikorius.nucleo.separacion.separar_datos`` y guarda el resultado en la
-sesión. Toda la lógica de la separación está fuera de la GUI.
+El panel solo recoge el porcentaje de test y la semilla y se los pasa a
+``Sesion.separar``. Toda la lógica de la separación está fuera de la GUI.
 """
 
 from nicegui import ui
 
-from sikorius.gui.avisos import notificar_error, notificar_exito
-from sikorius.gui.paneles.base import Panel
-from sikorius.nucleo.separacion import (
+from sikorius.dominio.separacion import (
     PORCENTAJE_TEST_DEFECTO,
     SEMILLA_DEFECTO,
     ErrorSeparacion,
     interpretar_porcentaje,
-    interpretar_semilla,
-    separar_datos,
 )
-from sikorius.nucleo.texto import formatear_numero
+from sikorius.dominio.texto import formatear_numero
+from sikorius.gui.avisos import notificar_error, notificar_exito
+from sikorius.gui.paneles.base import Panel
 
 
 def texto_resultado(separacion):
@@ -131,21 +128,13 @@ class PanelSeparacion(Panel):
     def separar(self):
         """Separa el dataset con los valores del formulario y guarda el
         resultado en la sesión."""
-        if self.sesion.seleccion is None:
-            notificar_error("Confirma primero la selección de columnas.")
-            return
         try:
-            porcentaje = interpretar_porcentaje(self.entrada_porcentaje.value)
-            semilla = interpretar_semilla(self.entrada_semilla.value)
-            entrenamiento, test = separar_datos(
-                self.sesion.dataset.datos, porcentaje, semilla
+            self.sesion.separar(
+                self.entrada_porcentaje.value, self.entrada_semilla.value
             )
         except ErrorSeparacion as error:
             notificar_error(error)
             return
-        self.sesion.guardar_separacion(
-            entrenamiento, test, porcentaje, semilla
-        )
         notificar_exito(
             "Datos separados correctamente. "
             + texto_resultado(self.sesion.separacion)

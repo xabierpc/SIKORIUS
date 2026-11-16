@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.separacion import separar_datos
-from sikorius.sesion import Sesion
+from sikorius.aplicacion.sesion import Sesion
+from sikorius.dominio.separacion import separar_datos
 
 
 @pytest.fixture
