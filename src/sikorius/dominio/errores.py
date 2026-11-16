@@ -1,4 +1,10 @@
-"""Errores esperados de SIKORIUS: la GUI muestra su mensaje tal cual."""
+"""Errores esperados de SIKORIUS: la GUI muestra su mensaje tal cual.
+
+Están todos aquí, en la capa más baja, para que cualquier capa los pueda
+lanzar y la GUI los pueda capturar sin importar la capa de datos. Por eso
+``ErrorImportacion`` y ``ErrorPersistencia``, aunque los lanza ``datos/``,
+también viven en este archivo.
+"""
 
 
 class ErrorSikorius(Exception):
@@ -33,5 +39,5 @@ class AvisoPreprocesado(ErrorPreprocesado):
     """El preprocesado se podría hacer, pero el resultado no sería válido."""
 
 
-class ColumnasNoEncontradasError(ErrorPreprocesado, ValueError):
+class ErrorColumnasNoEncontradas(ErrorPreprocesado, ValueError):
     """Alguna columna seleccionada no existe en el DataFrame."""

@@ -25,6 +25,17 @@ COLORES = {
     "info": "#7dd3fc",
 }
 
+# Colores del gráfico del ajuste. Los puntos usan los dos colores de marca.
+COLORES_GRAFICO = {
+    "entrenamiento": COLORES["primary"],
+    "test": COLORES["secondary"],
+    "recta": "#eeeeee",
+    "texto": "#c9c4e0",
+    "texto_claro": "#eeeeee",
+    "lineas": "rgba(255, 255, 255, 0.12)",
+    "fondo_tooltip": COLORES["dark"],
+}
+
 # Un color por columna, para reconocerla de un vistazo en los selectores, en
 # la tabla y en la fórmula. Son tonos claros que se distinguen sobre el fondo
 # oscuro y que no se parecen al morado de marca. Cada columna toma el de su
@@ -71,43 +82,10 @@ def tinte(color, opacidad):
     )
 
 
-# Forque (de Tup Wanders, licencia SIL OFL: ver recursos/fuentes/OFL.txt) es
-# la fuente del logo. Solo tiene mayúsculas, sin tildes ni Ñ y sin paréntesis
-# ni barras, así que se usa únicamente en textos fijos nuestros (títulos de
-# paneles, pestañas y el nombre de la barra), todos escritos sin tildes, y
-# siempre en mayúsculas. Los títulos son las etiquetas "text-lg
-# font-semibold" (y "text-xl font-bold" la de la barra). La fuente solo tiene
-# un grosor: con "font-weight: 400" el navegador no la engorda por su cuenta.
-CSS_TEMA = """
-@font-face {
-    font-family: 'Forque';
-    font-weight: 400;
-    font-display: swap;
-    src: url('/recursos/fuentes/Forque.ttf') format('truetype');
-}
-.text-lg.font-semibold, .text-xl.font-bold, .q-tab__label {
-    font-family: 'Forque', sans-serif;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-.text-lg.font-semibold { font-size: 1.35rem; line-height: 1.2; }
-.text-xl.font-bold { font-size: 1.8rem; line-height: 1; }
-.q-tab__label { font-size: 1.1rem; line-height: 1.2; }
-
-/* Cabecera de la tabla de datos (opaca: las filas pasan por debajo). Lleva
-   la fuente normal: los nombres de columna son del usuario y pueden tener
-   tildes, Ñ o símbolos que Forque no trae. */
-.sk-tabla thead tr th {
-    background-color: #3f2d75 !important;
-    color: #ffffff;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    border-bottom: 2px solid #8b5cf6;
-}
-"""
+# Todo el CSS propio de la interfaz está en recursos/estilos.css: la fuente
+# Forque de los títulos, la cabecera de la tabla, la animación de las
+# pestañas y la del botón de inicio.
+CSS_TEMA = (CARPETA_RECURSOS / "estilos.css").read_text(encoding="utf-8")
 
 _recursos_publicados = False
 

@@ -4,8 +4,8 @@ from pathlib import Path
 
 from nicegui import ui
 
+from sikorius.aplicacion.sesion import Sesion
 from sikorius.gui.pagina import construir_pagina
-from sikorius.sesion import Sesion
 
 # Icono de la pestaña del navegador: la S del logo
 RUTA_ICONO = Path(__file__).parent / "gui" / "recursos" / "favicon.svg"

@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 from nicegui import ui
 
+from sikorius.dominio.separacion import separar_datos
 from sikorius.gui.componentes.selectores import plantilla_chip
 from sikorius.gui.componentes.tabla_datos import (
     TablaDatos,
@@ -24,7 +25,6 @@ from sikorius.gui.paneles.panel_dataset import PanelDataset, alto_tabla
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 from sikorius.gui.tema import PALETA_COLUMNAS, colores_columnas, tinte
-from sikorius.nucleo.separacion import separar_datos
 
 
 @pytest.fixture(autouse=True)

@@ -2,6 +2,7 @@
 
 from nicegui import ui
 
+from sikorius.aplicacion.sesion import ETAPAS
 from sikorius.gui.paneles.base import Panel
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset
@@ -9,35 +10,11 @@ from sikorius.gui.paneles.panel_modelo import PanelModelo
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 from sikorius.gui.tema import aplicar_tema
-from sikorius.sesion import ETAPAS
 
 # Quasar pone en mayúsculas el texto de todos los botones. Con "no-caps" se
 # muestran tal cual se escriben: solo la primera letra en mayúscula.
 ui.button.default_props("no-caps")
 
-
-# El contenido ocupa como mínimo el alto de la página (min-height: inherit
-# copia el de q-page, que ya descuenta la barra de arriba). Así lo que tiene
-# "my-auto" queda con el mismo espacio arriba que abajo.
-CSS_PAGINA = """
-.nicegui-content { min-height: inherit; }
-
-/* Una pestaña que se desbloquea crece desde cero y aparece poco a poco; las
-   que ya estaban se desplazan a la izquierda porque el grupo va pegado a la
-   derecha. La animación se repite cada vez que la pestaña deja de estar
-   oculta (display: none) */
-.sk-pestana {
-    overflow: hidden;
-    animation: sk-pestana 0.45s ease both;
-}
-@keyframes sk-pestana {
-    from { max-width: 0; opacity: 0; }
-    to { max-width: 20rem; opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-    .sk-pestana { animation: none; }
-}
-"""
 
 TITULOS = {
     "datos": "Datos",
@@ -52,7 +29,7 @@ class Pestanas(Panel):
 
     Las pestañas no disponibles no se ven. Como el grupo va pegado a la
     derecha, al abrirse una nueva las anteriores se desplazan a la
-    izquierda (ver CSS_PAGINA). Si
+    izquierda (ver recursos/estilos.css). Si
     una etapa deja de estar disponible mientras el usuario la está viendo
     (por ejemplo, al cargar otro dataset estando en "Modelo"), se le lleva
     a la última etapa que sí lo está.
@@ -76,7 +53,7 @@ class Pestanas(Panel):
                     ).classes("sk-pestana")
         # El contenido se coloca después, dentro de self.paneles
         # "my-auto" centra verticalmente el contenido de la pestaña en el
-        # espacio que queda libre (ver CSS_PAGINA)
+        # espacio que queda libre (ver recursos/estilos.css)
         self.paneles = ui.tab_panels(self.tabs, value="datos").classes(
             "w-full bg-transparent my-auto"
         )
@@ -105,7 +82,6 @@ def construir_pagina(sesion):
     conectan unos paneles con otros.
     """
     aplicar_tema()
-    ui.add_css(CSS_PAGINA)
     pestanas = Pestanas(sesion)
     with pestanas.paneles:
         with ui.tab_panel("datos"):

@@ -9,10 +9,10 @@ from pathlib import Path
 import pytest
 from nicegui import ui
 
+from sikorius.dominio.separacion import separar_datos
 from sikorius.gui.componentes import carga_modelo
 from sikorius.gui.paneles import panel_dataset
 from sikorius.gui.paneles.panel_dataset import PanelDataset, carpeta_inicial
-from sikorius.nucleo.separacion import separar_datos
 
 
 @pytest.fixture

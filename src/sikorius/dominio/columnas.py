@@ -7,7 +7,7 @@ ser texto (por ejemplo, 2020 en la cabecera de un Excel).
 
 import pandas as pd
 
-from sikorius.nucleo.errores import ErrorSeleccion
+from sikorius.dominio.errores import ErrorSeleccion
 
 
 def resolver_columnas(df, nombres):

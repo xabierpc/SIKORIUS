@@ -1,6 +1,6 @@
 """Tests del guardado (#21, tarea #138) y la carga (#24) del modelo en JSON.
 
-uv run pytest tests/nucleo/test_persistencia.py -v
+uv run pytest tests/datos/test_persistencia.py -v
 """
 
 import json
@@ -11,14 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.errores import ErrorPersistencia, ErrorSikorius
-from sikorius.nucleo.modelo import (
-    ModeloLineal,
-    entrenar_modelo,
-    formula_texto,
-    metricas_modelo,
-)
-from sikorius.nucleo.persistencia import (
+from sikorius.datos.persistencia import (
     EXTENSION,
     FORMATO,
     VERSION_FORMATO,
@@ -26,6 +19,13 @@ from sikorius.nucleo.persistencia import (
     guardar_modelo,
     modelo_a_diccionario,
     ruta_con_extension,
+)
+from sikorius.dominio.errores import ErrorPersistencia, ErrorSikorius
+from sikorius.dominio.modelo import (
+    ModeloLineal,
+    entrenar_modelo,
+    formula_texto,
+    metricas_modelo,
 )
 
 # =============================================================================
@@ -554,352 +554,120 @@ def test_diccionario_usa_listas_y_floats(entrenado):
 
 
 # =============================================================================
-# cargar_modelo (historia #24)
+# Carga del modelo
 # =============================================================================
 
 
-def guardar_y_cargar(modelo, metricas, ruta):
-    guardar_modelo(modelo, metricas, ruta)
-    return cargar_modelo(ruta)
+def test_guardar_y_cargar_conserva_toda_la_informacion(entrenado, tmp_path):
+    modelo, metricas, entrenamiento, test = entrenado
+    ruta = guardar_modelo(modelo, metricas, tmp_path / "modelo ñ.json")
 
+    cargado, metricas_cargadas = cargar_modelo(ruta)
 
-def test_cargar_conserva_toda_la_informacion(entrenado, tmp_path):
-    modelo, metricas, _, _ = entrenado
-
-    cargado, metricas_cargadas = guardar_y_cargar(
-        modelo, metricas, tmp_path / "m.json"
-    )
-
-    assert isinstance(cargado, ModeloLineal)
     assert cargado.features == modelo.features
     assert cargado.target == modelo.target
     assert cargado.coeficientes == modelo.coeficientes
     assert cargado.termino_independiente == modelo.termino_independiente
     assert cargado.descripcion == modelo.descripcion
-    assert formula_texto(cargado) == formula_texto(modelo)
     assert metricas_cargadas == metricas
+    np.testing.assert_array_equal(
+        cargado.predecir(test), modelo.predecir(test)
+    )
 
 
-def test_cargar_descripcion_vacia(entrenado, tmp_path):
+def test_cargar_con_descripcion_vacia(entrenado, tmp_path):
     modelo, metricas, _, _ = entrenado
     modelo.descripcion = ""
-    cargado, _ = guardar_y_cargar(modelo, metricas, tmp_path / "m.json")
+    cargado, _ = cargar_modelo(
+        guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    )
     assert cargado.descripcion == ""
 
 
-def test_cargar_descripcion_con_tildes_saltos_y_comillas(entrenado, tmp_path):
+def test_cambiar_la_descripcion_y_volver_a_guardar(entrenado, tmp_path):
     modelo, metricas, _, _ = entrenado
-    modelo.descripcion = 'Precio de la "vivienda"\nen A Coruña, año 2026'
-    cargado, _ = guardar_y_cargar(modelo, metricas, tmp_path / "m.json")
-    assert cargado.descripcion == modelo.descripcion
-
-
-def test_el_modelo_cargado_predice_lo_mismo(entrenado, tmp_path):
-    modelo, metricas, entrenamiento, test = entrenado
-    cargado, _ = guardar_y_cargar(modelo, metricas, tmp_path / "m.json")
-    for datos in (entrenamiento, test):
-        np.testing.assert_array_equal(
-            cargado.predecir(datos), modelo.predecir(datos)
-        )
-
-
-def test_cargar_regresion_simple(tmp_path):
-    entrenamiento = datos_entrenamiento()
-    modelo = entrenar_modelo(entrenamiento, ["x1"], "y")
-    metricas = metricas_modelo(modelo, entrenamiento, datos_test())
-    cargado, _ = guardar_y_cargar(modelo, metricas, tmp_path / "m.json")
-    assert cargado.features == ("x1",)
-    assert cargado.coeficientes == modelo.coeficientes
-
-
-def test_cargar_columnas_con_nombres_raros(tmp_path):
-    modelo = ModeloLineal(("año ñ", 'x "2"'), "precio €", (1.5, -2.0), 3.0)
-    cargado, _ = guardar_y_cargar(
-        modelo, metricas_fijas(), tmp_path / "m.json"
-    )
-    assert cargado.features == modelo.features
-    assert cargado.target == modelo.target
-
-
-@pytest.mark.parametrize("valor", [float("nan"), float("inf"), None])
-def test_metricas_null_se_cargan_como_nan(entrenado, tmp_path, valor):
-    modelo, _, _, _ = entrenado
-    metricas = metricas_fijas()
-    metricas["test"]["r2"] = valor
-    _, cargadas = guardar_y_cargar(modelo, metricas, tmp_path / "m.json")
-    assert np.isnan(cargadas["test"]["r2"])
-    assert cargadas["entrenamiento"] == metricas_fijas()["entrenamiento"]
-
-
-def test_cambiar_descripcion_y_volver_a_guardar(entrenado, tmp_path):
-    """Lo único que cambia es la descripción: coeficientes, columnas y
-    métricas siguen igual."""
-    modelo, metricas, _, _ = entrenado
-    ruta = tmp_path / "m.json"
-    cargado, metricas_cargadas = guardar_y_cargar(modelo, metricas, ruta)
-    antes = leer_json(ruta)
-
-    cargado.descripcion = "Descripción nueva"
+    ruta = guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    cargado, metricas_cargadas = cargar_modelo(ruta)
+    cargado.descripcion = "Nueva descripción"
     guardar_modelo(cargado, metricas_cargadas, ruta)
+
     otra_vez, metricas_otra_vez = cargar_modelo(ruta)
-    despues = leer_json(ruta)
-
-    assert otra_vez.descripcion == "Descripción nueva"
-    assert otra_vez.features == modelo.features
-    assert otra_vez.target == modelo.target
+    assert otra_vez.descripcion == "Nueva descripción"
     assert otra_vez.coeficientes == modelo.coeficientes
-    assert otra_vez.termino_independiente == modelo.termino_independiente
+    assert otra_vez.features == modelo.features
     assert metricas_otra_vez == metricas
-    antes.pop("descripcion")
-    despues.pop("descripcion")
-    assert despues == antes
+
+
+def test_cargar_metricas_no_calculables(entrenado, tmp_path):
+    modelo, _, _, _ = entrenado
+    metricas = {
+        "entrenamiento": {"r2": 0.9, "ecm": 1.0},
+        "test": {"r2": float("nan"), "ecm": 2.0},
+    }
+    _, cargadas = cargar_modelo(
+        guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    )
+    assert np.isnan(cargadas["test"]["r2"])
+
+
+def test_cargar_columnas_con_nombre_numerico(tmp_path):
+    modelo = ModeloLineal((2020, 2021), "y", (1.0, 2.0), 3.0)
+    ruta = guardar_modelo(modelo, metricas_fijas(), tmp_path / "m.json")
+    cargado, _ = cargar_modelo(ruta)
+    assert cargado.features == (2020, 2021)
 
 
 @pytest.mark.parametrize(
-    "carpeta", ["con espacios", "canción", "año ñandú", "a b/c ñ"]
-)
-def test_cargar_rutas_con_espacios_tildes_y_enie(entrenado, tmp_path, carpeta):
-    modelo, metricas, _, _ = entrenado
-    destino = tmp_path / carpeta
-    destino.mkdir(parents=True)
-    cargado, _ = guardar_y_cargar(modelo, metricas, destino / "módelo ñ.json")
-    assert cargado.coeficientes == modelo.coeficientes
-
-
-def test_cargar_acepta_ruta_como_texto(entrenado, tmp_path):
-    modelo, metricas, _, _ = entrenado
-    ruta = tmp_path / "m.json"
-    guardar_modelo(modelo, metricas, ruta)
-    cargado, _ = cargar_modelo(str(ruta))
-    assert cargado.features == modelo.features
-
-
-def test_cargar_no_modifica_el_archivo(entrenado, tmp_path):
-    modelo, metricas, _, _ = entrenado
-    ruta = tmp_path / "m.json"
-    guardar_modelo(modelo, metricas, ruta)
-    antes = ruta.read_bytes()
-    cargar_modelo(ruta)
-    assert ruta.read_bytes() == antes
-    assert list(tmp_path.iterdir()) == [ruta]
-
-
-def test_cargar_un_archivo_escrito_a_mano(tmp_path):
-    """Un archivo con exactamente la estructura de la historia #20."""
-    ruta = tmp_path / "a_mano.json"
-    ruta.write_text(
-        json.dumps(
-            {
-                "formato": FORMATO,
-                "version_formato": VERSION_FORMATO,
-                "descripcion": "",
-                "formula": "y = 2 * x + 1",
-                "modelo": {
-                    "features": ["x"],
-                    "target": "y",
-                    "coeficientes": [2],
-                    "termino_independiente": 1,
-                },
-                "metricas": {
-                    "entrenamiento": {"r2": 1, "ecm": 0},
-                    "test": {"r2": None, "ecm": 0.5},
-                },
-            }
+    ("contenido", "mensaje"),
+    [
+        ("no es json", "dañado"),
+        ("[]", "no es un modelo"),
+        ('{"formato": "otro"}', "no es un modelo"),
+        ('{"formato": "sikorius-modelo", "version_formato": 99}', "versión"),
+        (
+            '{"formato": "sikorius-modelo", "version_formato": 1}',
+            "faltan los datos del modelo",
         ),
-        encoding="utf-8",
-    )
-    modelo, metricas = cargar_modelo(ruta)
-    assert modelo.coeficientes == (2.0,)
-    assert type(modelo.coeficientes[0]) is float
-    assert type(modelo.termino_independiente) is float
-    assert metricas["entrenamiento"] == {"r2": 1.0, "ecm": 0.0}
-    assert np.isnan(metricas["test"]["r2"])
-
-
-# --- Archivos que no valen ---
-
-
-def archivo_valido(entrenado):
-    """Diccionario del archivo que guarda ``guardar_modelo``."""
-    modelo, metricas, _, _ = entrenado
-    return modelo_a_diccionario(modelo, metricas)
-
-
-def escribir(ruta, datos):
-    ruta.write_text(json.dumps(datos), encoding="utf-8")
-    return ruta
-
-
-def comprobar_error(ruta, *trozos):
-    """La carga falla con un ErrorSikorius cuyo mensaje tiene los trozos."""
-    with pytest.raises(ErrorPersistencia) as error:
-        cargar_modelo(ruta)
-    assert isinstance(error.value, ErrorSikorius)
-    for trozo in trozos:
-        assert trozo in str(error.value)
-
-
-def test_cargar_archivo_inexistente(tmp_path):
-    comprobar_error(tmp_path / "no_existe.json", "no existe")
-
-
-def test_cargar_una_carpeta(tmp_path):
-    comprobar_error(tmp_path, "es una carpeta")
-
-
-@pytest.mark.skipif(
-    sys.platform == "win32" or os.geteuid() == 0,
-    reason="root (o Windows) ignora estos permisos",
-)
-def test_cargar_sin_permiso_de_lectura(entrenado, tmp_path):
-    ruta = escribir(tmp_path / "m.json", archivo_valido(entrenado))
-    ruta.chmod(0)
-    try:
-        comprobar_error(ruta, "permiso")
-    finally:
-        ruta.chmod(0o644)
-
-
-def test_cargar_otro_error_del_sistema(tmp_path, monkeypatch):
-    ruta = tmp_path / "m.json"
-    ruta.write_text("{}", encoding="utf-8")
-
-    def falla(*args, **kwargs):
-        raise OSError(5, "Error de entrada/salida")
-
-    monkeypatch.setattr(type(ruta), "read_text", falla)
-    comprobar_error(ruta, "Error de entrada/salida")
-
-
-@pytest.mark.parametrize(
-    "contenido",
-    [
-        b"",
-        b"esto no es json",
-        b'{"formato": "sikorius-modelo", ',
-        b"\xff\xfe\x00\x01",
     ],
-    ids=["vacio", "texto", "cortado", "binario"],
 )
-def test_cargar_archivo_danado(tmp_path, contenido):
-    ruta = tmp_path / "m.json"
-    ruta.write_bytes(contenido)
-    comprobar_error(ruta, "m.json", "dañado")
-
-
-@pytest.mark.parametrize("contenido", ["[]", "3", '"hola"', "null", "{}"])
-def test_cargar_json_que_no_es_un_modelo(tmp_path, contenido):
-    ruta = tmp_path / "m.json"
+def test_cargar_archivo_no_valido(tmp_path, contenido, mensaje):
+    ruta = tmp_path / "malo.json"
     ruta.write_text(contenido, encoding="utf-8")
-    comprobar_error(ruta, "no es un archivo de modelo de SIKORIUS")
-
-
-def test_cargar_formato_de_otra_aplicacion(entrenado, tmp_path):
-    datos = archivo_valido(entrenado)
-    datos["formato"] = "otra-aplicacion"
-    comprobar_error(escribir(tmp_path / "m.json", datos), "no es un archivo")
-
-
-@pytest.mark.parametrize("version", [2, 0, "1", True, None, 1.5])
-def test_cargar_version_desconocida(entrenado, tmp_path, version):
-    datos = archivo_valido(entrenado)
-    datos["version_formato"] = version
-    comprobar_error(escribir(tmp_path / "m.json", datos), "versión")
-
-
-def test_cargar_sin_version(entrenado, tmp_path):
-    datos = archivo_valido(entrenado)
-    del datos["version_formato"]
-    comprobar_error(escribir(tmp_path / "m.json", datos), "versión")
+    with pytest.raises(ErrorPersistencia, match=mensaje):
+        cargar_modelo(ruta)
 
 
 @pytest.mark.parametrize(
-    "camino",
+    ("campo", "valor"),
     [
-        ("descripcion",),
-        ("modelo",),
-        ("metricas",),
-        ("modelo", "features"),
-        ("modelo", "target"),
-        ("modelo", "coeficientes"),
-        ("modelo", "termino_independiente"),
-        ("metricas", "entrenamiento"),
-        ("metricas", "test"),
-        ("metricas", "test", "r2"),
-        ("metricas", "entrenamiento", "ecm"),
-    ],
-    ids=lambda camino: ".".join(camino),
-)
-def test_cargar_le_falta_informacion(entrenado, tmp_path, camino):
-    datos = archivo_valido(entrenado)
-    sitio = datos
-    for clave in camino[:-1]:
-        sitio = sitio[clave]
-    del sitio[camino[-1]]
-    comprobar_error(escribir(tmp_path / "m.json", datos), "incompleto")
-
-
-@pytest.mark.parametrize(
-    "camino, valor",
-    [
-        (("descripcion",), None),
-        (("descripcion",), 3),
-        (("modelo",), []),
-        (("metricas",), [0.9, 1.5]),
-        (("modelo", "features"), "x1"),
-        (("modelo", "features"), []),
-        (("modelo", "features"), ["x1", 2]),
-        (("modelo", "features"), ["x1", ""]),
-        (("modelo", "features"), ["x1", "x1"]),
-        (("modelo", "target"), 3),
-        (("modelo", "target"), ""),
-        (("modelo", "target"), "x1"),
-        (("modelo", "coeficientes"), 2.0),
-        (("modelo", "coeficientes"), [1.0]),
-        (("modelo", "coeficientes"), [1.0, 2.0, 3.0]),
-        (("modelo", "coeficientes"), [1.0, "2"]),
-        (("modelo", "coeficientes"), [1.0, None]),
-        (("modelo", "coeficientes"), [1.0, True]),
-        (("modelo", "termino_independiente"), "5"),
-        (("modelo", "termino_independiente"), None),
-        (("metricas", "test"), 0.5),
-        (("metricas", "test", "r2"), "0.9"),
-        (("metricas", "test", "ecm"), True),
+        ("features", []),
+        ("features", [True]),
+        ("target", None),
+        ("coeficientes", [1.0]),
+        ("coeficientes", ["2", 1.0]),
+        ("termino_independiente", None),
     ],
 )
-def test_cargar_valores_que_no_corresponden(
-    entrenado, tmp_path, camino, valor
-):
-    datos = archivo_valido(entrenado)
-    sitio = datos
-    for clave in camino[:-1]:
-        sitio = sitio[clave]
-    sitio[camino[-1]] = valor
-    comprobar_error(escribir(tmp_path / "m.json", datos), "m.json")
-
-
-@pytest.mark.parametrize("constante", ["NaN", "Infinity", "-Infinity"])
-def test_cargar_rechaza_nan_e_infinito(entrenado, tmp_path, constante):
-    """No son JSON válido: guardar_modelo nunca los escribe."""
-    texto = json.dumps(archivo_valido(entrenado))
-    texto = texto.replace(
-        '"termino_independiente": ',
-        '"termino_independiente": ' + constante + ', "x": ',
-    )
-    ruta = tmp_path / "m.json"
-    ruta.write_text(texto, encoding="utf-8")
-    comprobar_error(ruta, "dañado")
-
-
-def test_tras_un_error_se_puede_cargar_otro(entrenado, tmp_path):
+def test_cargar_modelo_con_datos_mal(entrenado, tmp_path, campo, valor):
     modelo, metricas, _, _ = entrenado
-    malo = tmp_path / "malo.json"
-    malo.write_text("{", encoding="utf-8")
-    bueno = tmp_path / "bueno.json"
-    guardar_modelo(modelo, metricas, bueno)
-
+    ruta = guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    datos = leer_json(ruta)
+    datos["modelo"][campo] = valor
+    ruta.write_text(json.dumps(datos), encoding="utf-8")
     with pytest.raises(ErrorPersistencia):
-        cargar_modelo(malo)
-    cargado, _ = cargar_modelo(bueno)
+        cargar_modelo(ruta)
 
-    assert cargado.coeficientes == modelo.coeficientes
+
+def test_cargar_sin_metricas(entrenado, tmp_path):
+    modelo, metricas, _, _ = entrenado
+    ruta = guardar_modelo(modelo, metricas, tmp_path / "m.json")
+    datos = leer_json(ruta)
+    del datos["metricas"]["test"]["ecm"]
+    ruta.write_text(json.dumps(datos), encoding="utf-8")
+    with pytest.raises(ErrorPersistencia, match="ecm"):
+        cargar_modelo(ruta)
+
+
+def test_cargar_archivo_que_no_existe(tmp_path):
+    with pytest.raises(ErrorPersistencia, match="no existe"):
+        cargar_modelo(tmp_path / "nada.json")

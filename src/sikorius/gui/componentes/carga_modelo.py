@@ -8,12 +8,12 @@ núcleo): aquí no se abre ningún archivo.
 
 from pathlib import Path
 
+from sikorius.aplicacion import EXTENSION
+from sikorius.dominio.errores import ErrorPersistencia
 from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes.confirmacion import confirmar
 from sikorius.gui.componentes.dialogo_guardado import es_modelo
 from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
-from sikorius.nucleo.errores import ErrorPersistencia
-from sikorius.nucleo.persistencia import EXTENSION
 
 TITULO_EXPLORADOR = "Selecciona un modelo"
 
@@ -31,15 +31,6 @@ def carpeta_inicial(sesion):
     return Path.home()
 
 
-def tiene_cambios_sin_guardar(sesion):
-    """True si hay un modelo con cambios que se perderían al sustituirlo.
-
-    Es el caso de un modelo creado que no se ha guardado, o de uno
-    guardado o cargado cuya descripción ha cambiado después.
-    """
-    return sesion.modelo is not None and sesion.modelo_sin_guardar
-
-
 async def aceptar_perder_cambios(sesion, accion):
     """Pregunta antes de perder los cambios sin guardar del modelo.
 
@@ -51,7 +42,7 @@ async def aceptar_perder_cambios(sesion, accion):
     Returns:
         True si no hay cambios sin guardar o el usuario acepta perderlos.
     """
-    if not tiene_cambios_sin_guardar(sesion):
+    if not sesion.hay_cambios_sin_guardar():
         return True
     return await confirmar(
         "Cambios sin guardar",

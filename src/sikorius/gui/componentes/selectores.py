@@ -37,7 +37,63 @@ def plantilla_chip(colores, quitable):
     )
 
 
-class SelectorFeatures:
+class _SelectorColumnas:
+    """Parte común de los dos selectores: un ``ui.select`` con las columnas
+    del dataset, que se vuelve a crear vacío al cargar un dataset nuevo y
+    que está deshabilitado mientras no hay columnas.
+
+    Las subclases indican el texto, si se pueden elegir varias columnas y
+    si los "chips" se pueden quitar, y pueden filtrar las opciones.
+    """
+
+    ETIQUETA = ""
+    MULTIPLE = False
+    QUITABLE = False
+
+    def __init__(self):
+        self.columnas = []
+        self.selector = None
+        self.contenedor = ui.column().classes("w-full")
+        self._construir_selector()
+
+    def _opciones(self):
+        """Columnas que se ofrecen. Por defecto, todas."""
+        return list(self.columnas)
+
+    def _al_construir(self):
+        """Gancho para configurar el selector recién creado."""
+
+    def _construir_selector(self):
+        """(Re)crea el ui.select sin selección previa."""
+        self.contenedor.clear()
+        with self.contenedor:
+            self.selector = (
+                ui.select(
+                    options=self._opciones(),
+                    label=self.ETIQUETA,
+                    multiple=self.MULTIPLE,
+                    value=[] if self.MULTIPLE else None,
+                    clearable=True,
+                )
+                .props("use-chips")
+                .classes("w-full")
+            )
+            self.selector.add_slot(
+                "selected-item",
+                plantilla_chip(colores_columnas(self.columnas), self.QUITABLE),
+            )
+            self._al_construir()
+
+            if len(self.columnas) == 0:
+                self.selector.disable()
+            else:
+                self.selector.enable()
+
+    def _leer_columnas(self, df):
+        self.columnas = [str(columna) for columna in df.columns]
+
+
+class SelectorFeatures(_SelectorColumnas):
     """
     Selector dinámico de columnas de entrada (features).
 
@@ -46,43 +102,14 @@ class SelectorFeatures:
       anterior.
     """
 
-    def __init__(self):
-        self.columnas = []
-        self.selector = None
-        self.contenedor = ui.column().classes("w-full")
-        self._construir_selector()
-
-    def _construir_selector(self):
-        """(Re)crea el ui.select sin selección previa."""
-        self.contenedor.clear()
-        with self.contenedor:
-            self.selector = (
-                ui.select(
-                    options=self.columnas,
-                    label="Features (selección múltiple)",
-                    multiple=True,
-                    value=[],
-                    clearable=True,
-                )
-                .props("use-chips")
-                .classes("w-full")
-            )
-            self.selector.add_slot(
-                "selected-item",
-                plantilla_chip(colores_columnas(self.columnas), True),
-            )
-
-            if len(self.columnas) == 0:
-                self.selector.disable()
-            else:
-                self.selector.enable()
+    ETIQUETA = "Features (selección múltiple)"
+    MULTIPLE = True
+    QUITABLE = True
 
     def cargar_columnas(self, df):
         """Muestra las columnas de un dataset nuevo y limpia la selección
         anterior."""
-        self.columnas = []
-        for columna in df.columns:
-            self.columnas.append(str(columna))
+        self._leer_columnas(df)
         self._construir_selector()
 
     def obtener_seleccion(self):
@@ -94,7 +121,7 @@ class SelectorFeatures:
         return list(valor)
 
 
-class SelectorTarget:
+class SelectorTarget(_SelectorColumnas):
     """
     Selector dinámico de columnas de salida (target).
 
@@ -103,55 +130,25 @@ class SelectorTarget:
       una misma columna no sea entrada y salida a la vez.
     """
 
+    ETIQUETA = "Target (columna de salida)"
+
     def __init__(self, al_abrir=None):
         self.al_abrir = al_abrir
-        self.columnas = []
         self.excluidas = []
-        self.selector = None
-        self.contenedor = ui.column().classes("w-full")
-        self._construir_selector()
+        super().__init__()
 
     def _opciones(self):
         """Columnas disponibles como target (todas menos las excluidas)."""
-        disponibles = []
-        for columna in self.columnas:
-            if columna not in self.excluidas:
-                disponibles.append(columna)
-        return disponibles
+        return [c for c in self.columnas if c not in self.excluidas]
 
-    def _construir_selector(self):
-        """(Re)crea el ui.select sin selección previa."""
-        self.contenedor.clear()
-        with self.contenedor:
-            self.selector = (
-                ui.select(
-                    options=self._opciones(),
-                    label="Target (columna de salida)",
-                    value=None,
-                    clearable=True,
-                )
-                .props("use-chips")
-                .classes("w-full")
-            )
-            self.selector.add_slot(
-                "selected-item",
-                plantilla_chip(colores_columnas(self.columnas), False),
-            )
-
-            if self.al_abrir is not None:
-                self.selector.on("popup-show", lambda: self.al_abrir())
-
-            if len(self.columnas) == 0:
-                self.selector.disable()
-            else:
-                self.selector.enable()
+    def _al_construir(self):
+        if self.al_abrir is not None:
+            self.selector.on("popup-show", lambda: self.al_abrir())
 
     def cargar_columnas(self, df):
         """Muestra las columnas de un dataset nuevo y limpia la selección
         anterior."""
-        self.columnas = []
-        for columna in df.columns:
-            self.columnas.append(str(columna))
+        self._leer_columnas(df)
         self.excluidas = []
         self._construir_selector()
 

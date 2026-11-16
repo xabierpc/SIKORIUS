@@ -14,14 +14,13 @@ import pandas as pd
 import pytest
 from nicegui import ui
 
+from sikorius.aplicacion import EXTENSION
+from sikorius.aplicacion.sesion import Sesion
 from sikorius.gui.componentes import carga_modelo
 from sikorius.gui.componentes.carga_modelo import (
     aceptar_perder_cambios,
     carpeta_inicial,
-    tiene_cambios_sin_guardar,
 )
-from sikorius.nucleo.persistencia import EXTENSION
-from sikorius.sesion import Sesion
 
 # =============================================================================
 # Utilidades
@@ -253,14 +252,6 @@ def test_modelo_cargado_con_la_descripcion_cambiada_pregunta(
 
     assert len(preguntas.mensajes) == 1
     assert sesion.modelo.descripcion == "Guardado"
-
-
-def test_tiene_cambios_sin_guardar(tmp_path):
-    assert not tiene_cambios_sin_guardar(Sesion())
-    sesion = sesion_con_modelo()
-    assert tiene_cambios_sin_guardar(sesion)
-    sesion.guardar_modelo(tmp_path / "m.json")
-    assert not tiene_cambios_sin_guardar(sesion)
 
 
 def test_aceptar_perder_cambios_dice_que_se_va_a_hacer(preguntas):
