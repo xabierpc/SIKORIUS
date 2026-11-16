@@ -16,8 +16,8 @@ import os
 import tempfile
 from pathlib import Path
 
-from sikorius.nucleo.errores import ErrorPersistencia
-from sikorius.nucleo.modelo import formula_texto
+from sikorius.dominio.errores import ErrorPersistencia
+from sikorius.dominio.modelo import formula_texto
 
 FORMATO = "sikorius-modelo"
 VERSION_FORMATO = 1

@@ -6,14 +6,14 @@ from pathlib import Path
 
 from nicegui import ui
 
+from sikorius.aplicacion import EXTENSION
+from sikorius.dominio.errores import ErrorModelo, ErrorPersistencia
+from sikorius.dominio.modelo import terminos_formula
+from sikorius.dominio.texto import formatear_numero
 from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes import dialogo_guardado
 from sikorius.gui.paneles.base import Panel
 from sikorius.gui.tema import colores_columnas
-from sikorius.nucleo import modelo
-from sikorius.nucleo.errores import ErrorModelo, ErrorPersistencia
-from sikorius.nucleo.persistencia import EXTENSION
-from sikorius.nucleo.texto import formatear_numero
 
 DECIMALES_METRICAS = 4
 
@@ -52,7 +52,7 @@ def _formula(mod, marcar):
     duro = "\u00a0"
     terminos = []
     for posicion, (negativo, numero, columna) in enumerate(
-        modelo.terminos_formula(mod)
+        terminos_formula(mod)
     ):
         cuerpo = numero
         if columna is not None:
@@ -161,7 +161,7 @@ def opciones_grafico(datos):
     """Opciones de ECharts para el gráfico del ajuste.
 
     Args:
-        datos: Diccionario devuelto por ``modelo.datos_ajuste``.
+        datos: Diccionario devuelto por ``Sesion.datos_ajuste``.
 
     Returns:
         Diccionario de opciones para ``ui.echart``.
@@ -375,8 +375,6 @@ class PanelModelo(Panel):
     def _mostrar_resultados(self):
         """Escribe la fórmula y las métricas y dibuja el gráfico."""
         mod = self.sesion.modelo
-        entrenamiento, test = self.sesion.conjuntos_actuales()
-
         # Cada columna con el color que tiene en los selectores y la tabla
         colores = colores_columnas(self.sesion.dataset.datos.columns)
         self.formula.set_content(html_formula(mod, colores))
@@ -391,7 +389,7 @@ class PanelModelo(Panel):
         if self.descripcion.value != mod.descripcion:
             self.descripcion.set_value(mod.descripcion)
 
-        datos = modelo.datos_ajuste(mod, entrenamiento, test)
+        datos = self.sesion.datos_ajuste()
         self.grafico.options.update(opciones_grafico(datos))
         self.grafico.update()
 

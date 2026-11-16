@@ -11,12 +11,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from sikorius.nucleo import modelo, persistencia, preprocesado
-from sikorius.nucleo.columnas import resolver_columnas
-from sikorius.nucleo.errores import (
+from sikorius.datos import importador, persistencia
+from sikorius.dominio import modelo, preprocesado, separacion
+from sikorius.dominio.columnas import resolver_columnas, validar_seleccion
+from sikorius.dominio.errores import (
     ErrorModelo,
     ErrorPersistencia,
     ErrorPreprocesado,
+    ErrorSeleccion,
+    ErrorSeparacion,
 )
 
 # Etapas de la interfaz (pestañas), en orden
@@ -105,11 +108,34 @@ class Sesion:
 
     # --- Pasos del flujo ---
 
+    def importar_dataset(self, ruta):
+        """Lee el archivo de datos y lo carga como dataset actual.
+
+        Raises:
+            ErrorImportacion: Si el archivo no se puede leer. En ese caso
+                la sesión no cambia.
+        """
+        datos = importador.importar_datos(ruta)
+        self.cargar_dataset(datos, ruta)
+
     def cargar_dataset(self, datos, ruta):
         """Sustituye el dataset. Las columnas elegidas antes ya no valen."""
         self._borrar_desde("seleccion")
         self.dataset = Dataset(datos, str(Path(ruta).resolve()))
         self._avisar()
+
+    def confirmar_seleccion(self, features, target):
+        """Valida la selección elegida en la interfaz y, si es correcta, la
+        guarda.
+
+        Raises:
+            ErrorSeleccion: Si no hay dataset o la selección no es válida.
+                En ese caso la sesión no cambia.
+        """
+        if self.dataset is None:
+            raise ErrorSeleccion("Carga primero un dataset.")
+        validar_seleccion(self.dataset.datos, features, target)
+        self.guardar_seleccion(features, target)
 
     def guardar_seleccion(self, features, target):
         """Guarda una selección ya validada. Obliga a repetir la separación."""
@@ -126,6 +152,26 @@ class Sesion:
             entrenamiento, test, porcentaje_test, semilla
         )
         self._avisar()
+
+    def separar(self, texto_porcentaje, texto_semilla):
+        """Separa el dataset con los valores escritos en el formulario.
+
+        Interpreta el porcentaje de test y la semilla, separa y guarda los
+        conjuntos.
+
+        Raises:
+            ErrorSeparacion: Si falta la selección de columnas, los valores
+                no son válidos o no se puede separar. En ese caso la sesión
+                no cambia.
+        """
+        if self.seleccion is None:
+            raise ErrorSeparacion("Confirma primero la selección de columnas.")
+        porcentaje = separacion.interpretar_porcentaje(texto_porcentaje)
+        semilla = separacion.interpretar_semilla(texto_semilla)
+        entrenamiento, test = separacion.separar_datos(
+            self.dataset.datos, porcentaje, semilla
+        )
+        self.guardar_separacion(entrenamiento, test, porcentaje, semilla)
 
     def aplicar_preprocesado(self, estrategia, constante=None):
         """Preprocesa los conjuntos de la separación actual.
@@ -252,6 +298,33 @@ class Sesion:
         return preprocesado.detectar_nulos_conjuntos(
             entrenamiento, test, self.columnas_modelo()
         )
+
+    def detectar_nulos_originales(self):
+        """Nulos por columna en los conjuntos de la separación, antes del
+        preprocesado, o None si aún no hay selección y separación.
+
+        Así, después de preprocesar, se siguen viendo los valores que había
+        y se puede cambiar de estrategia.
+        """
+        if self.seleccion is None or self.separacion is None:
+            return None
+        return preprocesado.detectar_nulos_conjuntos(
+            self.separacion.entrenamiento,
+            self.separacion.test,
+            self.columnas_modelo(),
+        )
+
+    def datos_ajuste(self):
+        """Puntos y recta del gráfico del ajuste del modelo actual.
+
+        Returns:
+            El diccionario de ``modelo.datos_ajuste``, o None si no hay
+            modelo.
+        """
+        if self.modelo is None:
+            return None
+        entrenamiento, test = self.conjuntos_actuales()
+        return modelo.datos_ajuste(self.modelo, entrenamiento, test)
 
     def puede_crear_modelo(self):
         """True si hay separación y no quedan valores inexistentes."""

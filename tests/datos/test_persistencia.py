@@ -1,6 +1,6 @@
 """Tests del guardado del modelo en archivo JSON (#21, tarea #138).
 
-uv run pytest tests/nucleo/test_persistencia.py -v
+uv run pytest tests/datos/test_persistencia.py -v
 """
 
 import json
@@ -11,20 +11,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.errores import ErrorPersistencia, ErrorSikorius
-from sikorius.nucleo.modelo import (
-    ModeloLineal,
-    entrenar_modelo,
-    formula_texto,
-    metricas_modelo,
-)
-from sikorius.nucleo.persistencia import (
+from sikorius.datos.persistencia import (
     EXTENSION,
     FORMATO,
     VERSION_FORMATO,
     guardar_modelo,
     modelo_a_diccionario,
     ruta_con_extension,
+)
+from sikorius.dominio.errores import ErrorPersistencia, ErrorSikorius
+from sikorius.dominio.modelo import (
+    ModeloLineal,
+    entrenar_modelo,
+    formula_texto,
+    metricas_modelo,
 )
 
 # =============================================================================

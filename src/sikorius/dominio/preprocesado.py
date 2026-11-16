@@ -12,7 +12,7 @@ import math
 
 import pandas as pd
 
-from sikorius.nucleo.errores import (
+from sikorius.dominio.errores import (
     AvisoPreprocesado,
     ColumnasNoEncontradasError,
     ErrorPreprocesado,

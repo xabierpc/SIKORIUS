@@ -4,31 +4,31 @@ El panel muestra los valores inexistentes detectados en las columnas
 seleccionadas (por separado en entrenamiento y test), deja elegir la
 estrategia de tratamiento y la aplica con el botón "Aplicar preprocesado".
 
-Toda la detección y el tratamiento están en ``sikorius.nucleo.preprocesado``;
-aquí solo se leen los controles y se muestra el resultado.
+La detección y el tratamiento los hace la sesión (con
+``sikorius.dominio.preprocesado``); aquí solo se leen los controles y se
+muestra el resultado.
 """
 
 from nicegui import ui
 
+from sikorius.dominio.errores import (
+    AvisoPreprocesado,
+    ErrorModelo,
+    ErrorPreprocesado,
+)
+from sikorius.dominio.preprocesado import (
+    CONSTANTE,
+    ELIMINAR,
+    MEDIA,
+    MEDIANA,
+    hay_nulos,
+)
 from sikorius.gui.avisos import (
     notificar_aviso,
     notificar_error,
     notificar_exito,
 )
 from sikorius.gui.paneles.base import Panel
-from sikorius.nucleo.errores import (
-    AvisoPreprocesado,
-    ErrorModelo,
-    ErrorPreprocesado,
-)
-from sikorius.nucleo.preprocesado import (
-    CONSTANTE,
-    ELIMINAR,
-    MEDIA,
-    MEDIANA,
-    detectar_nulos_conjuntos,
-    hay_nulos,
-)
 
 OPCIONES_ESTRATEGIA = {
     ELIMINAR: "Eliminar filas con valores inexistentes",
@@ -121,13 +121,7 @@ class PanelPreprocesado(Panel):
         de aplicar, se siguen viendo los valores que había y se puede cambiar
         de estrategia.
         """
-        if self.sesion.seleccion is None or self.sesion.separacion is None:
-            return None
-        return detectar_nulos_conjuntos(
-            self.sesion.separacion.entrenamiento,
-            self.sesion.separacion.test,
-            self.sesion.columnas_modelo(),
-        )
+        return self.sesion.detectar_nulos_originales()
 
     def _mostrar_tabla(self, deteccion):
         filas = []

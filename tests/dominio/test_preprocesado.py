@@ -1,6 +1,6 @@
 """Pruebas del preprocesado de los datos antes de crear el modelo (#110, #111).
 
-    uv run pytest tests/nucleo/test_preprocesado.py -v
+    uv run pytest tests/dominio/test_preprocesado.py -v
 
 Bloques:
     - Constantes y jerarquía de errores.
@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.preprocesado import (
+from sikorius.dominio.preprocesado import (
     CONSTANTE,
     ELIMINAR,
     ESTRATEGIAS,

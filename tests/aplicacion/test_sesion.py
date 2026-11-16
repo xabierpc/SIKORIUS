@@ -2,9 +2,9 @@
 
 Recogen también las reglas que antes probaba tests/test_estado.py con el
 estado antiguo (EstadoApp). La lectura de archivos ya no es de la sesión:
-la prueban tests/nucleo/test_importador.py y tests/gui/test_panel_dataset.py.
+la prueban tests/datos/test_importador.py y tests/gui/test_panel_dataset.py.
 
-    uv run pytest tests/test_sesion.py -v
+    uv run pytest tests/aplicacion/test_sesion.py -v
 """
 
 import json
@@ -15,14 +15,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.errores import (
+from sikorius.dominio.errores import (
     AvisoPreprocesado,
+    ErrorImportacion,
     ErrorModelo,
     ErrorPersistencia,
     ErrorPreprocesado,
+    ErrorSeleccion,
+    ErrorSeparacion,
 )
-from sikorius.nucleo.modelo import ModeloLineal, metricas_modelo
-from sikorius.nucleo.preprocesado import ESTRATEGIAS
+from sikorius.dominio.modelo import ModeloLineal, metricas_modelo
+from sikorius.dominio.preprocesado import ESTRATEGIAS
 
 # =============================================================================
 # Utilidades
@@ -754,3 +757,91 @@ def test_etapas_se_cierran_al_cambiar_un_paso_anterior(sesion_separada, datos):
     sesion_separada.aplicar_preprocesado("media")
     sesion_separada.cargar_dataset(datos, "otro.csv")
     assert sesion_separada.etapas_disponibles() == ("datos", "variables")
+
+
+# =============================================================================
+# Operaciones que la GUI delega en la sesión
+# =============================================================================
+
+
+def test_importar_dataset_lee_el_archivo(sesion, tmp_path):
+    ruta = tmp_path / "datos.csv"
+    ruta.write_text("x,y\n1,2\n3,4\n", encoding="utf-8")
+    sesion.importar_dataset(ruta)
+    assert list(sesion.dataset.datos.columns) == ["x", "y"]
+    assert sesion.dataset.ruta == str(ruta.resolve())
+
+
+def test_importar_dataset_error_conserva_el_anterior(sesion, datos, tmp_path):
+    sesion.cargar_dataset(datos, "datos.csv")
+    anterior = sesion.dataset
+    with pytest.raises(ErrorImportacion):
+        sesion.importar_dataset(tmp_path / "no_existe.csv")
+    assert sesion.dataset is anterior
+
+
+def test_confirmar_seleccion_valida_y_guarda(sesion, datos):
+    sesion.cargar_dataset(datos, "datos.csv")
+    sesion.confirmar_seleccion(["x1"], "y")
+    assert sesion.seleccion.features == ("x1",)
+    assert sesion.seleccion.target == "y"
+
+
+def test_confirmar_seleccion_sin_dataset(sesion):
+    with pytest.raises(ErrorSeleccion):
+        sesion.confirmar_seleccion(["x1"], "y")
+
+
+def test_confirmar_seleccion_invalida_no_cambia_nada(sesion_separada):
+    seleccion = sesion_separada.seleccion
+    separacion = sesion_separada.separacion
+    with pytest.raises(ErrorSeleccion):
+        sesion_separada.confirmar_seleccion([], "y")
+    assert sesion_separada.seleccion is seleccion
+    assert sesion_separada.separacion is separacion
+
+
+def test_separar_interpreta_los_textos(sesion_con_seleccion):
+    sesion_con_seleccion.separar("30", "7")
+    separacion = sesion_con_seleccion.separacion
+    assert separacion.porcentaje_test == 30
+    assert separacion.semilla == 7
+    assert len(separacion.test) == 3
+    assert len(separacion.entrenamiento) == 7
+
+
+def test_separar_sin_seleccion(sesion, datos):
+    sesion.cargar_dataset(datos, "datos.csv")
+    with pytest.raises(ErrorSeparacion):
+        sesion.separar("20", "42")
+
+
+def test_separar_porcentaje_invalido_no_cambia_nada(sesion_separada):
+    separacion = sesion_separada.separacion
+    with pytest.raises(ErrorSeparacion):
+        sesion_separada.separar("abc", "42")
+    assert sesion_separada.separacion is separacion
+
+
+def test_nulos_originales_sin_separacion(sesion_con_seleccion):
+    assert sesion_con_seleccion.detectar_nulos_originales() is None
+
+
+def test_nulos_originales_no_cambian_al_preprocesar(sesion_con_nulos):
+    antes = sesion_con_nulos.detectar_nulos_originales()
+    sesion_con_nulos.aplicar_preprocesado(ESTRATEGIAS[0])
+    assert sesion_con_nulos.detectar_nulos_originales() == antes
+    assert sesion_con_nulos.detectar_nulos() != antes
+
+
+def test_datos_ajuste_sin_modelo(sesion):
+    assert sesion.datos_ajuste() is None
+
+
+def test_datos_ajuste_del_modelo_actual(sesion):
+    sesion_lineal(sesion)
+    sesion.crear_modelo()
+    datos = sesion.datos_ajuste()
+    assert datos["tipo"] == "multiple"
+    assert len(datos["entrenamiento"][0]) == 15
+    assert len(datos["test"][0]) == 5

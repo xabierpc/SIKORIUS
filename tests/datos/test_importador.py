@@ -5,7 +5,7 @@ corchetes la rama del código que recorre, por ejemplo [I1] o [S4]. El mapa
 completo de ramas está al principio de cada sección.
 
 Ejecución con cobertura de ramas:
-    uv run pytest tests/nucleo/test_importador.py --cov
+    uv run pytest tests/datos/test_importador.py --cov
 """
 
 import ast
@@ -19,8 +19,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-import sikorius.nucleo.importador as importador
-from sikorius.nucleo.importador import (
+import sikorius.datos.importador as importador
+from sikorius.datos.importador import (
     ErrorImportacion,
     _convertir_numericas,
     _leer_csv,

@@ -7,7 +7,7 @@ la interfaz es ``Sesion.crear_modelo``.
 
 import numpy as np
 
-from sikorius.nucleo.errores import ErrorModelo
+from sikorius.dominio.errores import ErrorModelo
 
 
 class ModeloLineal:

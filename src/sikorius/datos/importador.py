@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from sikorius.nucleo.errores import ErrorImportacion
-from sikorius.nucleo.formatos import (
+from sikorius.datos.formatos import (
     EXTENSIONES_CSV,
     EXTENSIONES_EXCEL,
     EXTENSIONES_SQLITE,
     extension,
 )
+from sikorius.dominio.errores import ErrorImportacion
 
 
 def importar_datos(ruta_archivo) -> pd.DataFrame:

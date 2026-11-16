@@ -16,6 +16,8 @@ import pandas as pd
 import pytest
 from nicegui import ui
 
+from sikorius.aplicacion.sesion import Sesion
+from sikorius.dominio import modelo as modelo_dominio
 from sikorius.gui.componentes import dialogo_guardado
 from sikorius.gui.paneles.panel_modelo import (
     AVISO_SIN_DESCRIPCION,
@@ -29,8 +31,6 @@ from sikorius.gui.paneles.panel_modelo import (
     texto_metrica,
 )
 from sikorius.gui.tema import colores_columnas
-from sikorius.nucleo import modelo as nucleo_modelo
-from sikorius.sesion import Sesion
 
 # =============================================================================
 # Utilidades
@@ -264,7 +264,7 @@ def test_opciones_del_grafico_son_datos_planos_para_el_navegador(sesion_lista):
     """Nada de arrays de numpy: tienen que poder convertirse a JSON."""
     sesion_lista.crear_modelo()
     entrenamiento, test = sesion_lista.conjuntos_actuales()
-    datos = nucleo_modelo.datos_ajuste(
+    datos = modelo_dominio.datos_ajuste(
         sesion_lista.modelo, entrenamiento, test
     )
 
@@ -280,7 +280,7 @@ def test_opciones_del_grafico_son_datos_planos_para_el_navegador(sesion_lista):
 def test_el_grafico_usa_los_colores_de_la_marca(sesion_lista):
     sesion_lista.crear_modelo()
     entrenamiento, test = sesion_lista.conjuntos_actuales()
-    datos = nucleo_modelo.datos_ajuste(
+    datos = modelo_dominio.datos_ajuste(
         sesion_lista.modelo, entrenamiento, test
     )
     series = opciones_grafico(datos)["series"]
@@ -357,7 +357,7 @@ def test_sin_separacion_avisa_al_pulsar(avisos):
 
 
 def modelo_de(coeficientes, independiente, features=("x1", "x2")):
-    return nucleo_modelo.ModeloLineal(
+    return modelo_dominio.ModeloLineal(
         features, "y", coeficientes, independiente
     )
 
@@ -646,7 +646,9 @@ def test_guardar_escribe_el_archivo_y_avisa(
     assert avisos == [("Modelo guardado en " + str(ruta), "positive")]
     datos = leer_json(ruta)
     assert datos["descripcion"] == "Descripción del modelo"
-    assert datos["formula"] == nucleo_modelo.formula_texto(sesion_lista.modelo)
+    assert datos["formula"] == modelo_dominio.formula_texto(
+        sesion_lista.modelo
+    )
     assert datos["modelo"]["features"] == ["x1", "x2"]
     assert datos["modelo"]["target"] == "y"
     assert set(datos["metricas"]) == {"entrenamiento", "test"}
@@ -819,7 +821,7 @@ def test_destino_de_un_modelo_nuevo_vuelve_al_dataset(
 
 
 def test_el_panel_no_escribe_archivos_por_su_cuenta():
-    """El panel delega: el JSON lo escribe nucleo.persistencia."""
+    """El panel delega: el JSON lo escribe datos.persistencia."""
     import sikorius.gui.paneles.panel_modelo as panel
 
     codigo = inspect.getsource(panel)

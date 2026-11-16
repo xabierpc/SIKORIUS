@@ -9,13 +9,12 @@ from pathlib import Path
 
 from nicegui import ui
 
+from sikorius.dominio.errores import ErrorImportacion
 from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
 from sikorius.gui.componentes.tabla_datos import TablaDatos
 from sikorius.gui.paneles.base import Panel
 from sikorius.gui.tema import colores_columnas
-from sikorius.nucleo.errores import ErrorImportacion
-from sikorius.nucleo.importador import importar_datos
 
 # El logo es un SVG con su animación dentro (ver recursos/logo.svg). Se
 # incrusta como HTML y no con ui.image porque una imagen no deja que el CSS
@@ -161,9 +160,8 @@ class PanelDataset(Panel):
         if ruta is None:
             return  # el usuario cerró el explorador: todo sigue igual
         try:
-            datos = importar_datos(ruta)
+            self.sesion.importar_dataset(ruta)
         except ErrorImportacion as error:
             notificar_error(error)
             return
-        self.sesion.cargar_dataset(datos, ruta)
         notificar_exito("Dataset cargado correctamente")

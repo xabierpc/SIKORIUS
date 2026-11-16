@@ -13,6 +13,7 @@ from pathlib import Path
 
 from nicegui import ui
 
+from sikorius.aplicacion import EXTENSION, ruta_con_extension
 from sikorius.gui.avisos import notificar_error
 from sikorius.gui.componentes.confirmacion import confirmar
 from sikorius.gui.componentes.explorador_archivos import (
@@ -20,7 +21,6 @@ from sikorius.gui.componentes.explorador_archivos import (
     nombre_unidad,
     unidades_disponibles,
 )
-from sikorius.nucleo.persistencia import EXTENSION, ruta_con_extension
 
 # Caracteres que Windows no admite en un nombre de archivo. Se rechazan en
 # todos los sistemas para que los modelos se puedan copiar a cualquiera.

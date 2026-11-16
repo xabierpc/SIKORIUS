@@ -1,6 +1,6 @@
 """Tests de la lógica del modelo de regresión lineal (#121).
 
-uv run pytest tests/nucleo/test_modelo.py -v
+uv run pytest tests/dominio/test_modelo.py -v
 """
 
 import inspect
@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.errores import ErrorModelo
-from sikorius.nucleo.modelo import (
+from sikorius.dominio.errores import ErrorModelo
+from sikorius.dominio.modelo import (
     ModeloLineal,
     calcular_ecm,
     calcular_r2,

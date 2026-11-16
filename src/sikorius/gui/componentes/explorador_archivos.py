@@ -13,7 +13,7 @@ from pathlib import Path
 
 from nicegui import ui
 
-from sikorius.nucleo.formatos import EXTENSIONES_ADMITIDAS, es_admitido
+from sikorius.aplicacion import EXTENSIONES_ADMITIDAS, es_admitido
 
 
 def _es_windows():

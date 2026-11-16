@@ -2,6 +2,7 @@
 
 from nicegui import ui
 
+from sikorius.aplicacion.sesion import ETAPAS
 from sikorius.gui.paneles.base import Panel
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset
@@ -9,7 +10,6 @@ from sikorius.gui.paneles.panel_modelo import PanelModelo
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 from sikorius.gui.tema import aplicar_tema
-from sikorius.sesion import ETAPAS
 
 # Quasar pone en mayúsculas el texto de todos los botones. Con "no-caps" se
 # muestran tal cual se escriben: solo la primera letra en mayúscula.

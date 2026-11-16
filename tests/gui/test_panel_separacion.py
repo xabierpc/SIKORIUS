@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 from nicegui import ui
 
+from sikorius.aplicacion.sesion import Sesion
+from sikorius.dominio.separacion import separar_datos
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
-from sikorius.nucleo.separacion import separar_datos
-from sikorius.sesion import Sesion
 
 # =============================================================================
 # Utilidades
@@ -276,12 +276,12 @@ def test_otros_pasos_no_borran_lo_que_se_esta_escribiendo(
 
 
 def test_panel_no_contiene_logica_de_separacion():
-    """La GUI llama a separar_datos; no baraja filas por su cuenta."""
+    """La GUI delega en la sesión; no baraja filas por su cuenta."""
     import inspect
 
     import sikorius.gui.paneles.panel_separacion as panel
 
     codigo = inspect.getsource(panel)
-    assert "separar_datos(" in codigo
+    assert "sesion.separar(" in codigo
     assert "permutation" not in codigo
     assert "sample(" not in codigo

@@ -1,6 +1,6 @@
 """Pruebas de la separación en entrenamiento y test (historia #41).
 
-    uv run pytest tests/nucleo/test_separacion.py -v
+    uv run pytest tests/dominio/test_separacion.py -v
 
 Bloques:
     - interpretar_porcentaje: valores válidos, límites (0, 1, 99, 100) y
@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sikorius.nucleo.separacion import (
+from sikorius.dominio.separacion import (
     FILAS_MINIMAS,
     PORCENTAJE_TEST_DEFECTO,
     SEMILLA_DEFECTO,
