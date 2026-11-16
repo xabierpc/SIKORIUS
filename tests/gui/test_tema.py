@@ -45,6 +45,51 @@ def test_la_gui_no_usa_colores_fijos_de_tailwind():
     assert encontrados == []
 
 
+# Una etiqueta con el mismo color de texto y de fondo (text-warning bg-warning)
+# no se lee. Se mira cada línea del código: si lleva text-X y bg-X con el
+# mismo color del tema, falla.
+TEXTO_TEMA = re.compile(
+    r"\btext-(primary|secondary|accent|dark|positive|negative|warning|info)\b"
+)
+FONDO_TEMA = re.compile(
+    r"\bbg-(primary|secondary|accent|dark|positive|negative|warning|info)\b"
+)
+
+
+def textos_del_mismo_color_que_su_fondo(texto):
+    """Líneas de ``texto`` con text-X y bg-X del mismo color del tema."""
+    repetidos = []
+    for numero, linea in enumerate(texto.splitlines(), start=1):
+        iguales = set(TEXTO_TEMA.findall(linea)) & set(
+            FONDO_TEMA.findall(linea)
+        )
+        if iguales:
+            repetidos.append(numero)
+    return repetidos
+
+
+def test_la_deteccion_de_texto_del_color_del_fondo_funciona():
+    assert textos_del_mismo_color_que_su_fondo(
+        '"text-sm text-warning bg-warning p-2"'
+    ) == [1]
+    assert (
+        textos_del_mismo_color_que_su_fondo('"text-dark bg-warning p-2"') == []
+    )
+    assert (
+        textos_del_mismo_color_que_su_fondo('"text-warning bg-white/5"') == []
+    )
+
+
+def test_ninguna_etiqueta_tiene_el_texto_del_color_de_su_fondo():
+    carpeta = Path(sikorius.gui.__file__).parent
+    encontrados = []
+    for archivo in carpeta.rglob("*.py"):
+        texto = archivo.read_text(encoding="utf-8")
+        for numero in textos_del_mismo_color_que_su_fondo(texto):
+            encontrados.append(archivo.name + ":" + str(numero))
+    assert encontrados == []
+
+
 # =============================================================================
 # Fuente de marca
 # =============================================================================
