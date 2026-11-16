@@ -127,7 +127,7 @@ class DialogoGuardado:
             carpeta_inicial: Carpeta que se muestra al abrir. Si no
                 existe, se empieza en la carpeta personal.
             nombre_inicial: Nombre que aparece ya escrito.
-            aviso: Texto opcional que se muestra en naranja encima de la
+            aviso: Texto opcional que se muestra en amarillo encima de la
                 lista (por ejemplo, que el modelo no tiene descripción).
                 No impide guardar.
             preguntar: Función asíncrona ``(titulo, mensaje,
@@ -153,7 +153,7 @@ class DialogoGuardado:
                 "text-sm text-secondary"
             )
             self.aviso = ui.label("").classes(
-                "text-sm text-warning bg-warning p-2 rounded w-full"
+                "text-sm text-dark bg-warning p-2 rounded w-full"
             )
             if aviso:
                 self.aviso.set_text(aviso)
