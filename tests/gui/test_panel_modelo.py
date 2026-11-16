@@ -4,8 +4,10 @@ uv run pytest tests/gui/test_panel_modelo.py -v
 """
 
 import asyncio
+import html
 import inspect
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -20,9 +22,14 @@ from sikorius.gui.paneles.panel_modelo import (
     PanelModelo,
     aviso_antes_de_guardar,
     destino_inicial,
+    html_formula,
+    opciones_grafico,
     texto_estado_guardado,
+    texto_formula,
     texto_metrica,
 )
+from sikorius.gui.tema import colores_columnas
+from sikorius.nucleo import modelo as nucleo_modelo
 from sikorius.sesion import Sesion
 
 # =============================================================================
@@ -73,23 +80,30 @@ def avisos(monkeypatch):
     return lista
 
 
+def formula_visible(panel):
+    """Fórmula que se ve en el panel (sin las etiquetas HTML de los
+    colores) y con espacios normales."""
+    texto = re.sub("<[^>]+>", "", panel.formula.content)
+    return html.unescape(texto).replace("\u00a0", " ")
+
+
 # =============================================================================
 # texto_metrica
 # =============================================================================
 
 
 @pytest.mark.parametrize(
-    "nombre, valor, esperado",
+    "valor, esperado",
     [
-        ("R²", 0.98164, "R²: 0.9816"),
-        ("ECM", 238494173.71153, "ECM: 238494173.7115"),
-        ("R²", 1.0, "R²: 1"),
-        ("R²", -0.5, "R²: -0.5"),
-        ("R²", float("nan"), "R²: no calculable"),
+        (0.98164, "0.9816"),
+        (238494173.71153, "238494173.7115"),
+        (1.0, "1"),
+        (-0.5, "-0.5"),
+        (float("nan"), "no calculable"),
     ],
 )
-def test_texto_metrica(nombre, valor, esperado):
-    assert texto_metrica(nombre, valor) == esperado
+def test_texto_metrica(valor, esperado):
+    assert texto_metrica(valor) == esperado
 
 
 # =============================================================================
@@ -152,8 +166,30 @@ def test_crear_muestra_exito_y_resultados(sesion_lista, avisos):
 def test_muestra_la_formula_con_el_signo_correcto(sesion_lista):
     panel = PanelModelo(sesion_lista)
     panel.crear()
-    assert panel.formula.text == "y = 2.0000 * x1 - 3.0000 * x2 + 5.0000"
-    assert "+ -" not in panel.formula.text
+    assert formula_visible(panel) == "y = 2.0000 · x1 − 3.0000 · x2 + 5.0000"
+    assert "+ -" not in formula_visible(panel)
+    assert "\n" not in panel.formula.content  # todo en una línea
+
+
+def test_la_formula_colorea_cada_columna_con_su_color(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    colores = colores_columnas(sesion_lista.dataset.datos.columns)
+    for columna in sesion_lista.modelo.features:
+        assert colores[columna] in panel.formula.content
+    assert colores[sesion_lista.modelo.target] in panel.formula.content
+
+
+def test_html_formula_escapa_los_nombres_de_columna():
+    mod = modelo_de((2.0,), 1.0, features=("<b>x</b>",))
+    texto = html_formula(mod, {"<b>x</b>": "#38bdf8"})
+    assert "<b>" not in texto
+    assert "&lt;b&gt;x&lt;/b&gt;" in texto
+
+
+def test_html_formula_sin_color_no_pone_estilo():
+    texto = html_formula(modelo_de((2.0,), 1.0, features=("x1",)), {})
+    assert "style" not in texto
 
 
 def test_muestra_las_metricas_de_cada_conjunto(sesion_lista):
@@ -161,8 +197,8 @@ def test_muestra_las_metricas_de_cada_conjunto(sesion_lista):
     panel.crear()
     for clave in ("entrenamiento", "test"):
         r2, ecm = panel.metricas[clave]
-        assert r2.text == "R²: 1"  # ajuste perfecto: los datos no tienen ruido
-        assert ecm.text == "ECM: 0"
+        assert r2.text == "1"  # ajuste perfecto: los datos no tienen ruido
+        assert ecm.text == "0"
 
 
 def test_las_metricas_distinguen_entrenamiento_y_test():
@@ -170,36 +206,105 @@ def test_las_metricas_distinguen_entrenamiento_y_test():
     df.loc[15:, "y"] += 2  # el test tiene un error constante de 2
     panel = PanelModelo(crear_sesion(df))
     panel.crear()
-    assert panel.metricas["entrenamiento"][1].text == "ECM: 0"
-    assert panel.metricas["test"][1].text == "ECM: 4"
+    assert panel.metricas["entrenamiento"][1].text == "0"
+    assert panel.metricas["test"][1].text == "4"
 
 
 def test_r2_no_calculable_se_avisa_en_pantalla():
     df = datos_lineales().assign(y=7.0)  # salida constante
     panel = PanelModelo(crear_sesion(df))
     panel.crear()
-    assert panel.metricas["entrenamiento"][0].text == "R²: no calculable"
-    assert panel.metricas["test"][0].text == "R²: no calculable"
+    assert panel.metricas["entrenamiento"][0].text == "no calculable"
+    assert panel.metricas["test"][0].text == "no calculable"
+
+
+def nombres_de_series(grafico):
+    return [serie["name"] for serie in grafico.options["series"]]
 
 
 def test_grafico_regresion_multiple(sesion_lista):
     panel = PanelModelo(sesion_lista)
     panel.crear()
-    ejes = panel.grafico.fig.axes[0]
-    assert ejes.get_xlabel() == "Valor predicho"
-    assert ejes.get_ylabel() == "Valor real"
-    textos = [t.get_text() for t in ejes.get_legend().get_texts()]
-    assert textos == ["Entrenamiento", "Test", "Real = predicho"]
+    opciones = panel.grafico.options
+    assert opciones["xAxis"]["name"] == "Valor predicho"
+    assert opciones["yAxis"]["name"] == "Valor real"
+    assert nombres_de_series(panel.grafico) == [
+        "Entrenamiento",
+        "Test",
+        "Real = predicho",
+    ]
 
 
 def test_grafico_regresion_simple():
     panel = PanelModelo(crear_sesion(features=("x1",)))
     panel.crear()
-    ejes = panel.grafico.fig.axes[0]
-    assert ejes.get_xlabel() == "x1"
-    assert ejes.get_ylabel() == "y"
-    textos = [t.get_text() for t in ejes.get_legend().get_texts()]
-    assert textos == ["Entrenamiento", "Test", "Recta del modelo"]
+    opciones = panel.grafico.options
+    assert opciones["xAxis"]["name"] == "x1"
+    assert opciones["yAxis"]["name"] == "y"
+    assert nombres_de_series(panel.grafico) == [
+        "Entrenamiento",
+        "Test",
+        "Recta del modelo",
+    ]
+
+
+def test_el_grafico_lleva_los_puntos_de_cada_conjunto(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    entrenamiento, test, recta = panel.grafico.options["series"]
+    assert len(entrenamiento["data"]) == 15
+    assert len(test["data"]) == 5
+    assert len(recta["data"]) == 2
+    # cada punto es [valor predicho, valor real]; el ajuste es perfecto
+    for predicho, real in entrenamiento["data"] + test["data"]:
+        assert predicho == pytest.approx(real)
+
+
+def test_opciones_del_grafico_son_datos_planos_para_el_navegador(sesion_lista):
+    """Nada de arrays de numpy: tienen que poder convertirse a JSON."""
+    sesion_lista.crear_modelo()
+    entrenamiento, test = sesion_lista.conjuntos_actuales()
+    datos = nucleo_modelo.datos_ajuste(
+        sesion_lista.modelo, entrenamiento, test
+    )
+
+    opciones = opciones_grafico(datos)
+
+    json.dumps(opciones)  # falla si queda algo que no sea JSON
+    for serie in opciones["series"]:
+        for punto in serie["data"]:
+            assert type(punto[0]) is float
+            assert type(punto[1]) is float
+
+
+def test_el_grafico_usa_los_colores_de_la_marca(sesion_lista):
+    sesion_lista.crear_modelo()
+    entrenamiento, test = sesion_lista.conjuntos_actuales()
+    datos = nucleo_modelo.datos_ajuste(
+        sesion_lista.modelo, entrenamiento, test
+    )
+    series = opciones_grafico(datos)["series"]
+    assert series[0]["itemStyle"]["color"] == "#8b5cf6"
+    assert series[1]["itemStyle"]["color"] == "#7dd3fc"
+
+
+def test_el_tooltip_muestra_las_dos_coordenadas_con_su_nombre(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    opciones = panel.grafico.options
+    # La función de JavaScript va en una clave con ":" delante
+    formateador = opciones["tooltip"][":formatter"]
+    assert "dimensionNames[0]" in formateador
+    assert "dimensionNames[1]" in formateador
+    for serie in opciones["series"]:
+        assert serie["dimensions"] == ["Valor predicho", "Valor real"]
+
+
+def test_los_ejes_no_obligan_a_empezar_en_cero(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    assert panel.grafico.options["xAxis"]["scale"] is True
+    assert panel.grafico.options["yAxis"]["scale"] is True
 
 
 def test_crear_otra_vez_sustituye_al_modelo(sesion_lista, avisos):
@@ -211,7 +316,8 @@ def test_crear_otra_vez_sustituye_al_modelo(sesion_lista, avisos):
 
     assert sesion_lista.modelo is not primero
     assert [tipo for _, tipo in avisos] == ["positive", "positive"]
-    assert len(panel.grafico.fig.axes) == 1  # se redibuja, no se apila
+    # se sustituye el contenido, no se apila
+    assert len(panel.grafico.options["series"]) == 3
 
 
 def test_error_al_crear_avisa_y_no_cambia_nada(sesion_lista, avisos):
@@ -250,6 +356,39 @@ def test_sin_separacion_avisa_al_pulsar(avisos):
     assert "Separa primero" in mensaje
 
 
+def modelo_de(coeficientes, independiente, features=("x1", "x2")):
+    return nucleo_modelo.ModeloLineal(
+        features, "y", coeficientes, independiente
+    )
+
+
+def test_texto_formula_en_una_linea():
+    mod = modelo_de((2.0, -3.0), 5.0)
+    texto = texto_formula(mod).replace("\u00a0", " ")
+    assert texto == "y = 2.0000 · x1 − 3.0000 · x2 + 5.0000"
+
+
+def test_texto_formula_primer_coeficiente_negativo_con_el_signo_pegado():
+    mod = modelo_de((-2.0, 3.0), -5.0)
+    texto = texto_formula(mod).replace("\u00a0", " ")
+    assert texto == "y = −2.0000 · x1 + 3.0000 · x2 − 5.0000"
+
+
+def test_texto_formula_regresion_simple():
+    mod = modelo_de((2.0,), 1.0, features=("x",))
+    texto = texto_formula(mod).replace("\u00a0", " ")
+    assert texto == "y = 2.0000 · x + 1.0000"
+
+
+def test_texto_formula_solo_se_parte_entre_terminos():
+    """Cada término lleva espacios duros: el signo no se queda solo."""
+    texto = texto_formula(modelo_de((2.0, -3.0), 5.0))
+    assert "−\u00a03.0000\u00a0·\u00a0x2" in texto
+    assert "+\u00a05.0000" in texto
+    # los únicos espacios normales separan "y =" y los términos
+    assert texto.count(" ") == 4
+
+
 # =============================================================================
 # Camino completo
 # =============================================================================
@@ -269,8 +408,8 @@ def test_camino_completo_con_valores_inexistentes(sesion_separada, avisos):
     assert avisos[-1] == ("Modelo creado correctamente.", "positive")
     assert sesion_separada.modelo.features == ("x1", "x2")
     assert panel.resultados.visible
-    assert panel.formula.text.startswith("y = ")
-    assert "R²" in panel.metricas["test"][0].text
+    assert formula_visible(panel).startswith("y = ")
+    assert panel.metricas["test"][0].text != ""
 
 
 # =============================================================================
@@ -327,14 +466,15 @@ def test_al_recargar_la_pagina_se_ve_el_modelo(sesion_lista):
     panel = PanelModelo(sesion_lista)
 
     assert panel.resultados.visible
-    assert panel.formula.text == "y = 2.0000 * x1 - 3.0000 * x2 + 5.0000"
+    expected = "y = 2.0000 · x1 − 3.0000 · x2 + 5.0000"
+    assert formula_visible(panel) == expected
 
 
 def test_no_contiene_logica_del_modelo():
     import sikorius.gui.paneles.panel_modelo as panel
 
     codigo = inspect.getsource(panel)
-    for llamada in ("formula_texto(", "metricas_modelo(", "datos_ajuste("):
+    for llamada in ("terminos_formula(", "metricas_modelo(", "datos_ajuste("):
         assert llamada in codigo
     for prohibido in ("lstsq", "polyfit", "numpy", "np.", "mean("):
         assert prohibido not in codigo
@@ -506,7 +646,7 @@ def test_guardar_escribe_el_archivo_y_avisa(
     assert avisos == [("Modelo guardado en " + str(ruta), "positive")]
     datos = leer_json(ruta)
     assert datos["descripcion"] == "Descripción del modelo"
-    assert datos["formula"] == panel.formula.text
+    assert datos["formula"] == nucleo_modelo.formula_texto(sesion_lista.modelo)
     assert datos["modelo"]["features"] == ["x1", "x2"]
     assert datos["modelo"]["target"] == "y"
     assert set(datos["metricas"]) == {"entrenamiento", "test"}
@@ -525,10 +665,8 @@ def test_lo_guardado_es_lo_que_se_ve(
 
     datos = leer_json(tmp_path / "m.json")
     for clave, (r2, ecm) in panel.metricas.items():
-        assert r2.text == texto_metrica("R²", datos["metricas"][clave]["r2"])
-        assert ecm.text == texto_metrica(
-            "ECM", datos["metricas"][clave]["ecm"]
-        )
+        assert r2.text == texto_metrica(datos["metricas"][clave]["r2"])
+        assert ecm.text == texto_metrica(datos["metricas"][clave]["ecm"])
 
 
 def test_cerrar_el_dialogo_no_guarda_nada(

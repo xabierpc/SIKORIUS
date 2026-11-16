@@ -691,3 +691,66 @@ def test_tras_un_error_se_puede_volver_a_guardar(sesion, tmp_path):
         sesion.guardar_modelo(tmp_path / "no_existe" / "m.json")
     ruta = sesion.guardar_modelo(tmp_path / "m.json")
     assert ruta.exists()
+
+
+# =============================================================================
+# etapas_disponibles
+# =============================================================================
+
+
+def test_etapas_sin_dataset_solo_datos(sesion):
+    assert sesion.etapas_disponibles() == ("datos",)
+
+
+def test_etapas_con_dataset_abre_variables(sesion, datos):
+    sesion.cargar_dataset(datos, "datos.csv")
+    assert sesion.etapas_disponibles() == ("datos", "variables")
+
+
+def test_etapas_seleccion_sola_no_abre_preprocesado(sesion_con_seleccion):
+    assert sesion_con_seleccion.etapas_disponibles() == ("datos", "variables")
+
+
+def test_etapas_separar_con_nulos_abre_preprocesado_pero_no_modelo(
+    sesion_separada,
+):
+    assert sesion_separada.etapas_disponibles() == (
+        "datos",
+        "variables",
+        "preprocesado",
+    )
+
+
+def test_etapas_aplicar_preprocesado_abre_modelo(sesion_separada):
+    sesion_separada.aplicar_preprocesado("media")
+    assert sesion_separada.etapas_disponibles() == (
+        "datos",
+        "variables",
+        "preprocesado",
+        "modelo",
+    )
+
+
+def test_etapas_sin_nada_que_tratar_abre_preprocesado_y_modelo(sesion):
+    sesion.cargar_dataset(
+        pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "y": [2.0, 4.0, 6.0, 8.0]}),
+        "limpio.csv",
+    )
+    sesion.guardar_seleccion(["x"], "y")
+    assert "preprocesado" not in sesion.etapas_disponibles()
+    sesion.guardar_separacion(
+        sesion.dataset.datos.iloc[:3],
+        sesion.dataset.datos.iloc[3:],
+        25,
+        1,
+    )
+    assert sesion.etapas_disponibles()[-2:] == (
+        "preprocesado",
+        "modelo",
+    )
+
+
+def test_etapas_se_cierran_al_cambiar_un_paso_anterior(sesion_separada, datos):
+    sesion_separada.aplicar_preprocesado("media")
+    sesion_separada.cargar_dataset(datos, "otro.csv")
+    assert sesion_separada.etapas_disponibles() == ("datos", "variables")

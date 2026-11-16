@@ -227,7 +227,10 @@ def test_tarea3_encabezados_son_los_nombres_de_columna():
 
     columnas, filas = dataframe_a_tabla(df)
 
-    assert etiquetas_de(columnas) == ["superficie", "precio"]
+    # La etiqueta es el título "bonito" (primera en mayúscula)...
+    assert etiquetas_de(columnas) == ["Superficie", "Precio"]
+    # ...y el nombre real de la columna se conserva en "real"
+    assert [c["real"] for c in columnas] == ["superficie", "precio"]
 
 
 def test_tarea3_formato_de_cada_columna():
@@ -281,7 +284,7 @@ def test_tarea3_nombres_con_puntos_y_no_texto():
 
     for campo in campos_de(columnas):
         assert "." not in campo
-    assert etiquetas_de(columnas) == ["precio.m2", "2026"]
+    assert etiquetas_de(columnas) == ["Precio.m2", "2026"]
     assert filas[0][columnas[0]["field"]] == 1
     assert filas[0][columnas[1]["field"]] == 2
 
@@ -355,6 +358,6 @@ def test_tarea3_con_datos_del_importador(carpeta_rara):
 
     columnas, filas = dataframe_a_tabla(df)
 
-    assert etiquetas_de(columnas) == ["barrio", "superficie"]
+    assert etiquetas_de(columnas) == ["Barrio", "Superficie"]
     assert filas[0][columnas[1]["field"]] == 60.5
     assert filas[1][columnas[1]["field"]] is None

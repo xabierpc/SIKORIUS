@@ -3,6 +3,12 @@
 import pandas as pd
 from nicegui import ui
 
+from sikorius.gui.tema import tinte
+
+# Opacidad del color de fondo de una columna resaltada: se nota sin tapar
+# los números
+OPACIDAD_TINTE = 0.16
+
 # Tipos que el navegador recibe tal cual; el resto se muestra como texto
 _TIPOS_JSON = (str, int, float, bool)
 
@@ -21,12 +27,24 @@ def _valor_para_tabla(valor):
     return str(valor)
 
 
+def titulo_columna(nombre):
+    """Nombre de columna para la cabecera: sin guiones bajos y con la primera
+    letra en mayúscula ("metros_cuadrados" -> "Metros cuadrados").
+
+    Solo se cambia la primera letra: el resto se deja como está para no
+    estropear siglas como "IVA" o "ID".
+    """
+    texto = str(nombre).replace("_", " ").strip()
+    return texto[:1].upper() + texto[1:]
+
+
 def dataframe_a_tabla(df):
     """Convierte un DataFrame en las columnas y filas que usa ui.table.
 
     Cada columna usa una clave interna (c0, c1, ...) porque Quasar interpreta
     los puntos de 'field' como rutas anidadas: una columna llamada 'precio.m2'
-    se mostraría vacía. El nombre real de la columna va en 'label'. Los
+    se mostraría vacía. El nombre de la columna va en 'label' ya arreglado
+    para leerlo (ver titulo_columna) y el nombre real en 'real'. Los
     valores que faltan (NaN) se convierten en None porque NaN no es JSON
     válido.
 
@@ -41,9 +59,10 @@ def dataframe_a_tabla(df):
         columnas.append(
             {
                 "name": campo,
-                "label": str(nombre),
+                "label": titulo_columna(nombre),
+                "real": str(nombre),
                 "field": campo,
-                "align": "left",
+                "align": "center",
                 "sortable": True,
             }
         )
@@ -77,12 +96,19 @@ class TablaDatos:
                 pagination={"rowsPerPage": 0},
             )
             .props("virtual-scroll flat bordered dense hide-pagination")
-            .classes("w-full")
+            .classes("w-full sk-tabla")
             .style("height: 40vh")
+        )
+        # Al pasar el ratón por una cabecera sale el nombre real de la columna
+        self.tabla.add_slot(
+            "header-cell",
+            '<q-th :props="props" :title="props.col.real"'
+            ' :style="props.col.color ? {borderBottomColor: props.col.color}'
+            ' : {}">{{ props.col.label }}</q-th>',
         )
         self.tabla.add_slot(
             "no-data",
-            '<div class="w-full text-center text-gray-500">'
+            '<div class="w-full text-center opacity-70">'
             "Todavía no se ha cargado ningún dataset</div>",
         )
 
@@ -91,3 +117,24 @@ class TablaDatos:
         columnas, filas = dataframe_a_tabla(df)
         self.tabla.columns = columnas
         self.tabla.rows = filas
+
+    def colorear(self, colores):
+        """Tiñe las columnas indicadas, {nombre real de columna: color}.
+
+        El resto de columnas se quedan sin color. Cada columna lleva en
+        "style" el fondo de sus celdas y en "color" el color de la línea
+        de su cabecera (ver el slot "header-cell").
+        """
+        columnas = []
+        for columna in self.tabla.columns:
+            nueva = dict(columna)
+            nueva.pop("style", None)
+            nueva.pop("color", None)
+            color = colores.get(columna["real"])
+            if color is not None:
+                nueva["style"] = "background-color: " + tinte(
+                    color, OPACIDAD_TINTE
+                )
+                nueva["color"] = color
+            columnas.append(nueva)
+        self.tabla.columns = columnas

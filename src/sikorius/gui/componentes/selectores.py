@@ -8,7 +8,33 @@ El tipo de regresión no se elige aquí: la sesión lo deduce del número de
 columnas de entrada (una -> simple, varias -> múltiple).
 """
 
+import html
+import json
+
 from nicegui import ui
+
+from sikorius.gui.tema import colores_columnas
+
+
+def plantilla_chip(colores, quitable):
+    """Plantilla Quasar del "chip" (recuadro ovalado) de cada columna elegida.
+
+    Cada chip toma el color de su columna: borde del color y fondo del mismo
+    color casi transparente ("40" al final de un color hex es un 25% de
+    opacidad). Los colores se meten en la plantilla como un objeto de
+    JavaScript, con las comillas escapadas para que un nombre de columna raro
+    no rompa el atributo.
+    """
+    tabla = html.escape(json.dumps(colores), quote=True)
+    color = "(" + tabla + ")[props.opt.label]"
+    return (
+        '<q-chip dense :removable="' + ("true" if quitable else "false") + '"'
+        ' :tabindex="props.tabindex" text-color="white"'
+        ' @remove="props.removeAtIndex(props.index)"'
+        " :style=\"{border: '1px solid ' + " + color + ","
+        " backgroundColor: " + color + " + '40'}\">"
+        "{{ props.opt.label }}</q-chip>"
+    )
 
 
 class SelectorFeatures:
@@ -40,6 +66,10 @@ class SelectorFeatures:
                 )
                 .props("use-chips")
                 .classes("w-full")
+            )
+            self.selector.add_slot(
+                "selected-item",
+                plantilla_chip(colores_columnas(self.columnas), True),
             )
 
             if len(self.columnas) == 0:
@@ -93,12 +123,20 @@ class SelectorTarget:
         """(Re)crea el ui.select sin selección previa."""
         self.contenedor.clear()
         with self.contenedor:
-            self.selector = ui.select(
-                options=self._opciones(),
-                label="Target (columna de salida)",
-                value=None,
-                clearable=True,
-            ).classes("w-full")
+            self.selector = (
+                ui.select(
+                    options=self._opciones(),
+                    label="Target (columna de salida)",
+                    value=None,
+                    clearable=True,
+                )
+                .props("use-chips")
+                .classes("w-full")
+            )
+            self.selector.add_slot(
+                "selected-item",
+                plantilla_chip(colores_columnas(self.columnas), False),
+            )
 
             if self.al_abrir is not None:
                 self.selector.on("popup-show", lambda: self.al_abrir())

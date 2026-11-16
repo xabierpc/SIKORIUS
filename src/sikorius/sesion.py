@@ -19,6 +19,8 @@ from sikorius.nucleo.errores import (
     ErrorPreprocesado,
 )
 
+# Etapas de la interfaz (pestañas), en orden
+ETAPAS = ("datos", "variables", "preprocesado", "modelo")
 # Orden del flujo: cambiar un paso borra todos los que van detrás
 PASOS = ("dataset", "seleccion", "separacion", "preprocesado", "modelo")
 
@@ -257,6 +259,23 @@ class Sesion:
         if deteccion is None:
             return False
         return not preprocesado.hay_nulos(deteccion)
+
+    def etapas_disponibles(self):
+        """Etapas de la interfaz que ya se pueden abrir, en orden.
+
+        "datos" siempre; "variables" con un dataset cargado; "preprocesado"
+        con los datos separados; "modelo" cuando ya se puede crear (sin
+        valores inexistentes: si no había nada que tratar, se abre a la vez
+        que "preprocesado").
+        """
+        disponibles = ["datos"]
+        if self.dataset is not None:
+            disponibles.append("variables")
+        if self.separacion is not None:
+            disponibles.append("preprocesado")
+        if self.puede_crear_modelo():
+            disponibles.append("modelo")
+        return tuple(disponibles)
 
     def motivo_no_crear_modelo(self):
         """Explica por qué todavía no se puede crear el modelo.
