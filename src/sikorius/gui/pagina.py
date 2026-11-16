@@ -33,6 +33,9 @@ class Pestanas(Panel):
     una etapa deja de estar disponible mientras el usuario la está viendo
     (por ejemplo, al cargar otro dataset estando en "Modelo"), se le lleva
     a la última etapa que sí lo está.
+
+    Al cargar un modelo de un archivo (historia #24) solo quedan "Datos" y
+    "Modelo", y se lleva al usuario a "Modelo" para que lo vea.
     """
 
     def __init__(self, sesion):
@@ -54,14 +57,21 @@ class Pestanas(Panel):
         self.paneles = ui.tab_panels(self.tabs, value="datos").classes(
             "w-full bg-transparent my-auto"
         )
+        # Último modelo cargado de un archivo al que ya se ha llevado al
+        # usuario: solo se le lleva a "Modelo" una vez por cada carga.
+        self._modelo_cargado = None
         super().__init__(sesion)
 
     def actualizar(self):
-        self.header.set_value(self.sesion.dataset is not None)
+        cargado = self.sesion.modelo_cargado
+        self.header.set_value(self.sesion.dataset is not None or cargado)
         disponibles = self.sesion.etapas_disponibles()
         for etapa, pestana in self.pestanas.items():
             pestana.set_visibility(etapa in disponibles)
-        if self.paneles.value not in disponibles:
+        if cargado and self.sesion.modelo is not self._modelo_cargado:
+            self._modelo_cargado = self.sesion.modelo
+            self.paneles.set_value("modelo")
+        elif self.paneles.value not in disponibles:
             self.paneles.set_value(disponibles[-1])
 
 

@@ -189,23 +189,39 @@ class NavegadorCarpetas:
         return True
 
 
-async def seleccionar_archivo(carpeta_inicial):
+async def seleccionar_archivo(
+    carpeta_inicial,
+    titulo="Selecciona un dataset",
+    tipos=None,
+    admitido=es_admitido,
+):
     """Abre el explorador y espera a que el usuario elija un archivo.
+
+    Por defecto muestra los datasets que se pueden importar. Cambiando
+    ``titulo``, ``tipos`` y ``admitido`` sirve para elegir otros archivos
+    (por ejemplo, un modelo guardado).
 
     Args:
         carpeta_inicial: Carpeta que se muestra al abrir el explorador.
+        titulo: Texto de la cabecera del explorador.
+        tipos: Extensiones que se muestran, para el texto "Tipos
+            admitidos". Por defecto, las del módulo de importación.
+        admitido: Función que recibe la ruta de un archivo y dice si se
+            muestra. Por defecto, los datasets que se pueden importar.
 
     Returns:
         Ruta absoluta (str) del archivo elegido, o None si el usuario cierra
         el explorador sin elegir nada (botón Cancelar, Escape o clic fuera).
     """
-    tipos = ", ".join(EXTENSIONES_ADMITIDAS)
+    if tipos is None:
+        tipos = EXTENSIONES_ADMITIDAS
+    tipos = ", ".join(tipos)
 
     with ui.dialog() as dialogo, ui.card().classes("w-[650px] max-w-full"):
-        ui.label("Selecciona un dataset").classes("text-lg font-semibold")
+        ui.label(titulo).classes("text-lg font-semibold")
         ui.label("Tipos admitidos: " + tipos).classes("text-sm text-secondary")
         navegador = NavegadorCarpetas(
-            es_admitido,
+            admitido,
             lambda ruta: dialogo.submit(str(ruta.resolve())),
             "No hay carpetas ni archivos compatibles",
         )

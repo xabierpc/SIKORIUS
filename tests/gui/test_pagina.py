@@ -380,3 +380,92 @@ def test_la_tabla_no_se_vuelve_a_enviar_si_los_colores_no_cambian(
     sesion._avisar()  # un aviso cualquiera de la sesión
 
     assert panel.tabla.tabla.columns is columnas
+
+
+# =============================================================================
+# Modelo cargado de un archivo (historia #24)
+# =============================================================================
+
+
+def guardar_modelo_de(sesion_separada, ruta):
+    sesion_separada.aplicar_preprocesado("media")
+    sesion_separada.crear_modelo()
+    return sesion_separada.guardar_modelo(ruta)
+
+
+def test_al_cargar_un_modelo_solo_quedan_datos_y_modelo(
+    sesion, sesion_separada, tmp_path
+):
+    ruta = guardar_modelo_de(sesion_separada, tmp_path / "m.json")
+    pestanas = Pestanas(sesion)
+
+    sesion.cargar_modelo(ruta)
+
+    assert pestanas_activas(pestanas) == ["datos", "modelo"]
+    assert pestanas.paneles.value == "modelo"
+    assert pestanas.header.value
+
+
+def test_con_datos_cargar_un_modelo_oculta_las_secciones_de_datos(
+    sesion_separada, tmp_path
+):
+    ruta = guardar_modelo_de(sesion_separada, tmp_path / "m.json")
+    pestanas = Pestanas(sesion_separada)
+    pestanas.paneles.set_value("variables")
+
+    sesion_separada.cargar_modelo(ruta)
+
+    assert pestanas_activas(pestanas) == ["datos", "modelo"]
+    assert pestanas.paneles.value == "modelo"
+
+
+def test_tras_cargar_el_usuario_puede_ir_a_datos(
+    sesion, sesion_separada, tmp_path
+):
+    ruta = guardar_modelo_de(sesion_separada, tmp_path / "m.json")
+    pestanas = Pestanas(sesion)
+    sesion.cargar_modelo(ruta)
+    pestanas.paneles.set_value("datos")
+
+    # Guardar el modelo avisa a los paneles: no se vuelve a saltar
+    sesion.guardar_modelo(tmp_path / "copia.json")
+
+    assert pestanas.paneles.value == "datos"
+
+
+def test_al_recargar_con_modelo_cargado_se_ve_el_modelo(
+    sesion, sesion_separada, tmp_path
+):
+    sesion.cargar_modelo(
+        guardar_modelo_de(sesion_separada, tmp_path / "m.json")
+    )
+    pestanas = Pestanas(sesion)  # F5
+    assert pestanas.paneles.value == "modelo"
+    assert pestanas.header.value
+
+
+def test_cargar_un_dataset_vuelve_a_mostrar_las_secciones(
+    sesion, sesion_separada, tmp_path, datos
+):
+    sesion.cargar_modelo(
+        guardar_modelo_de(sesion_separada, tmp_path / "m.json")
+    )
+    pestanas = Pestanas(sesion)
+    panel = PanelDataset(sesion)
+
+    sesion.cargar_dataset(datos, "datos.csv")
+
+    assert pestanas_activas(pestanas) == ["datos", "variables"]
+    assert pestanas.paneles.value == "variables"
+    assert panel.contenido.visible
+
+
+def test_construir_pagina_con_modelo_cargado(
+    sesion, sesion_separada, tmp_path
+):
+    sesion.cargar_modelo(
+        guardar_modelo_de(sesion_separada, tmp_path / "m.json")
+    )
+    construir_pagina(sesion)
+    sesion.guardar_descripcion("Otra")
+    assert sesion.modelo_sin_guardar

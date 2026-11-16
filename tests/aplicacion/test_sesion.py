@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from sikorius.aplicacion.sesion import Sesion
 from sikorius.dominio.errores import (
     AvisoPreprocesado,
     ErrorImportacion,
@@ -757,6 +758,176 @@ def test_etapas_se_cierran_al_cambiar_un_paso_anterior(sesion_separada, datos):
     sesion_separada.aplicar_preprocesado("media")
     sesion_separada.cargar_dataset(datos, "otro.csv")
     assert sesion_separada.etapas_disponibles() == ("datos", "variables")
+
+
+# =============================================================================
+# cargar_modelo (historia #24)
+# =============================================================================
+
+
+def guardar_un_modelo(tmp_path, nombre="modelo.json", descripcion="Mi modelo"):
+    """Crea un modelo en otra sesión, lo guarda y devuelve (ruta, sesión)."""
+    origen = Sesion()
+    sesion_lineal(origen)
+    origen.crear_modelo()
+    origen.guardar_descripcion(descripcion)
+    return origen.guardar_modelo(tmp_path / nombre), origen
+
+
+def test_cargar_modelo_lo_pone_en_la_sesion(sesion, tmp_path):
+    ruta, origen = guardar_un_modelo(tmp_path)
+
+    cargado = sesion.cargar_modelo(ruta)
+
+    assert sesion.modelo is cargado
+    assert cargado.features == origen.modelo.features
+    assert cargado.target == origen.modelo.target
+    assert cargado.coeficientes == origen.modelo.coeficientes
+    assert cargado.descripcion == "Mi modelo"
+    assert sesion.modelo_cargado
+
+
+def test_cargar_modelo_usa_las_metricas_del_archivo(sesion, tmp_path):
+    ruta, origen = guardar_un_modelo(tmp_path)
+    sesion.cargar_modelo(ruta)
+    assert sesion.metricas_modelo() == origen.metricas_modelo()
+
+
+def test_las_metricas_cargadas_no_se_pueden_estropear_desde_fuera(
+    sesion, tmp_path
+):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    sesion.cargar_modelo(ruta)
+    sesion.metricas_modelo()["test"]["r2"] = 123.0
+    assert sesion.metricas_modelo()["test"]["r2"] != 123.0
+
+
+def test_cargar_modelo_queda_guardado_en_su_archivo(sesion, tmp_path):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    sesion.cargar_modelo(str(ruta))
+    assert sesion.ruta_modelo == str(ruta.resolve())
+    assert not sesion.modelo_sin_guardar
+
+
+def test_cargar_modelo_borra_el_dataset_y_los_pasos(sesion, tmp_path):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    sesion_lineal(sesion)
+    sesion.aplicar_preprocesado("media")
+    sesion.crear_modelo()
+
+    sesion.cargar_modelo(ruta)
+
+    assert sesion.dataset is None
+    assert sesion.seleccion is None
+    assert sesion.separacion is None
+    assert sesion.preprocesado is None
+    assert sesion.motivo_no_crear_modelo() is not None
+
+
+def test_cargar_modelo_avisa_a_la_interfaz(sesion, tmp_path):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+    sesion.cargar_modelo(ruta)
+    assert avisos == ["cambio"]
+
+
+def test_etapas_con_modelo_cargado_solo_datos_y_modelo(sesion, tmp_path):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    sesion_lineal(sesion)
+    sesion.cargar_modelo(ruta)
+    assert sesion.etapas_disponibles() == ("datos", "modelo")
+
+
+def test_un_modelo_creado_no_es_cargado(sesion):
+    sesion_lineal(sesion)
+    assert not sesion.modelo_cargado
+    sesion.crear_modelo()
+    assert not sesion.modelo_cargado
+
+
+def test_error_al_cargar_no_cambia_la_sesion(sesion, tmp_path):
+    sesion_lineal(sesion)
+    modelo = sesion.crear_modelo()
+    dataset = sesion.dataset
+    malo = tmp_path / "malo.json"
+    malo.write_text("no es json", encoding="utf-8")
+    avisos = []
+    sesion.al_cambiar(lambda: avisos.append("cambio"))
+
+    with pytest.raises(ErrorPersistencia):
+        sesion.cargar_modelo(malo)
+
+    assert sesion.modelo is modelo
+    assert sesion.dataset is dataset
+    assert sesion.modelo_sin_guardar
+    assert not sesion.modelo_cargado
+    assert avisos == []
+
+
+def test_tras_un_error_se_puede_cargar_otro(sesion, tmp_path):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    with pytest.raises(ErrorPersistencia):
+        sesion.cargar_modelo(tmp_path / "no_existe.json")
+    sesion.cargar_modelo(ruta)
+    assert sesion.modelo_cargado
+
+
+def test_cambiar_la_descripcion_del_cargado_deja_cambios(sesion, tmp_path):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    sesion.cargar_modelo(ruta)
+    sesion.guardar_descripcion("Otra descripción")
+    assert sesion.modelo_sin_guardar
+    assert sesion.modelo.descripcion == "Otra descripción"
+
+
+def test_volver_a_guardar_el_cargado_solo_cambia_la_descripcion(
+    sesion, tmp_path
+):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    antes = leer_json(ruta)
+    sesion.cargar_modelo(ruta)
+    sesion.guardar_descripcion("Otra descripción")
+
+    sesion.guardar_modelo(ruta)
+
+    despues = leer_json(ruta)
+    assert despues["descripcion"] == "Otra descripción"
+    antes.pop("descripcion")
+    despues.pop("descripcion")
+    assert despues == antes
+    assert not sesion.modelo_sin_guardar
+    assert sesion.modelo_cargado
+
+
+def test_guardar_el_cargado_en_otro_archivo(sesion, tmp_path):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    sesion.cargar_modelo(ruta)
+    copia = sesion.guardar_modelo(tmp_path / "copia.json")
+    assert sesion.ruta_modelo == str(copia)
+    assert leer_json(copia) == leer_json(ruta)
+
+
+def test_cargar_un_dataset_descarta_el_modelo_cargado(sesion, tmp_path, datos):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    sesion.cargar_modelo(ruta)
+
+    sesion.cargar_dataset(datos, "datos.csv")
+
+    assert sesion.modelo is None
+    assert not sesion.modelo_cargado
+    assert sesion.ruta_modelo is None
+    assert sesion.metricas_modelo() is None
+    assert sesion.etapas_disponibles() == ("datos", "variables")
+
+
+def test_cargar_otro_modelo_sustituye_al_anterior(sesion, tmp_path):
+    primero, _ = guardar_un_modelo(tmp_path, "uno.json", "Uno")
+    segundo, _ = guardar_un_modelo(tmp_path, "dos.json", "Dos")
+    sesion.cargar_modelo(primero)
+    sesion.cargar_modelo(segundo)
+    assert sesion.modelo.descripcion == "Dos"
+    assert sesion.ruta_modelo == str(segundo.resolve())
 
 
 # =============================================================================

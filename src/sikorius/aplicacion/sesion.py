@@ -2,10 +2,12 @@
 
 Guarda el resultado de cada paso (dataset, columnas, separación y
 preprocesado) y, cuando cambia un paso, borra los posteriores porque ya no
-corresponden. No importa NiceGUI: la interfaz se entera de los cambios
-suscribiéndose con ``al_cambiar``.
+corresponden. También puede tener un modelo cargado de un archivo, sin
+ningún dato (historia #24). No importa NiceGUI: la interfaz se entera de
+los cambios suscribiéndose con ``al_cambiar``.
 """
 
+import copy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -81,6 +83,9 @@ class Sesion:
         # guardado; cambiar la descripción también es un cambio).
         self._ruta_modelo = None
         self._modelo_sin_guardar = False
+        # Métricas leídas del archivo del modelo cargado. Un modelo cargado
+        # no tiene datos con los que recalcularlas; con uno creado es None.
+        self._metricas_cargadas = None
         self._oyentes = []
 
     # --- Estado (solo lectura) ---
@@ -161,6 +166,7 @@ class Sesion:
         self._modelo = None
         self._ruta_modelo = None
         self._modelo_sin_guardar = False
+        self._metricas_cargadas = None
 
     # --- Pasos del flujo ---
 
@@ -341,7 +347,35 @@ class Sesion:
         self._avisar()
         return guardada
 
+    def cargar_modelo(self, ruta):
+        """Sustituye todo el trabajo por un modelo guardado en un archivo.
+
+        El archivo no tiene datos, así que se borran el dataset y todos los
+        pasos. El modelo queda como guardado en ruta, sin cambios: para
+        volver a guardarlo se propone ese mismo archivo. Pedir confirmación
+        si el modelo anterior tenía cambios es cosa de la interfaz.
+
+        Returns:
+            El ModeloLineal cargado.
+
+        Raises:
+            ErrorPersistencia: Si el archivo no se puede leer o no es un
+                modelo válido. En ese caso la sesión no cambia.
+        """
+        cargado, metricas = persistencia.cargar_modelo(ruta)
+        self._borrar_desde("dataset")
+        self._modelo = cargado
+        self._metricas_cargadas = metricas
+        self._ruta_modelo = str(Path(ruta).resolve())
+        self._avisar()
+        return cargado
+
     # --- Consultas ---
+
+    @property
+    def modelo_cargado(self):
+        """True si el modelo actual se cargó de un archivo (no hay datos)."""
+        return self.modelo is not None and self._metricas_cargadas is not None
 
     def columnas_modelo(self):
         """Columnas reales de entrada seguidas de la de salida."""
@@ -357,12 +391,17 @@ class Sesion:
     def metricas_modelo(self):
         """R² y ECM del modelo actual en entrenamiento y test.
 
+        De un modelo cargado se devuelven las métricas del archivo, porque
+        no hay datos con los que calcularlas.
+
         Returns:
             El diccionario de ``modelo.metricas_modelo``, o None si no hay
             modelo.
         """
         if self.modelo is None:
             return None
+        if self.modelo_cargado:
+            return copy.deepcopy(self._metricas_cargadas)
         entrenamiento, test = self.conjuntos_actuales()
         return modelo.metricas_modelo(self.modelo, entrenamiento, test)
 
@@ -396,9 +435,9 @@ class Sesion:
 
         Returns:
             El diccionario de ``modelo.datos_ajuste``, o None si no hay
-            modelo.
+            modelo o el modelo se cargó de un archivo (no hay datos).
         """
-        if self.modelo is None:
+        if self.modelo is None or self.modelo_cargado:
             return None
         entrenamiento, test = self.conjuntos_actuales()
         return modelo.datos_ajuste(self.modelo, entrenamiento, test)
@@ -422,8 +461,12 @@ class Sesion:
         "datos" siempre; "variables" con un dataset cargado; "preprocesado"
         con los datos separados; "modelo" cuando ya se puede crear (sin
         valores inexistentes: si no había nada que tratar, se abre a la vez
-        que "preprocesado").
+        que "preprocesado"). Con un modelo cargado de un archivo no hay
+        datos con los que trabajar: solo "datos" (para empezar de nuevo) y
+        "modelo".
         """
+        if self.modelo_cargado:
+            return ("datos", "modelo")
         disponibles = ["datos"]
         if self.dataset is not None:
             disponibles.append("variables")

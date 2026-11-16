@@ -1,4 +1,4 @@
-"""Tests del guardado del modelo en archivo JSON (#21, tarea #138).
+"""Tests del guardado (#21, tarea #138) y la carga (#24) del modelo en JSON.
 
 uv run pytest tests/datos/test_persistencia.py -v
 """
