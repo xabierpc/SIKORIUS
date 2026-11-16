@@ -1,8 +1,10 @@
 """Carga del dataset: pantalla de inicio con el logo y tabla con los datos.
 
 Mientras no hay dataset se ve la pantalla de inicio (el logo, que se
-escribe solo, y el botón de subir el archivo). En cuanto se carga uno, la
-pantalla de inicio desaparece y ocupa su lugar la tabla con los datos.
+escribe solo, y los botones de subir el archivo o cargar un modelo ya
+guardado). En cuanto se carga un dataset, la pantalla de inicio desaparece
+y ocupa su lugar la tabla con los datos. Con un modelo cargado no hay
+datos, así que se sigue viendo la pantalla de inicio.
 """
 
 from pathlib import Path
@@ -10,6 +12,7 @@ from pathlib import Path
 from nicegui import ui
 
 from sikorius.gui.avisos import notificar_error, notificar_exito
+from sikorius.gui.componentes import carga_modelo
 from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
 from sikorius.gui.componentes.tabla_datos import TablaDatos
 from sikorius.gui.paneles.base import Panel
@@ -93,13 +96,27 @@ class PanelDataset(Panel):
             logo = RUTA_LOGO.read_text(encoding="utf-8")
             # sanitize=False: el SVG es un archivo nuestro y lleva su <style>
             ui.html(logo, sanitize=False).classes("w-full max-w-3xl")
-            self.boton_cargar = (
-                ui.button(
-                    "Subir dataset", icon="upload_file", on_click=self.cargar
+            with ui.row().classes("items-center justify-center gap-4"):
+                self.boton_cargar = (
+                    ui.button(
+                        "Subir dataset",
+                        icon="upload_file",
+                        on_click=self.cargar,
+                    )
+                    .props("size=lg")
+                    .classes("sk-aparecer")
                 )
-                .props("size=lg")
-                .classes("sk-aparecer")
-            )
+                # Recuperar un modelo guardado en vez de crear uno nuevo
+                # (historia #24)
+                self.boton_cargar_modelo = (
+                    ui.button(
+                        "Cargar modelo",
+                        icon="file_open",
+                        on_click=self.cargar_modelo,
+                    )
+                    .props("size=lg outline")
+                    .classes("sk-aparecer")
+                )
             ui.label("CSV, Excel o SQLite").classes(
                 "text-sm opacity-70 sk-aparecer"
             )
@@ -117,6 +134,11 @@ class PanelDataset(Panel):
                 ui.space()
                 self.boton_otro = ui.button(
                     "Cargar otro", icon="folder_open", on_click=self.cargar
+                ).props("outline")
+                self.boton_otro_modelo = ui.button(
+                    "Cargar modelo",
+                    icon="file_open",
+                    on_click=self.cargar_modelo,
                 ).props("outline")
             self.tabla = TablaDatos()
 
@@ -156,7 +178,17 @@ class PanelDataset(Panel):
         self.tabla.tabla.style("height: " + alto_tabla(len(dataset.datos)))
 
     async def cargar(self):
-        """Abre el explorador e importa el archivo elegido."""
+        """Abre el explorador e importa el archivo elegido.
+
+        Si hay un modelo cargado con cambios sin guardar, antes pregunta,
+        porque el dataset nuevo lo sustituye.
+        """
+        if self.sesion.modelo_cargado:
+            seguir = await carga_modelo.aceptar_perder_cambios(
+                self.sesion, "cargas un dataset"
+            )
+            if not seguir:
+                return
         ruta = await seleccionar_archivo(carpeta_inicial(self.sesion))
         if ruta is None:
             return  # el usuario cerró el explorador: todo sigue igual
@@ -167,3 +199,7 @@ class PanelDataset(Panel):
             return
         self.sesion.cargar_dataset(datos, ruta)
         notificar_exito("Dataset cargado correctamente")
+
+    async def cargar_modelo(self):
+        """Recupera un modelo guardado (ver ``componentes.carga_modelo``)."""
+        await carga_modelo.cargar_modelo(self.sesion)

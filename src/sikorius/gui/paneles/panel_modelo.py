@@ -1,4 +1,9 @@
-"""Panel para crear y evaluar el modelo de regresión lineal."""
+"""Panel para crear y evaluar el modelo de regresión lineal.
+
+También muestra un modelo cargado de un archivo (historia #24): fórmula,
+métricas y descripción, pero no el gráfico ni el botón de crear, porque
+el archivo no tiene datos.
+"""
 
 import html
 import math
@@ -343,8 +348,14 @@ class PanelModelo(Panel):
 
     def actualizar(self):
         """Habilita/deshabilita la creación y muestra el modelo."""
+        # Con un modelo cargado no hay datos: no se puede crear otro
+        cargado = self.sesion.modelo_cargado
+        self.boton.set_visibility(not cargado)
         motivo = self.sesion.motivo_no_crear_modelo()
-        if motivo is not None:
+        if cargado:
+            self.aviso.set_visibility(False)
+            self.boton.disable()
+        elif motivo is not None:
             self.aviso.set_text(motivo)
             self.aviso.set_visibility(True)
             self.boton.disable()
@@ -373,12 +384,20 @@ class PanelModelo(Panel):
         self.estado_guardado.set_visibility(texto != "")
 
     def _mostrar_resultados(self):
-        """Escribe la fórmula y las métricas y dibuja el gráfico."""
-        mod = self.sesion.modelo
-        entrenamiento, test = self.sesion.conjuntos_actuales()
+        """Escribe la fórmula y las métricas y dibuja el gráfico.
 
-        # Cada columna con el color que tiene en los selectores y la tabla
-        colores = colores_columnas(self.sesion.dataset.datos.columns)
+        De un modelo cargado no hay gráfico: el archivo no tiene datos.
+        """
+        mod = self.sesion.modelo
+        cargado = self.sesion.modelo_cargado
+
+        # Cada columna con el color que tiene en los selectores y la tabla.
+        # Un modelo cargado no tiene dataset: se usan sus propias columnas.
+        if cargado:
+            columnas = list(mod.features) + [mod.target]
+        else:
+            columnas = self.sesion.dataset.datos.columns
+        colores = colores_columnas(columnas)
         self.formula.set_content(html_formula(mod, colores))
 
         metricas = self.sesion.metricas_modelo()
@@ -391,6 +410,10 @@ class PanelModelo(Panel):
         if self.descripcion.value != mod.descripcion:
             self.descripcion.set_value(mod.descripcion)
 
+        self.grafico.set_visibility(not cargado)
+        if cargado:
+            return
+        entrenamiento, test = self.sesion.conjuntos_actuales()
         datos = modelo.datos_ajuste(mod, entrenamiento, test)
         self.grafico.options.update(opciones_grafico(datos))
         self.grafico.update()

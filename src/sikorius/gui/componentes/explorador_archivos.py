@@ -73,17 +73,33 @@ def listar_carpeta(carpeta, admitido=es_admitido):
     return entradas
 
 
-async def seleccionar_archivo(carpeta_inicial):
+async def seleccionar_archivo(
+    carpeta_inicial,
+    titulo="Selecciona un dataset",
+    tipos=None,
+    admitido=es_admitido,
+):
     """Abre el explorador y espera a que el usuario elija un archivo.
+
+    Por defecto muestra los datasets que se pueden importar. Cambiando
+    ``titulo``, ``tipos`` y ``admitido`` sirve para elegir otros archivos
+    (por ejemplo, un modelo guardado).
 
     Args:
         carpeta_inicial: Carpeta que se muestra al abrir el explorador.
+        titulo: Texto de la cabecera del explorador.
+        tipos: Extensiones que se muestran, para el texto "Tipos
+            admitidos". Por defecto, las del módulo de importación.
+        admitido: Función que recibe la ruta de un archivo y dice si se
+            muestra. Por defecto, los datasets que se pueden importar.
 
     Returns:
         Ruta absoluta (str) del archivo elegido, o None si el usuario cierra
         el explorador sin elegir nada (botón Cancelar, Escape o clic fuera).
     """
-    tipos = ", ".join(EXTENSIONES_ADMITIDAS)
+    if tipos is None:
+        tipos = EXTENSIONES_ADMITIDAS
+    tipos = ", ".join(tipos)
 
     # Cada botón necesita su propia función: una lambda escrita dentro del
     # bucle de las unidades se quedaría con la última unidad para todos
@@ -91,7 +107,7 @@ async def seleccionar_archivo(carpeta_inicial):
         return lambda: mostrar(carpeta)
 
     with ui.dialog() as dialogo, ui.card().classes("w-[650px] max-w-full"):
-        ui.label("Selecciona un dataset").classes("text-lg font-semibold")
+        ui.label(titulo).classes("text-lg font-semibold")
         ui.label("Tipos admitidos: " + tipos).classes("text-sm text-secondary")
         with ui.row().classes("w-full items-center no-wrap"):
             ui.button(
@@ -127,7 +143,7 @@ async def seleccionar_archivo(carpeta_inicial):
 
     def mostrar(carpeta):
         try:
-            entradas = listar_carpeta(carpeta)
+            entradas = listar_carpeta(carpeta, admitido)
         except PermissionError:
             ui.notify(
                 "Sin permiso para abrir " + str(carpeta), type="negative"
