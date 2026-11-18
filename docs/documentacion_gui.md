@@ -9,7 +9,7 @@ Elegir la librería con la que se hará la interfaz gráfica de SIKORIUS. La apl
 
 - elegir columnas;
 
-- crear un modelo de regresión lineal y ver su gráfico de Matplotlib;
+- crear un modelo de regresión lineal y ver su gráfico interactivo (ECharts);
 
 - guardar el modelo, cargarlo y hacer predicciones.
 
@@ -66,7 +66,7 @@ navegador. Para ello usa la librería pywebview.
 | **Selección múltiple** | `ui.select(opciones, multiple=True)` | `st.multiselect` |
 | **Área de texto** | `ui.input`, `ui.textarea` | `st.text_input`, `st.text_area` |
 | **Mensajes al usuario** | `ui.notify`, `ui.dialog` | `st.success`, `st.error`, `st.toast`, `st.dialog` |
-| **Gráficos de Matplotlib** | `ui.matplotlib` y `ui.pyplot` | `st.pyplot(fig)` |
+| **Gráficos** | `ui.echart` (el que usamos), `ui.matplotlib`, `ui.plotly` | `st.pyplot`, `st.plotly_chart`, `st.altair_chart` |
 | **Guardar archivos** | En el navegador, `ui.download` (descarga). En modo nativo, diálogo de guardado del sistema vía pywebview | `st.download_button` (descarga; el navegador decide dónde se guarda) |
 | **Tareas largas sin bloquear la interfaz** | `run.io_bound()` y `run.cpu_bound()` | El script espera a que termine; se puede mostrar `st.spinner` |
 | **Pruebas automatizadas** | Simulador de pruebas con pytest que no necesita navegador | `AppTest` simula la aplicación en las pruebas |
