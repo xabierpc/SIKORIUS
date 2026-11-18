@@ -39,6 +39,15 @@ class ErrorPrediccion(ErrorSikorius):
     """No se puede hacer la predicción con los valores introducidos."""
 
 
+class ErrorTransformacion(ErrorSikorius):
+    """No se puede aplicar un cambio al dataset (asistente)."""
+
+
+class ErrorAsistente(ErrorSikorius):
+    """El asistente no puede responder: sin clave, sin red o respuesta
+    que no se entiende."""
+
+
 class AvisoPreprocesado(ErrorPreprocesado):
     """El preprocesado se podría hacer, pero el resultado no sería válido."""
 

@@ -46,6 +46,21 @@ Para desarrollar, el trabajo se hace desde la rama `dev` (`git switch dev`), com
 uv run sikorius
 ```
 
+## Asistente (opcional)
+
+El botón flotante de abajo a la derecha abre un chat con una LLM de
+[Groq](https://console.groq.com). Explica el dataset y el modelo, y puede
+proponer cambios al dataset (eliminar o renombrar columnas, filtrar filas,
+quitar duplicados, nulos o atípicos, convertir texto a número). Los cambios
+se ven antes de aplicarlos y se pueden deshacer.
+
+Para activarlo, copia `.env.example` como `.env` y pon tu clave
+(`GROQ_API_KEY=...`). El `.env` no se sube al repositorio. Sin clave, la
+aplicación funciona igual y el asistente sale desactivado. A Groq solo se le
+mandan los nombres de las columnas, estadísticas resumidas y el modelo, no
+las filas del dataset. Los tests usan una LLM falsa: no necesitan clave ni
+red. Más detalles en [`docs/asistente.md`](docs/asistente.md).
+
 ## Tests
 
 ```bash
@@ -77,10 +92,11 @@ SIKORIUS/
 │   │   ├── componentes/ # Piezas reutilizables: tabla, explorador...
 │   │   ├── paneles/     # Un panel por paso de la aplicación
 │   │   └── pagina.py    # Coloca los paneles en la página
-│   ├── aplicacion/      # Sesión: estado del flujo y operaciones de la GUI
-│   ├── datos/           # Importar datasets y guardar modelos
+│   ├── aplicacion/      # Sesión (estado del flujo) y asistente
+│   ├── datos/           # Importar datasets, guardar modelos y Groq
 │   ├── dominio/         # Lógica sin interfaz ni archivos: columnas,
-│   │                    # separación, preprocesado, modelo
+│   │                    # separación, preprocesado, modelo y los
+│   │                    # cambios que puede proponer el asistente
 │   └── app.py           # Punto de entrada
 ├── tests/               # Misma estructura que src/sikorius
 │   ├── aplicacion/      # Tests de la sesión

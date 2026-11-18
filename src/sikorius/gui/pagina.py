@@ -4,6 +4,7 @@ from nicegui import ui
 
 from sikorius.aplicacion.sesion import ETAPAS
 from sikorius.gui.paneles.base import Panel
+from sikorius.gui.paneles.panel_asistente import PanelAsistente
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset
 from sikorius.gui.paneles.panel_modelo import PanelModelo
@@ -76,11 +77,12 @@ class Pestanas(Panel):
             self.paneles.set_value(disponibles[-1])
 
 
-def construir_pagina(sesion):
+def construir_pagina(sesion, asistente=None):
     """Coloca los paneles en la página, en el orden del flujo de trabajo.
 
     Cada panel se suscribe a la sesión y se actualiza solo: aquí no se
-    conectan unos paneles con otros.
+    conectan unos paneles con otros. Si se pasa el ``Asistente``, se añade
+    su panel lateral con el chat.
     """
     aplicar_tema()
     pestanas = Pestanas(sesion)
@@ -104,3 +106,9 @@ def construir_pagina(sesion):
         with ui.tab_panel("modelo"), ui.column().classes("w-full gap-4"):
             PanelModelo(sesion)
             PanelPrediccion(sesion)
+    if asistente is not None:
+
+        def etapa_actual():
+            return TITULOS.get(pestanas.paneles.value)
+
+        PanelAsistente(sesion, asistente, etapa_actual)

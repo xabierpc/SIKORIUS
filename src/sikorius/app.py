@@ -4,6 +4,7 @@ from pathlib import Path
 
 from nicegui import ui
 
+from sikorius.aplicacion.asistente import Asistente
 from sikorius.aplicacion.sesion import Sesion
 from sikorius.gui.pagina import construir_pagina
 
@@ -16,11 +17,13 @@ def main():
 
     Hay una sola sesión para toda la aplicación, porque se usa en local: si
     se abre otra pestaña o se recarga la página, se ve el mismo trabajo.
+    Lo mismo con el asistente: la conversación sigue al recargar.
     """
     sesion = Sesion()
+    asistente = Asistente(sesion)
 
     @ui.page("/")
     def pagina_principal():
-        construir_pagina(sesion)
+        construir_pagina(sesion, asistente)
 
     ui.run(title="SIKORIUS", favicon=RUTA_ICONO, reload=False)
