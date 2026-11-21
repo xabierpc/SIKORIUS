@@ -13,9 +13,9 @@ solo para esta ejecución con --with:
 from pathlib import Path
 
 import numpy as np
-import statsmodels.api as sm # type: ignore
-from sklearn.linear_model import LinearRegression # type: ignore
-from sklearn.metrics import mean_squared_error, r2_score # type: ignore
+import statsmodels.api as sm  # type: ignore
+from sklearn.linear_model import LinearRegression  # type: ignore
+from sklearn.metrics import mean_squared_error, r2_score  # type: ignore
 
 from sikorius.datos.importador import importar_datos
 from sikorius.dominio.preprocesado import ELIMINAR, aplicar_preprocesado

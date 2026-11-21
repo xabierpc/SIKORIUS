@@ -20,8 +20,8 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-from sklearn.linear_model import LinearRegression # type: ignore
-from sklearn.metrics import mean_squared_error, r2_score # type: ignore
+from sklearn.linear_model import LinearRegression  # type: ignore
+from sklearn.metrics import mean_squared_error, r2_score  # type: ignore
 
 from sikorius.datos.importador import importar_datos
 from sikorius.dominio.preprocesado import ELIMINAR, aplicar_preprocesado

@@ -299,6 +299,25 @@ def test_el_tooltip_muestra_las_dos_coordenadas_con_su_nombre(sesion_lista):
         assert serie["dimensions"] == ["Valor predicho", "Valor real"]
 
 
+def test_el_tooltip_escapa_los_nombres_de_columna(sesion_lista):
+    """El tooltip de ECharts interpreta HTML y los nombres de los ejes son
+    los de las columnas del archivo: sin escapar, una cabecera como
+    <img onerror=...> ejecutaría código al pasar el ratón por un punto."""
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    formateador = panel.grafico.options["tooltip"][":formatter"]
+    for valor in (
+        "punto.seriesName",
+        "punto.dimensionNames[0]",
+        "punto.dimensionNames[1]",
+    ):
+        # Cada vez que se usa, va dentro de esc(...)
+        assert formateador.count(valor) == formateador.count(
+            "esc(" + valor + ")"
+        )
+        assert "esc(" + valor + ")" in formateador
+
+
 def test_los_ejes_no_obligan_a_empezar_en_cero(sesion_lista):
     panel = PanelModelo(sesion_lista)
     panel.crear()
