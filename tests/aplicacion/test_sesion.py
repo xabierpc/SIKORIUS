@@ -850,6 +850,47 @@ def test_etapas_con_modelo_cargado_solo_inicio_y_modelo(sesion, tmp_path):
     assert sesion.etapas_disponibles() == ("inicio", "modelo")
 
 
+# =============================================================================
+# siguiente_etapa (botón "Continuar")
+# =============================================================================
+
+
+def test_siguiente_sin_dataset_no_se_puede_continuar(sesion):
+    assert sesion.siguiente_etapa("inicio") is None
+
+
+def test_siguiente_con_dataset_se_continua_a_datos_y_variables(sesion, datos):
+    sesion.cargar_dataset(datos, "datos.csv")
+    assert sesion.siguiente_etapa("inicio") == "datos"
+    assert sesion.siguiente_etapa("datos") == "variables"
+    # Sin separar no se puede pasar de "variables"
+    assert sesion.siguiente_etapa("variables") is None
+
+
+def test_siguiente_tras_separar_y_preprocesar(sesion_separada):
+    assert sesion_separada.siguiente_etapa("variables") == "preprocesado"
+    assert sesion_separada.siguiente_etapa("preprocesado") is None
+    sesion_separada.aplicar_preprocesado("media")
+    assert sesion_separada.siguiente_etapa("preprocesado") == "modelo"
+
+
+def test_siguiente_desde_modelo_no_hay_mas(sesion_separada):
+    sesion_separada.aplicar_preprocesado("media")
+    assert sesion_separada.siguiente_etapa("modelo") is None
+
+
+def test_siguiente_de_una_etapa_cerrada_es_none(sesion):
+    assert sesion.siguiente_etapa("preprocesado") is None
+
+
+def test_siguiente_con_modelo_cargado_va_de_inicio_a_modelo(sesion, tmp_path):
+    ruta, _ = guardar_un_modelo(tmp_path)
+    sesion_lineal(sesion)
+    sesion.cargar_modelo(ruta)
+    assert sesion.siguiente_etapa("inicio") == "modelo"
+    assert sesion.siguiente_etapa("modelo") is None
+
+
 def test_un_modelo_creado_no_es_cargado(sesion):
     sesion_lineal(sesion)
     assert not sesion.modelo_cargado

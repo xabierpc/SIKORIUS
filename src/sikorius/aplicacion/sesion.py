@@ -495,6 +495,26 @@ class Sesion:
             disponibles.append("modelo")
         return tuple(disponibles)
 
+    def siguiente_etapa(self, actual):
+        """Etapa a la que lleva "Continuar" desde ``actual``.
+
+        Cada etapa se abre al completar los pasos de la anterior (ver
+        ``etapas_disponibles``), así que se puede continuar justo cuando la
+        siguiente ya está disponible. Con un modelo cargado de un archivo,
+        desde "Inicio" se continúa a "Modelo".
+
+        Returns:
+            El nombre de la siguiente etapa, o None si aún no se puede
+            continuar (faltan pasos o ``actual`` es la última).
+        """
+        disponibles = self.etapas_disponibles()
+        if actual not in disponibles:
+            return None
+        posicion = disponibles.index(actual) + 1
+        if posicion == len(disponibles):
+            return None
+        return disponibles[posicion]
+
     def motivo_no_crear_modelo(self):
         """Explica por qué todavía no se puede crear el modelo.
 
