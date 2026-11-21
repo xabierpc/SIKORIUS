@@ -25,7 +25,7 @@ from sikorius.dominio.errores import (
 )
 
 # Etapas de la interfaz (pestañas), en orden
-ETAPAS = ("datos", "variables", "preprocesado", "modelo")
+ETAPAS = ("inicio", "datos", "variables", "preprocesado", "modelo")
 # Orden del flujo: cambiar un paso borra todos los que van detrás
 PASOS = ("dataset", "seleccion", "separacion", "preprocesado", "modelo")
 
@@ -477,18 +477,18 @@ class Sesion:
     def etapas_disponibles(self):
         """Etapas de la interfaz que ya se pueden abrir, en orden.
 
-        "datos" siempre; "variables" con un dataset cargado; "preprocesado"
-        con los datos separados; "modelo" cuando ya se puede crear (sin
-        valores inexistentes: si no había nada que tratar, se abre a la vez
-        que "preprocesado"). Con un modelo cargado de un archivo no hay
-        datos con los que trabajar: solo "datos" (para empezar de nuevo) y
-        "modelo".
+        "inicio" siempre; "datos" y "variables" con un dataset cargado;
+        "preprocesado" con los datos separados; "modelo" cuando ya se puede
+        crear (sin valores inexistentes: si no había nada que tratar, se
+        abre a la vez que "preprocesado"). Con un modelo cargado de un
+        archivo no hay datos con los que trabajar: solo "inicio" (para
+        empezar de nuevo) y "modelo".
         """
         if self.modelo_cargado:
-            return ("datos", "modelo")
-        disponibles = ["datos"]
+            return ("inicio", "modelo")
+        disponibles = ["inicio"]
         if self.dataset is not None:
-            disponibles.append("variables")
+            disponibles += ["datos", "variables"]
         if self.separacion is not None:
             disponibles.append("preprocesado")
         if self.puede_crear_modelo():
