@@ -14,11 +14,7 @@ from nicegui import ui
 
 from sikorius.dominio.separacion import separar_datos
 from sikorius.gui.componentes.selectores import plantilla_chip
-from sikorius.gui.componentes.tabla_datos import (
-    TablaDatos,
-    dataframe_a_tabla,
-    titulo_columna,
-)
+from sikorius.gui.componentes.tabla_datos import TablaDatos, dataframe_a_tabla
 from sikorius.gui.pagina import TITULOS, Pestanas, construir_pagina
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset, alto_tabla
@@ -247,28 +243,13 @@ def test_la_tabla_grande_se_limita_al_70_por_ciento_de_la_pantalla():
 # =============================================================================
 
 
-@pytest.mark.parametrize(
-    "nombre, esperado",
-    [
-        ("metros_cuadrados", "Metros cuadrados"),
-        ("precio", "Precio"),
-        ("IVA", "IVA"),  # solo se toca la primera letra
-        ("año_de_venta", "Año de venta"),
-        ("_oculta", "Oculta"),
-        (2020, "2020"),
-        ("", ""),
-    ],
-)
-def test_titulo_columna(nombre, esperado):
-    assert titulo_columna(nombre) == esperado
-
-
-def test_la_tabla_muestra_titulos_legibles_y_guarda_el_nombre_real():
+def test_la_tabla_muestra_el_nombre_original_de_cada_columna():
     df = pd.DataFrame({"metros_cuadrados": [1.0], "precio": [2.0]})
 
     columnas, filas = dataframe_a_tabla(df)
 
-    assert [c["label"] for c in columnas] == ["Metros cuadrados", "Precio"]
+    # La cabecera lleva el nombre tal cual viene en el dataset
+    assert [c["label"] for c in columnas] == ["metros_cuadrados", "precio"]
     assert [c["real"] for c in columnas] == ["metros_cuadrados", "precio"]
     # Los datos siguen enlazados por la clave interna, no por el título
     assert filas[0]["c0"] == 1.0
