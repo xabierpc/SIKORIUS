@@ -10,6 +10,7 @@ archivos siempre los lee y escribe a través de la sesión.
 """
 
 import ast
+import importlib
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ import pytest
 import sikorius
 
 RAIZ = Path(sikorius.__file__).parent
+PROTOTIPOS = RAIZ.parents[1] / "prototipos"
 
 PROHIBIDOS = {
     "dominio": (
@@ -48,3 +50,34 @@ def test_capa_no_importa_capas_prohibidas(capa):
             assert not modulo.startswith(PROHIBIDOS[capa]), (
                 capa + "/" + archivo.name + " importa " + modulo
             )
+
+
+def _importaciones_de_sikorius(archivo):
+    """Pares (módulo, nombre) de cada ``from sikorius... import nombre``."""
+    arbol = ast.parse(archivo.read_text(encoding="utf-8"))
+    for nodo in ast.walk(arbol):
+        if (
+            isinstance(nodo, ast.ImportFrom)
+            and nodo.module is not None
+            and nodo.module.startswith("sikorius")
+        ):
+            for alias in nodo.names:
+                yield nodo.module, alias.name
+
+
+@pytest.mark.parametrize(
+    "archivo", sorted(PROTOTIPOS.glob("*.py")), ids=lambda a: a.name
+)
+def test_los_prototipos_importan_cosas_que_existen(archivo):
+    """Los scripts de prototipos/ no los ejecuta el CI: si se mueve un módulo,
+    este test avisa de que el script se ha quedado con una ruta vieja."""
+    for modulo, nombre in _importaciones_de_sikorius(archivo):
+        try:
+            cargado = importlib.import_module(modulo)
+        except ModuleNotFoundError:
+            pytest.fail(
+                archivo.name + " importa " + modulo + ", que no existe"
+            )
+        assert hasattr(cargado, nombre), (
+            archivo.name + " importa " + nombre + " de " + modulo
+        )

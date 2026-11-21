@@ -1,5 +1,7 @@
 # Investigación de persistencia de modelos: joblib y JSON
 
+> **Nota:** este documento se escribió cuando el código estaba en `nucleo/`. Tras la reorganización en capas, esas rutas son hoy `dominio/` (`modelo.py`, `preprocesado.py`, `separacion.py`, `errores.py`), `datos/` (`importador.py`, `persistencia.py`) y `aplicacion/sesion.py`. El texto se deja tal como estaba, para conservar lo que se decidió en su momento.
+
 ## 1. Objetivo
 
 Elegir cómo guardará SIKORIUS un modelo de regresión lineal en un archivo y cómo lo recuperará después, junto con la información que la aplicación necesita mostrar:

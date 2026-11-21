@@ -20,12 +20,12 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.linear_model import LinearRegression # type: ignore
+from sklearn.metrics import mean_squared_error, r2_score # type: ignore
 
-from sikorius.nucleo.importador import importar_datos
-from sikorius.nucleo.preprocesado import ELIMINAR, aplicar_preprocesado
-from sikorius.nucleo.separacion import separar_datos
+from sikorius.datos.importador import importar_datos
+from sikorius.dominio.preprocesado import ELIMINAR, aplicar_preprocesado
+from sikorius.dominio.separacion import separar_datos
 
 RUTA_DEFECTO = Path(__file__).resolve().parents[1] / "data" / "housing.csv"
 TARGET = "median_house_value"

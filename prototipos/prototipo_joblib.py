@@ -18,18 +18,18 @@ import pickle
 import tempfile
 from pathlib import Path
 
-import joblib
+import joblib # type: ignore
 import numpy as np
 import pandas as pd
 
-from sikorius.nucleo.importador import importar_datos
-from sikorius.nucleo.modelo import (
+from sikorius.datos.importador import importar_datos
+from sikorius.dominio.modelo import (
     entrenar_modelo,
     formula_texto,
     metricas_modelo,
 )
-from sikorius.nucleo.preprocesado import ELIMINAR, aplicar_preprocesado
-from sikorius.nucleo.separacion import separar_datos
+from sikorius.dominio.preprocesado import ELIMINAR, aplicar_preprocesado
+from sikorius.dominio.separacion import separar_datos
 
 RUTA_DATOS = Path(__file__).resolve().parents[1] / "data" / "housing.csv"
 RUTA_MODELO = Path(__file__).resolve().parent / "modelo_housing.joblib"
