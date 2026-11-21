@@ -4,7 +4,7 @@ Junta los botones de crear y guardar, la fórmula, las métricas, el gráfico
 del ajuste y la descripción. La fórmula y el gráfico son componentes
 (``componentes/formula.py`` y ``componentes/grafico_ajuste.py``).
 
-También muestra un modelo cargado de un archivo (historia #24): fórmula,
+También muestra un modelo cargado de un archivo: fórmula,
 métricas y descripción, pero no el gráfico ni el botón de crear, porque
 el archivo no tiene datos.
 """
@@ -106,15 +106,16 @@ class PanelModelo(Panel):
                 self.formula = ui.html("", sanitize=False).classes(
                     "text-xl text-center w-full break-words"
                 )
-                # Mitad izquierda: gráfico. Mitad derecha: las métricas,
-                # centradas. "basis-0 grow" reparte el ancho a partes
-                # iguales y "min-w-0" deja encoger cada mitad.
+                # Izquierda: gráfico. Derecha: las métricas, centradas.
+                # "basis-0" + grow-[13]/grow-[7] reparte el ancho 65/35, así
+                # el gráfico mide 1,3 veces lo que medía con el reparto a
+                # medias; "min-w-0" deja encoger cada parte.
                 with ui.row().classes("w-full items-center no-wrap gap-6"):
                     self.grafico = ui.echart(
                         {"xAxis": {}, "yAxis": {}, "series": []}
-                    ).classes("basis-0 grow min-w-0 h-96")
+                    ).classes("basis-0 grow-[13] min-w-0 h-[500px]")
                     with ui.column().classes(
-                        "basis-0 grow min-w-0 items-center gap-8"
+                        "basis-0 grow-[7] min-w-0 items-center gap-8"
                     ):
                         # Una tarjeta por conjunto:
                         # {"entrenamiento": (R², ECM), ...}
