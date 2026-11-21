@@ -500,3 +500,83 @@ def test_construir_pagina_con_modelo_cargado(
     construir_pagina(sesion)
     sesion.guardar_descripcion("Otra")
     assert sesion.modelo_sin_guardar
+
+
+# =============================================================================
+# Botón "Continuar"
+# =============================================================================
+
+
+def test_continuar_esta_a_la_derecha_de_la_barra(sesion):
+    pestanas = Pestanas(sesion)
+    assert pestanas.boton_continuar.text == "Continuar"
+    assert pestanas.boton_continuar.parent_slot.parent is pestanas.acciones
+
+
+def test_continuar_desactivado_sin_dataset(sesion):
+    pestanas = Pestanas(sesion)
+    assert not pestanas.boton_continuar.enabled
+
+
+def test_continuar_avanza_por_las_etapas(sesion, datos):
+    pestanas = Pestanas(sesion)
+    sesion.cargar_dataset(datos, "datos.csv")  # se pasa a "datos"
+    assert pestanas.boton_continuar.enabled
+
+    pestanas.continuar()
+
+    assert pestanas.paneles.value == "variables"
+    # Hasta separar no se puede seguir
+    assert not pestanas.boton_continuar.enabled
+    sesion.guardar_seleccion(["x1", "x2"], "y")
+    entrenamiento, test = separar_datos(sesion.dataset.datos, 20, 42)
+    sesion.guardar_separacion(entrenamiento, test, 20, 42)
+    assert pestanas.boton_continuar.enabled
+
+    pestanas.continuar()
+
+    assert pestanas.paneles.value == "preprocesado"
+    assert not pestanas.boton_continuar.enabled
+    sesion.aplicar_preprocesado("media")
+    pestanas.continuar()
+    assert pestanas.paneles.value == "modelo"
+    assert not pestanas.boton_continuar.visible  # es la última
+
+
+def test_continuar_sin_completar_no_mueve(sesion, datos):
+    pestanas = Pestanas(sesion)
+    sesion.cargar_dataset(datos, "datos.csv")
+    pestanas.paneles.set_value("variables")
+
+    pestanas.continuar()
+
+    assert pestanas.paneles.value == "variables"
+
+
+def test_volver_atras_con_las_pestanas_reactiva_continuar(sesion_separada):
+    sesion_separada.aplicar_preprocesado("media")
+    pestanas = Pestanas(sesion_separada)
+    pestanas.paneles.set_value("modelo")
+    assert not pestanas.boton_continuar.visible
+
+    pestanas.tabs.set_value("datos")  # el usuario pulsa la pestaña
+
+    assert pestanas.paneles.value == "datos"
+    assert pestanas.boton_continuar.visible
+    assert pestanas.boton_continuar.enabled
+
+
+def test_continuar_con_modelo_cargado_va_de_inicio_a_modelo(
+    sesion, sesion_separada, tmp_path
+):
+    sesion.cargar_modelo(
+        guardar_modelo_de(sesion_separada, tmp_path / "m.json")
+    )
+    pestanas = Pestanas(sesion)
+    pestanas.paneles.set_value("inicio")
+    assert pestanas.boton_continuar.enabled
+
+    pestanas.continuar()
+
+    assert pestanas.paneles.value == "modelo"
+    assert not pestanas.boton_continuar.visible

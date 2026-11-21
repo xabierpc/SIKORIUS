@@ -41,6 +41,12 @@ class Pestanas(Panel):
     dataset se lleva al usuario a "Datos" para que lo vea. Al cargar un
     modelo de un archivo (historia #24) solo quedan "Inicio" y "Modelo", y
     se le lleva a "Modelo".
+
+    El botón "Continuar" de la derecha lleva a la etapa siguiente y está
+    desactivado hasta completar los pasos de la que se ve. En "Modelo", la
+    última, no se ve. Qué etapa viene
+    después lo decide la sesión (``Sesion.siguiente_etapa``); las pestañas
+    siguen sirviendo para volver atrás.
     """
 
     def __init__(self, sesion):
@@ -58,14 +64,23 @@ class Pestanas(Panel):
                     self.pestanas[etapa] = ui.tab(
                         etapa, label=TITULOS[etapa]
                     ).classes("sk-pestana")
-            # Hueco de la derecha para botones como "Continuar"
             self.acciones = ui.row().classes("items-center justify-end")
+            with self.acciones:
+                self.boton_continuar = ui.button(
+                    "Continuar", on_click=self.continuar
+                ).props(
+                    "icon-right=arrow_forward unelevated color=white"
+                    " text-color=primary"
+                )
         # El contenido se coloca después, dentro de self.paneles
         # "my-auto" centra verticalmente el contenido de la pestaña en el
         # espacio que queda libre (ver recursos/estilos.css)
-        self.paneles = ui.tab_panels(self.tabs, value="inicio").classes(
-            "w-full bg-transparent my-auto"
-        )
+        # Al cambiar de pestaña (también a mano) se revisa "Continuar"
+        self.paneles = ui.tab_panels(
+            self.tabs,
+            value="inicio",
+            on_change=lambda _: self._actualizar_continuar(),
+        ).classes("w-full bg-transparent my-auto")
         # Último modelo cargado de un archivo al que ya se ha llevado al
         # usuario: solo se le lleva a "Modelo" una vez por cada carga.
         self._modelo_cargado = None
@@ -90,6 +105,23 @@ class Pestanas(Panel):
             self.paneles.set_value("datos")
         elif self.paneles.value not in disponibles:
             self.paneles.set_value(disponibles[-1])
+        self._actualizar_continuar()
+
+    def _actualizar_continuar(self):
+        """Activa "Continuar" solo si la pestaña que se ve está completa.
+
+        En la última etapa ("Modelo") no hay nada después: el botón no se ve.
+        """
+        actual = self.paneles.value
+        self.boton_continuar.set_visibility(actual != ETAPAS[-1])
+        siguiente = self.sesion.siguiente_etapa(actual)
+        self.boton_continuar.set_enabled(siguiente is not None)
+
+    def continuar(self):
+        """Pasa a la etapa siguiente, si ya se puede."""
+        siguiente = self.sesion.siguiente_etapa(self.paneles.value)
+        if siguiente is not None:
+            self.paneles.set_value(siguiente)
 
 
 def construir_pagina(sesion):
