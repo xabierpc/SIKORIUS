@@ -125,6 +125,17 @@ def test_pestanas_al_empezar_solo_inicio(sesion):
     assert pestanas.paneles.value == "inicio"
 
 
+def test_las_pestanas_van_en_el_centro_de_la_barra(sesion):
+    pestanas = Pestanas(sesion)
+    barra = pestanas.tabs.parent_slot.parent
+    assert "sk-barra" in barra.classes
+    # nombre | pestañas | acciones: las pestañas son la columna del medio
+    hijos = list(barra)
+    assert len(hijos) == 3
+    assert hijos[1] is pestanas.tabs
+    assert hijos[2] is pestanas.acciones
+
+
 def test_inicio_va_a_la_izquierda_de_datos():
     assert list(TITULOS)[:2] == ["inicio", "datos"]
     assert TITULOS["inicio"] == "Inicio"

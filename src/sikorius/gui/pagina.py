@@ -30,9 +30,9 @@ TITULOS = {
 class Pestanas(Panel):
     """Pestañas de arriba: cada etapa se abre al completar la anterior.
 
-    Las pestañas no disponibles no se ven. Como el grupo va pegado a la
-    derecha, al abrirse una nueva las anteriores se desplazan a la
-    izquierda (ver recursos/estilos.css). Si
+    Las pestañas no disponibles no se ven. El grupo va centrado en la
+    barra, así que al abrirse una nueva todas se recolocan para seguir
+    centradas (ver recursos/estilos.css). Si
     una etapa deja de estar disponible mientras el usuario la está viendo
     (por ejemplo, al cargar otro dataset estando en "Modelo"), se le lleva
     a la última etapa que sí lo está.
@@ -46,9 +46,11 @@ class Pestanas(Panel):
     def __init__(self, sesion):
         # Sin dataset se ve la pantalla de inicio y la barra no hace falta
         self.header = ui.header().classes("items-center")
-        with self.header:
+        # Tres columnas: nombre, pestañas y acciones. Las de los lados miden
+        # lo mismo, así que las pestañas quedan en el centro exacto de la
+        # barra aunque a la derecha se añadan botones (ver estilos.css).
+        with self.header, ui.element("div").classes("sk-barra"):
             ui.label("SIKORIUS").classes("text-xl font-bold")
-            ui.space()
             self.tabs = ui.tabs().props("no-caps")
             self.pestanas = {}
             with self.tabs:
@@ -56,6 +58,8 @@ class Pestanas(Panel):
                     self.pestanas[etapa] = ui.tab(
                         etapa, label=TITULOS[etapa]
                     ).classes("sk-pestana")
+            # Hueco de la derecha para botones como "Continuar"
+            self.acciones = ui.row().classes("items-center justify-end")
         # El contenido se coloca después, dentro de self.paneles
         # "my-auto" centra verticalmente el contenido de la pestaña en el
         # espacio que queda libre (ver recursos/estilos.css)
