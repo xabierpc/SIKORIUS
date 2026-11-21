@@ -1,28 +1,16 @@
-"""Carga del dataset: pantalla de inicio con el logo y tabla con los datos.
+"""Pestaña "Datos": la tabla con el dataset cargado.
 
-Mientras no hay dataset se ve la pantalla de inicio (el logo, que se
-escribe solo, y los botones de subir el archivo o cargar un modelo ya
-guardado). En cuanto se carga un dataset, la pantalla de inicio desaparece
-y ocupa su lugar la tabla con los datos. Con un modelo cargado no hay
-datos, así que se sigue viendo la pantalla de inicio.
+La pantalla de inicio (logo y botones de subir un dataset o cargar un
+modelo) es otra pestaña, ver ``panel_inicio``. Esta solo tiene sentido con
+un dataset: sin él, la pestaña no se ve (``Sesion.etapas_disponibles``).
 """
-
-from pathlib import Path
 
 from nicegui import ui
 
-from sikorius.dominio.errores import ErrorImportacion
-from sikorius.gui.avisos import notificar_error, notificar_exito
-from sikorius.gui.componentes import carga_modelo
-from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
+from sikorius.gui.componentes import carga_dataset
 from sikorius.gui.componentes.tabla_datos import TablaDatos
 from sikorius.gui.paneles.base import Panel
-from sikorius.gui.tema import CARPETA_RECURSOS, colores_columnas
-
-# El logo es un SVG con su animación dentro (ver recursos/logo.svg). Se
-# incrusta como HTML y no con ui.image porque una imagen no deja que el CSS
-# anime sus piezas.
-RUTA_LOGO = CARPETA_RECURSOS / "logo.svg"
+from sikorius.gui.tema import colores_columnas
 
 # Alto en píxeles de cada fila de la tabla (modo "dense") y de sus bordes
 ALTO_FILA = 28.5
@@ -53,13 +41,6 @@ def colores_elegidos(sesion):
     return {c: todos[c] for c in elegidas if c in todos}
 
 
-def carpeta_inicial(sesion):
-    """Carpeta del último archivo cargado o, si no hay, la carpeta personal."""
-    if sesion.dataset is not None:
-        return Path(sesion.dataset.ruta).parent
-    return Path.home()
-
-
 def texto_resumen(datos):
     """Texto como "20640 filas y 10 columnas"."""
     return (
@@ -68,40 +49,12 @@ def texto_resumen(datos):
 
 
 class PanelDataset(Panel):
-    """Pantalla de inicio (sin dataset) o tabla grande (con dataset)."""
+    """Ruta y tamaño del dataset, la tabla y el botón de cargar otro.
+
+    Para cargar un modelo guardado se vuelve a la pestaña "Inicio".
+    """
 
     def __init__(self, sesion):
-
-        self.inicio = ui.column().classes("w-full items-center gap-6")
-        with self.inicio:
-            logo = RUTA_LOGO.read_text(encoding="utf-8")
-            # sanitize=False: el SVG es un archivo nuestro y lleva su <style>
-            ui.html(logo, sanitize=False).classes("w-full max-w-3xl")
-            with ui.row().classes("items-center justify-center gap-4"):
-                self.boton_cargar = (
-                    ui.button(
-                        "Subir dataset",
-                        icon="upload_file",
-                        on_click=self.cargar,
-                    )
-                    .props("size=lg")
-                    .classes("sk-aparecer")
-                )
-                # Recuperar un modelo guardado en vez de crear uno nuevo
-                # (historia #24)
-                self.boton_cargar_modelo = (
-                    ui.button(
-                        "Cargar modelo",
-                        icon="file_open",
-                        on_click=self.cargar_modelo,
-                    )
-                    .props("size=lg outline")
-                    .classes("sk-aparecer")
-                )
-            ui.label("CSV, Excel o SQLite").classes(
-                "text-sm opacity-70 sk-aparecer"
-            )
-
         self.contenido = ui.column().classes("w-full")
         with self.contenido:
             with ui.row().classes("w-full items-center no-wrap"):
@@ -116,11 +69,6 @@ class PanelDataset(Panel):
                 self.boton_otro = ui.button(
                     "Cargar otro", icon="folder_open", on_click=self.cargar
                 ).props("outline")
-                self.boton_otro_modelo = ui.button(
-                    "Cargar modelo",
-                    icon="file_open",
-                    on_click=self.cargar_modelo,
-                ).props("outline")
             self.tabla = TablaDatos()
 
         # Dataset que se ve ahora en la tabla. La sesión avisa en cada paso
@@ -133,7 +81,6 @@ class PanelDataset(Panel):
 
     def actualizar(self):
         dataset = self.sesion.dataset
-        self.inicio.set_visibility(dataset is None)
         self.contenido.set_visibility(dataset is not None)
         if dataset is None:
             self.etiqueta_ruta.set_text("Ningún archivo cargado")
@@ -159,27 +106,5 @@ class PanelDataset(Panel):
         self.tabla.tabla.style("height: " + alto_tabla(len(dataset.datos)))
 
     async def cargar(self):
-        """Abre el explorador e importa el archivo elegido.
-
-        Si hay un modelo cargado con cambios sin guardar, antes pregunta,
-        porque el dataset nuevo lo sustituye.
-        """
-        if self.sesion.modelo_cargado:
-            seguir = await carga_modelo.aceptar_perder_cambios(
-                self.sesion, "cargas un dataset"
-            )
-            if not seguir:
-                return
-        ruta = await seleccionar_archivo(carpeta_inicial(self.sesion))
-        if ruta is None:
-            return  # el usuario cerró el explorador: todo sigue igual
-        try:
-            self.sesion.importar_dataset(ruta)
-        except ErrorImportacion as error:
-            notificar_error(error)
-            return
-        notificar_exito("Dataset cargado correctamente")
-
-    async def cargar_modelo(self):
-        """Recupera un modelo guardado (ver ``componentes.carga_modelo``)."""
-        await carga_modelo.cargar_modelo(self.sesion)
+        """Carga otro dataset (ver ``componentes.carga_dataset``)."""
+        await carga_dataset.cargar_dataset(self.sesion)

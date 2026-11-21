@@ -18,6 +18,7 @@ from sikorius.gui.componentes.tabla_datos import TablaDatos, dataframe_a_tabla
 from sikorius.gui.pagina import TITULOS, Pestanas, construir_pagina
 from sikorius.gui.paneles.panel_columnas import PanelColumnas
 from sikorius.gui.paneles.panel_dataset import PanelDataset, alto_tabla
+from sikorius.gui.paneles.panel_inicio import PanelInicio
 from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 from sikorius.gui.tema import PALETA_COLUMNAS, colores_columnas, tinte
@@ -118,9 +119,51 @@ def pestanas_activas(pestanas):
     return [e for e, p in pestanas.pestanas.items() if p.visible]
 
 
-def test_pestanas_al_empezar_solo_datos(sesion):
+def test_pestanas_al_empezar_solo_inicio(sesion):
     pestanas = Pestanas(sesion)
-    assert pestanas_activas(pestanas) == ["datos"]
+    assert pestanas_activas(pestanas) == ["inicio"]
+    assert pestanas.paneles.value == "inicio"
+
+
+def test_las_pestanas_van_en_el_centro_de_la_barra(sesion):
+    pestanas = Pestanas(sesion)
+    barra = pestanas.tabs.parent_slot.parent
+    assert "sk-barra" in barra.classes
+    # nombre | pestañas | acciones: las pestañas son la columna del medio
+    hijos = list(barra)
+    assert len(hijos) == 3
+    assert hijos[1] is pestanas.tabs
+    assert hijos[2] is pestanas.acciones
+
+
+def test_inicio_va_a_la_izquierda_de_datos():
+    assert list(TITULOS)[:2] == ["inicio", "datos"]
+    assert TITULOS["inicio"] == "Inicio"
+
+
+def test_al_subir_un_dataset_se_pasa_a_datos(sesion, datos):
+    pestanas = Pestanas(sesion)
+
+    sesion.cargar_dataset(datos, "datos.csv")
+
+    assert pestanas.paneles.value == "datos"
+
+
+def test_el_usuario_puede_volver_al_inicio_con_dataset(sesion, datos):
+    pestanas = Pestanas(sesion)
+    sesion.cargar_dataset(datos, "datos.csv")
+    pestanas.paneles.set_value("inicio")
+
+    # Los pasos siguientes avisan a los paneles: no se vuelve a saltar
+    sesion.guardar_seleccion(["x1", "x2"], "y")
+
+    assert pestanas.paneles.value == "inicio"
+    assert "inicio" in pestanas_activas(pestanas)
+
+
+def test_al_recargar_con_dataset_se_ven_los_datos(sesion, datos):
+    sesion.cargar_dataset(datos, "datos.csv")
+    pestanas = Pestanas(sesion)  # F5
     assert pestanas.paneles.value == "datos"
 
 
@@ -134,23 +177,29 @@ def test_las_pestanas_bloqueadas_no_se_ven_y_se_animan(sesion):
 def test_pestanas_se_desbloquean_con_el_flujo(sesion, datos):
     pestanas = Pestanas(sesion)
     sesion.cargar_dataset(datos, "datos.csv")
-    assert pestanas_activas(pestanas) == ["datos", "variables"]
+    assert pestanas_activas(pestanas) == ["inicio", "datos", "variables"]
     sesion.guardar_seleccion(["x1", "x2"], "y")
     entrenamiento, test = separar_datos(sesion.dataset.datos, 20, 42)
     sesion.guardar_separacion(entrenamiento, test, 20, 42)
-    assert pestanas_activas(pestanas) == ["datos", "variables", "preprocesado"]
+    assert pestanas_activas(pestanas) == [
+        "inicio",
+        "datos",
+        "variables",
+        "preprocesado",
+    ]
     sesion.aplicar_preprocesado("media")
     assert pestanas_activas(pestanas) == list(TITULOS)
 
 
 def test_pestanas_si_se_cierra_la_que_se_ve_se_va_a_la_ultima_abierta(
-    sesion_separada, datos
+    sesion_separada,
 ):
     sesion_separada.aplicar_preprocesado("media")
     pestanas = Pestanas(sesion_separada)
     pestanas.paneles.set_value("modelo")
 
-    sesion_separada.cargar_dataset(datos, "otro.csv")
+    # Otra selección borra la separación: se cierran preprocesado y modelo
+    sesion_separada.guardar_seleccion(["x1"], "y")
 
     assert pestanas.paneles.value == "variables"
 
@@ -171,36 +220,37 @@ def test_pestanas_no_mueven_al_usuario_si_su_pestana_sigue_abierta(
 # =============================================================================
 
 
-def test_sin_dataset_se_ve_el_inicio_y_no_la_tabla(sesion):
-    panel = PanelDataset(sesion)
-    assert panel.inicio.visible
-    assert not panel.contenido.visible
+def test_el_inicio_tiene_subir_dataset(sesion):
+    panel = PanelInicio(sesion)
     assert panel.boton_cargar.text == "Subir dataset"
 
 
-def test_al_cargar_un_dataset_el_inicio_desaparece(sesion, datos):
+def test_sin_dataset_la_tabla_no_se_ve(sesion):
+    panel = PanelDataset(sesion)
+    assert not panel.contenido.visible
+
+
+def test_al_cargar_un_dataset_se_ve_la_tabla(sesion, datos):
     panel = PanelDataset(sesion)
 
     sesion.cargar_dataset(datos, "datos.csv")
 
-    assert not panel.inicio.visible
     assert panel.contenido.visible
     assert panel.etiqueta_resumen.text == "10 filas y 3 columnas"
     assert len(panel.tabla.tabla.rows) == 10
 
 
-def test_al_recargar_con_dataset_no_se_ve_el_inicio(sesion, datos):
+def test_al_recargar_con_dataset_se_ve_la_tabla(sesion, datos):
     sesion.cargar_dataset(datos, "datos.csv")
 
     panel = PanelDataset(sesion)  # F5
 
-    assert not panel.inicio.visible
     assert panel.contenido.visible
 
 
 def test_el_logo_se_incrusta_con_su_animacion(sesion):
-    panel = PanelDataset(sesion)
-    html = [e for e in panel.inicio if isinstance(e, ui.html)]
+    panel = PanelInicio(sesion)
+    html = [e for e in panel.contenido if isinstance(e, ui.html)]
     assert len(html) == 1
     assert "<svg" in html[0].content
     assert "sk-morado" in html[0].content
@@ -374,7 +424,7 @@ def guardar_modelo_de(sesion_separada, ruta):
     return sesion_separada.guardar_modelo(ruta)
 
 
-def test_al_cargar_un_modelo_solo_quedan_datos_y_modelo(
+def test_al_cargar_un_modelo_solo_quedan_inicio_y_modelo(
     sesion, sesion_separada, tmp_path
 ):
     ruta = guardar_modelo_de(sesion_separada, tmp_path / "m.json")
@@ -382,7 +432,7 @@ def test_al_cargar_un_modelo_solo_quedan_datos_y_modelo(
 
     sesion.cargar_modelo(ruta)
 
-    assert pestanas_activas(pestanas) == ["datos", "modelo"]
+    assert pestanas_activas(pestanas) == ["inicio", "modelo"]
     assert pestanas.paneles.value == "modelo"
     assert pestanas.header.value
 
@@ -396,22 +446,22 @@ def test_con_datos_cargar_un_modelo_oculta_las_secciones_de_datos(
 
     sesion_separada.cargar_modelo(ruta)
 
-    assert pestanas_activas(pestanas) == ["datos", "modelo"]
+    assert pestanas_activas(pestanas) == ["inicio", "modelo"]
     assert pestanas.paneles.value == "modelo"
 
 
-def test_tras_cargar_el_usuario_puede_ir_a_datos(
+def test_tras_cargar_el_usuario_puede_volver_al_inicio(
     sesion, sesion_separada, tmp_path
 ):
     ruta = guardar_modelo_de(sesion_separada, tmp_path / "m.json")
     pestanas = Pestanas(sesion)
     sesion.cargar_modelo(ruta)
-    pestanas.paneles.set_value("datos")
+    pestanas.paneles.set_value("inicio")
 
     # Guardar el modelo avisa a los paneles: no se vuelve a saltar
     sesion.guardar_modelo(tmp_path / "copia.json")
 
-    assert pestanas.paneles.value == "datos"
+    assert pestanas.paneles.value == "inicio"
 
 
 def test_al_recargar_con_modelo_cargado_se_ve_el_modelo(
@@ -436,8 +486,8 @@ def test_cargar_un_dataset_vuelve_a_mostrar_las_secciones(
 
     sesion.cargar_dataset(datos, "datos.csv")
 
-    assert pestanas_activas(pestanas) == ["datos", "variables"]
-    assert pestanas.paneles.value == "variables"
+    assert pestanas_activas(pestanas) == ["inicio", "datos", "variables"]
+    assert pestanas.paneles.value == "datos"
     assert panel.contenido.visible
 
 

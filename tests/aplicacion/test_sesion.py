@@ -703,23 +703,28 @@ def test_tras_un_error_se_puede_volver_a_guardar(sesion, tmp_path):
 # =============================================================================
 
 
-def test_etapas_sin_dataset_solo_datos(sesion):
-    assert sesion.etapas_disponibles() == ("datos",)
+def test_etapas_sin_dataset_solo_inicio(sesion):
+    assert sesion.etapas_disponibles() == ("inicio",)
 
 
 def test_etapas_con_dataset_abre_variables(sesion, datos):
     sesion.cargar_dataset(datos, "datos.csv")
-    assert sesion.etapas_disponibles() == ("datos", "variables")
+    assert sesion.etapas_disponibles() == ("inicio", "datos", "variables")
 
 
 def test_etapas_seleccion_sola_no_abre_preprocesado(sesion_con_seleccion):
-    assert sesion_con_seleccion.etapas_disponibles() == ("datos", "variables")
+    assert sesion_con_seleccion.etapas_disponibles() == (
+        "inicio",
+        "datos",
+        "variables",
+    )
 
 
 def test_etapas_separar_con_nulos_abre_preprocesado_pero_no_modelo(
     sesion_separada,
 ):
     assert sesion_separada.etapas_disponibles() == (
+        "inicio",
         "datos",
         "variables",
         "preprocesado",
@@ -729,6 +734,7 @@ def test_etapas_separar_con_nulos_abre_preprocesado_pero_no_modelo(
 def test_etapas_aplicar_preprocesado_abre_modelo(sesion_separada):
     sesion_separada.aplicar_preprocesado("media")
     assert sesion_separada.etapas_disponibles() == (
+        "inicio",
         "datos",
         "variables",
         "preprocesado",
@@ -758,7 +764,11 @@ def test_etapas_sin_nada_que_tratar_abre_preprocesado_y_modelo(sesion):
 def test_etapas_se_cierran_al_cambiar_un_paso_anterior(sesion_separada, datos):
     sesion_separada.aplicar_preprocesado("media")
     sesion_separada.cargar_dataset(datos, "otro.csv")
-    assert sesion_separada.etapas_disponibles() == ("datos", "variables")
+    assert sesion_separada.etapas_disponibles() == (
+        "inicio",
+        "datos",
+        "variables",
+    )
 
 
 # =============================================================================
@@ -833,11 +843,11 @@ def test_cargar_modelo_avisa_a_la_interfaz(sesion, tmp_path):
     assert avisos == ["cambio"]
 
 
-def test_etapas_con_modelo_cargado_solo_datos_y_modelo(sesion, tmp_path):
+def test_etapas_con_modelo_cargado_solo_inicio_y_modelo(sesion, tmp_path):
     ruta, _ = guardar_un_modelo(tmp_path)
     sesion_lineal(sesion)
     sesion.cargar_modelo(ruta)
-    assert sesion.etapas_disponibles() == ("datos", "modelo")
+    assert sesion.etapas_disponibles() == ("inicio", "modelo")
 
 
 def test_un_modelo_creado_no_es_cargado(sesion):
@@ -919,7 +929,7 @@ def test_cargar_un_dataset_descarta_el_modelo_cargado(sesion, tmp_path, datos):
     assert not sesion.modelo_cargado
     assert sesion.ruta_modelo is None
     assert sesion.metricas_modelo() is None
-    assert sesion.etapas_disponibles() == ("datos", "variables")
+    assert sesion.etapas_disponibles() == ("inicio", "datos", "variables")
 
 
 def test_cargar_otro_modelo_sustituye_al_anterior(sesion, tmp_path):

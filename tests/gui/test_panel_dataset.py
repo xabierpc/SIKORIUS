@@ -10,9 +10,9 @@ import pytest
 from nicegui import ui
 
 from sikorius.dominio.separacion import separar_datos
-from sikorius.gui.componentes import carga_modelo
-from sikorius.gui.paneles import panel_dataset
-from sikorius.gui.paneles.panel_dataset import PanelDataset, carpeta_inicial
+from sikorius.gui.componentes import carga_dataset, carga_modelo
+from sikorius.gui.componentes.carga_dataset import carpeta_inicial
+from sikorius.gui.paneles.panel_dataset import PanelDataset
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def elegir_en_explorador(monkeypatch, ruta):
     async def explorador_falso(_carpeta):
         return ruta
 
-    monkeypatch.setattr(panel_dataset, "seleccionar_archivo", explorador_falso)
+    monkeypatch.setattr(carga_dataset, "seleccionar_archivo", explorador_falso)
 
 
 # --- carpeta_inicial (antes en pagina.py, con el estado global) ---
@@ -162,34 +162,24 @@ def responder_confirmacion(monkeypatch, respuesta):
     return mensajes
 
 
-def test_el_inicio_tiene_el_boton_cargar_modelo(sesion):
-    panel = PanelDataset(sesion)
-    assert panel.boton_cargar_modelo.text == "Cargar modelo"
-    assert panel.boton_cargar_modelo.enabled
-
-
-def test_con_datos_tambien_se_puede_cargar_un_modelo(sesion, datos):
+def test_con_datos_solo_esta_el_boton_cargar_otro(sesion, datos):
+    """Cargar un modelo se hace desde "Inicio", no desde "Datos"."""
     sesion.cargar_dataset(datos, "datos.csv")
     panel = PanelDataset(sesion)
-    assert panel.boton_otro_modelo.text == "Cargar modelo"
+    botones = [
+        e.text
+        for e in panel.contenido.descendants()
+        if isinstance(e, ui.button)
+    ]
+    assert botones == ["Cargar otro"]
 
 
-def test_el_boton_carga_el_modelo(
-    sesion, sesion_separada, tmp_path, monkeypatch, avisos
+def test_al_cargar_un_modelo_la_tabla_no_se_ve(
+    sesion, sesion_separada, tmp_path
 ):
-    ruta = modelo_guardado(sesion_separada, tmp_path / "m.json")
-
-    async def explorador_falso(_carpeta, **kwargs):
-        return str(ruta)
-
-    monkeypatch.setattr(carga_modelo, "seleccionar_archivo", explorador_falso)
     panel = PanelDataset(sesion)
-
-    asyncio.run(panel.cargar_modelo())
-
-    assert sesion.modelo_cargado
-    assert panel.inicio.visible  # no hay datos: sigue el inicio
-    assert avisos[-1][1] == "positive"
+    sesion.cargar_modelo(modelo_guardado(sesion_separada, tmp_path / "m.json"))
+    assert not panel.contenido.visible  # el modelo no trae datos
 
 
 def test_cargar_dataset_con_modelo_cargado_con_cambios_pregunta(
