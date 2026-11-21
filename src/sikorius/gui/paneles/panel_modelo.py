@@ -117,10 +117,10 @@ class PanelModelo(Panel):
                     with ui.column().classes(
                         "basis-0 grow-[7] min-w-0 items-center gap-8"
                     ):
-                        # Una tarjeta por conjunto:
+                        # Una tarjeta por conjunto, una encima de otra:
                         # {"entrenamiento": (R², ECM), ...}
                         self.metricas = {}
-                        with ui.row().classes("gap-4 justify-center"):
+                        with ui.column().classes("w-full max-w-md gap-4"):
                             for clave, titulo in (
                                 ("entrenamiento", "Entrenamiento"),
                                 ("test", "Test"),
@@ -153,14 +153,24 @@ class PanelModelo(Panel):
         with (
             ui.card()
             .props("flat bordered")
-            .classes("items-center gap-0 px-6 py-4 bg-white/5")
+            .classes("w-full gap-2 px-8 py-5 bg-white/5")
         ):
-            ui.label(titulo).classes("text-lg font-semibold text-secondary")
-            ui.label("R²").classes("text-xs opacity-70 mt-2")
-            r2 = ui.label("").classes("text-2xl font-bold")
-            ui.label("ECM").classes("text-xs opacity-70 mt-2")
-            ecm = ui.label("").classes("text-lg break-all")
+            ui.label(titulo).classes("text-2xl font-semibold text-secondary")
+            r2 = PanelModelo._fila_metrica("R²")
+            ecm = PanelModelo._fila_metrica("ECM")
         return r2, ecm
+
+    @staticmethod
+    def _fila_metrica(nombre):
+        """Fila "nombre: valor" con letra grande para que se lea bien.
+
+        Returns:
+            La etiqueta del valor, para rellenarla.
+        """
+        with ui.row().classes("items-baseline no-wrap gap-2 text-3xl"):
+            ui.label(nombre + ":").classes("font-semibold")
+            # break-all: un ECM muy largo parte la línea en vez de salirse
+            return ui.label("").classes("font-bold break-all min-w-0")
 
     def actualizar(self):
         """Habilita/deshabilita la creación y muestra el modelo."""
