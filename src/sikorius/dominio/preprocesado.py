@@ -1,4 +1,4 @@
-"""Tratamiento de los valores inexistentes antes de crear el modelo.
+""" "Tratamiento de los valores inexistentes antes de crear el modelo.
 
 Detecta los valores inexistentes (NaN, None o texto vacío) de las columnas
 seleccionadas y elimina esas filas o las rellena con la media, la mediana o
@@ -33,8 +33,11 @@ def _comprobar_columnas(df, columnas):
         )
 
 
-def _celdas_vacias(serie):
-    """True en las celdas de texto vacías o con solo espacios."""
+def celdas_vacias(serie):
+    """True en las celdas de texto vacías o con solo espacios.
+
+    Es pública porque el importador la usa para la misma comprobación.
+    """
     vacias = serie.map(
         lambda valor: isinstance(valor, str) and valor.strip() == ""
     )
@@ -43,7 +46,7 @@ def _celdas_vacias(serie):
 
 def _mascara_nulos(serie):
     """True en las celdas sin valor: NaN, None o texto vacío."""
-    return serie.isna() | _celdas_vacias(serie)
+    return serie.isna() | celdas_vacias(serie)
 
 
 def normalizar_espacios_vacios(
@@ -64,7 +67,7 @@ def normalizar_espacios_vacios(
     _comprobar_columnas(df, columnas)
     copia = df.copy()
     for columna in columnas:
-        copia[columna] = copia[columna].mask(_celdas_vacias(copia[columna]))
+        copia[columna] = copia[columna].mask(celdas_vacias(copia[columna]))
     return copia
 
 

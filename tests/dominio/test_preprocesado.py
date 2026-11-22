@@ -24,6 +24,7 @@ from sikorius.dominio.preprocesado import (
     ErrorColumnasNoEncontradas,
     ErrorPreprocesado,
     aplicar_preprocesado,
+    celdas_vacias,
     detectar_nulos,
     detectar_nulos_conjuntos,
     hay_nulos,
@@ -95,6 +96,18 @@ def test_normalizar_celdas_vacias_pasan_a_nan(vacio):
     assert pd.isna(resultado.at[1, "a"])
     assert resultado.at[0, "a"] == 1.0
     assert resultado.at[2, "a"] == 3.0
+
+
+def test_celdas_vacias_marca_solo_el_texto_en_blanco():
+    serie = pd.Series(["", "  ", "x", None, 0, np.nan])
+    assert celdas_vacias(serie).tolist() == [
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]
 
 
 def test_normalizar_no_toca_textos_con_contenido():
