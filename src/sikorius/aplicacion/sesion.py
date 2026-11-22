@@ -8,7 +8,7 @@ los cambios suscribiéndose con ``al_cambiar``.
 """
 
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pandas as pd
@@ -58,6 +58,26 @@ class Preprocesado:
     resumen: dict
 
 
+@dataclass(frozen=True)
+class ArchivoModelo:
+    """Lo que la sesión sabe del archivo del modelo actual.
+
+    Attributes:
+        ruta: Archivo en el que se guardó el modelo por última vez, o None
+            si todavía no se ha guardado.
+        sin_guardar: True si el modelo ha cambiado desde entonces (un modelo
+            recién creado aún no se ha guardado; cambiar la descripción
+            también es un cambio).
+        metricas: Métricas leídas del archivo de un modelo cargado. Un
+            modelo cargado no tiene datos con los que recalcularlas; con
+            uno creado es None.
+    """
+
+    ruta: str | None = None
+    sin_guardar: bool = False
+    metricas: dict | None = None
+
+
 class Sesion:
     """Resultado de cada paso del flujo y aviso de cambios a la interfaz.
 
@@ -72,14 +92,7 @@ class Sesion:
         self._separacion = None
         self._preprocesado = None
         self._modelo = None
-        # Archivo en el que se guardó el modelo actual por última vez, y si
-        # ha cambiado desde entonces (un modelo recién creado aún no se ha
-        # guardado; cambiar la descripción también es un cambio).
-        self._ruta_modelo = None
-        self._modelo_sin_guardar = False
-        # Métricas leídas del archivo del modelo cargado. Un modelo cargado
-        # no tiene datos con los que recalcularlas; con uno creado es None.
-        self._metricas_cargadas = None
+        self._archivo = ArchivoModelo()
         self._oyentes = []
 
     # --- Estado (solo lectura) ---
@@ -112,12 +125,12 @@ class Sesion:
     @property
     def ruta_modelo(self):
         """Archivo en el que se guardó el modelo por última vez, o None."""
-        return self._ruta_modelo
+        return self._archivo.ruta
 
     @property
     def modelo_sin_guardar(self):
         """True si el modelo actual tiene cambios que no están guardados."""
-        return self._modelo_sin_guardar
+        return self._archivo.sin_guardar
 
     # --- Avisos ---
 
@@ -158,9 +171,7 @@ class Sesion:
         # El modelo va siempre detrás: cualquier cambio lo borra, y sin
         # modelo no hay nada que guardar
         self._modelo = None
-        self._ruta_modelo = None
-        self._modelo_sin_guardar = False
-        self._metricas_cargadas = None
+        self._archivo = ArchivoModelo()
 
     # --- Pasos del flujo ---
 
@@ -296,8 +307,7 @@ class Sesion:
         entrenamiento, _ = self.conjuntos_actuales()
         *features, target = self.columnas_modelo()
         self._modelo = modelo.entrenar_modelo(entrenamiento, features, target)
-        self._ruta_modelo = None
-        self._modelo_sin_guardar = True
+        self._archivo = replace(self._archivo, ruta=None, sin_guardar=True)
         self._avisar()
         return self.modelo
 
@@ -314,7 +324,7 @@ class Sesion:
         texto = str(texto)
         if texto != self.modelo.descripcion:
             self.modelo.descripcion = texto
-            self._modelo_sin_guardar = True
+            self._archivo = replace(self._archivo, sin_guardar=True)
 
     def guardar_modelo(self, ruta):
         """Guarda el modelo actual, con sus métricas, en un archivo JSON.
@@ -336,8 +346,9 @@ class Sesion:
         guardada = persistencia.guardar_modelo(
             self.modelo, self.metricas_modelo(), ruta
         )
-        self._ruta_modelo = str(guardada)
-        self._modelo_sin_guardar = False
+        self._archivo = replace(
+            self._archivo, ruta=str(guardada), sin_guardar=False
+        )
         self._avisar()
         return guardada
 
@@ -359,8 +370,9 @@ class Sesion:
         cargado, metricas = persistencia.cargar_modelo(ruta)
         self._borrar_desde("dataset")
         self._modelo = cargado
-        self._metricas_cargadas = metricas
-        self._ruta_modelo = str(Path(ruta).resolve())
+        self._archivo = ArchivoModelo(
+            ruta=str(Path(ruta).resolve()), metricas=metricas
+        )
         self._avisar()
         return cargado
 
@@ -388,7 +400,7 @@ class Sesion:
     @property
     def modelo_cargado(self):
         """True si el modelo actual se cargó de un archivo (no hay datos)."""
-        return self.modelo is not None and self._metricas_cargadas is not None
+        return self.modelo is not None and self._archivo.metricas is not None
 
     def columnas_modelo(self):
         """Columnas reales de entrada seguidas de la de salida."""
@@ -414,7 +426,7 @@ class Sesion:
         if self.modelo is None:
             return None
         if self.modelo_cargado:
-            return copy.deepcopy(self._metricas_cargadas)
+            return copy.deepcopy(self._archivo.metricas)
         entrenamiento, test = self.conjuntos_actuales()
         return modelo.metricas_modelo(self.modelo, entrenamiento, test)
 
@@ -459,7 +471,7 @@ class Sesion:
         """True si hay un modelo con cambios que se perderían al cargar otro
         dataset u otro modelo (recién creado o con la descripción cambiada).
         """
-        return self._modelo is not None and self._modelo_sin_guardar
+        return self._modelo is not None and self._archivo.sin_guardar
 
     def puede_crear_modelo(self):
         """True si hay separación y no quedan valores inexistentes."""
