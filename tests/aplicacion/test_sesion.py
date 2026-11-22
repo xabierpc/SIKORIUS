@@ -143,12 +143,6 @@ def test_repetir_separacion_descarta_el_preprocesado(sesion_separada):
     assert sesion_separada.modelo is None
 
 
-def test_tipo_de_regresion_segun_numero_de_entradas(sesion_con_seleccion):
-    assert sesion_con_seleccion.seleccion.tipo_regresion == "multiple"
-    sesion_con_seleccion.guardar_seleccion(["x1"], "y")
-    assert sesion_con_seleccion.seleccion.tipo_regresion == "simple"
-
-
 # =============================================================================
 # Avisos a la interfaz
 # =============================================================================

@@ -1,4 +1,4 @@
-"""Fórmula del modelo lista para mostrar: en texto o en HTML con colores.
+"""Fórmula del modelo lista para mostrar, en HTML con colores.
 
 Los números y los signos de cada término los calcula el dominio
 (``terminos_formula``); aquí solo se decide cómo se escriben.
@@ -13,7 +13,7 @@ def _formula(mod, marcar):
     """Construye la fórmula en una sola línea, lista para mostrar.
 
     ``marcar`` es la función que recibe el nombre de una columna y devuelve
-    cómo se escribe: tal cual (texto) o con su color (HTML).
+    cómo se escribe (con su color, en HTML).
 
     Dentro de cada término los espacios son "espacios duros" (\u00a0): si la
     fórmula no cabe y se parte en varias líneas, solo se parte entre términos
@@ -36,20 +36,11 @@ def _formula(mod, marcar):
     return marcar(str(mod.target)) + " = " + " ".join(terminos)
 
 
-def _sin_marcar(nombre):
-    return nombre
-
-
-def texto_formula(mod):
-    """La fórmula del modelo en una sola línea y sin colores.
-
-    Ejemplo: ``y = 2.0000 · x1 − 3.0000 · x2 + 5.0000``.
-    """
-    return _formula(mod, _sin_marcar)
-
-
 def html_formula(mod, colores):
-    """La misma fórmula en HTML, con cada columna de su color.
+    """La fórmula del modelo en HTML, con cada columna de su color.
+
+    Ejemplo (sin las etiquetas de color):
+    ``y = 2.0000 · x1 − 3.0000 · x2 + 5.0000``.
 
     ``colores`` es {nombre de columna: color}. Los nombres vienen del
     usuario, así que se escapan: un nombre como ``<b>`` se ve tal cual y no

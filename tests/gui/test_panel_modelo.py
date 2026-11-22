@@ -19,7 +19,7 @@ from nicegui import ui
 from sikorius.aplicacion.sesion import Sesion
 from sikorius.dominio import modelo as modelo_dominio
 from sikorius.gui.componentes import dialogo_guardado
-from sikorius.gui.componentes.formula import html_formula, texto_formula
+from sikorius.gui.componentes.formula import html_formula
 from sikorius.gui.componentes.grafico_ajuste import opciones_grafico
 from sikorius.gui.paneles.panel_modelo import (
     AVISO_SIN_DESCRIPCION,
@@ -380,27 +380,33 @@ def modelo_de(coeficientes, independiente, features=("x1", "x2")):
     )
 
 
-def test_texto_formula_en_una_linea():
+def formula_sin_colores(mod):
+    """La fórmula tal como la escribe html_formula si ninguna columna
+    tiene color."""
+    return html_formula(mod, {})
+
+
+def test_formula_sin_colores_en_una_linea():
     mod = modelo_de((2.0, -3.0), 5.0)
-    texto = texto_formula(mod).replace("\u00a0", " ")
+    texto = formula_sin_colores(mod).replace("\u00a0", " ")
     assert texto == "y = 2.0000 · x1 − 3.0000 · x2 + 5.0000"
 
 
-def test_texto_formula_primer_coeficiente_negativo_con_el_signo_pegado():
+def test_formula_sin_colores_primer_coeficiente_negativo_con_el_signo_pegado():
     mod = modelo_de((-2.0, 3.0), -5.0)
-    texto = texto_formula(mod).replace("\u00a0", " ")
+    texto = formula_sin_colores(mod).replace("\u00a0", " ")
     assert texto == "y = −2.0000 · x1 + 3.0000 · x2 − 5.0000"
 
 
-def test_texto_formula_regresion_simple():
+def test_formula_sin_colores_regresion_simple():
     mod = modelo_de((2.0,), 1.0, features=("x",))
-    texto = texto_formula(mod).replace("\u00a0", " ")
+    texto = formula_sin_colores(mod).replace("\u00a0", " ")
     assert texto == "y = 2.0000 · x + 1.0000"
 
 
-def test_texto_formula_solo_se_parte_entre_terminos():
+def test_formula_sin_colores_solo_se_parte_entre_terminos():
     """Cada término lleva espacios duros: el signo no se queda solo."""
-    texto = texto_formula(modelo_de((2.0, -3.0), 5.0))
+    texto = formula_sin_colores(modelo_de((2.0, -3.0), 5.0))
     assert "−\u00a03.0000\u00a0·\u00a0x2" in texto
     assert "+\u00a05.0000" in texto
     # los únicos espacios normales separan "y =" y los términos
@@ -1054,7 +1060,9 @@ def test_cargado_muestra_formula_metricas_y_descripcion(tmp_path):
     panel = PanelModelo(sesion)
 
     assert panel.resultados.visible
-    assert formula_visible(panel) == sin_duros(texto_formula(origen.modelo))
+    assert formula_visible(panel) == sin_duros(
+        formula_sin_colores(origen.modelo)
+    )
     metricas = origen.metricas_modelo()
     for clave, (r2, ecm) in panel.metricas.items():
         assert r2.text == texto_metrica(metricas[clave]["r2"])
@@ -1120,7 +1128,9 @@ def test_cargado_se_ve_al_cargarlo_con_el_panel_abierto(
 
     sesion_lista.cargar_modelo(ruta)
 
-    assert formula_visible(panel) == sin_duros(texto_formula(origen.modelo))
+    assert formula_visible(panel) == sin_duros(
+        formula_sin_colores(origen.modelo)
+    )
     assert not panel.grafico.visible
     assert not panel.boton.visible
 

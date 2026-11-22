@@ -230,7 +230,6 @@ def test_confirmar_una_sola_entrada_es_regresion_simple(panel_casas, avisos):
         "Selección confirmada. Entrada: superficie | Salida: precio",
         "positive",
     )
-    assert panel_casas.sesion.seleccion.tipo_regresion == "simple"
 
 
 def test_confirmar_varias_entradas_es_regresion_multiple(panel_casas, avisos):
@@ -243,7 +242,6 @@ def test_confirmar_varias_entradas_es_regresion_multiple(panel_casas, avisos):
         "Salida: precio",
         "positive",
     )
-    assert panel_casas.sesion.seleccion.tipo_regresion == "multiple"
 
 
 def test_confirmar_target_no_numerico(panel_casas, avisos):

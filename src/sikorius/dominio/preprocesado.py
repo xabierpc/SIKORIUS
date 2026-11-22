@@ -1,4 +1,4 @@
-""" "Tratamiento de los valores inexistentes antes de crear el modelo.
+"""Tratamiento de los valores inexistentes antes de crear el modelo.
 
 Detecta los valores inexistentes (NaN, None o texto vacío) de las columnas
 seleccionadas y elimina esas filas o las rellena con la media, la mediana o
@@ -89,19 +89,6 @@ def detectar_nulos(df: pd.DataFrame, columnas: list) -> dict:
     for columna in columnas:
         num_nulos[columna] = int(_mascara_nulos(df[columna]).sum())
     return num_nulos
-
-
-def quedan_nulos(df, columnas):
-    """Indica si queda algún valor inexistente en las columnas indicadas.
-
-    Args:
-        df: DataFrame a revisar.
-        columnas: Lista de nombres de columnas.
-
-    Returns:
-        True si hay al menos un valor inexistente, False en caso contrario.
-    """
-    return any(n > 0 for n in detectar_nulos(df, list(columnas)).values())
 
 
 def detectar_nulos_conjuntos(train, test, columnas):

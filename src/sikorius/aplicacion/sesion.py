@@ -41,12 +41,6 @@ class Seleccion:
     features: tuple
     target: str
 
-    @property
-    def tipo_regresion(self):
-        if len(self.features) == 1:
-            return "simple"
-        return "multiple"
-
 
 @dataclass(frozen=True, eq=False)
 class Separacion:
