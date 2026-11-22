@@ -13,11 +13,6 @@ from sikorius.gui.paneles.panel_preprocesado import PanelPreprocesado
 from sikorius.gui.paneles.panel_separacion import PanelSeparacion
 from sikorius.gui.tema import aplicar_tema
 
-# Quasar pone en mayúsculas el texto de todos los botones. Con "no-caps" se
-# muestran tal cual se escriben: solo la primera letra en mayúscula.
-ui.button.default_props("no-caps")
-
-
 TITULOS = {
     "inicio": "Inicio",
     "datos": "Datos",

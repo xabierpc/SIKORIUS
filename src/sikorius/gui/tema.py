@@ -105,3 +105,7 @@ def aplicar_tema():
     ui.dark_mode(True)
     ui.colors(**COLORES)
     ui.add_css(CSS_TEMA)
+    # Quasar pone en mayúsculas el texto de todos los botones. Con "no-caps"
+    # se muestran tal cual se escriben. Afecta a todos los botones que se
+    # creen después, por eso va aquí y no suelto al importar un módulo.
+    ui.button.default_props("no-caps")

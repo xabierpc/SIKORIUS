@@ -41,6 +41,11 @@ class Pagina:
         self.preprocesado = PanelPreprocesado(sesion)
 
 
+def test_construir_pagina_deja_los_botones_sin_mayusculas(sesion_separada):
+    construir_pagina(sesion_separada)
+    assert ui.button("Prueba").props.get("no-caps") is True
+
+
 def test_construir_pagina_no_falla_y_se_puede_repetir(sesion_separada):
     """Abrir dos pestañas (o recargar) sobre la misma sesión."""
     construir_pagina(sesion_separada)
