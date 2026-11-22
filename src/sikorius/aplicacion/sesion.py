@@ -24,9 +24,21 @@ from sikorius.dominio.errores import (
     ErrorSeparacion,
 )
 
+# Dos listas parecidas que no son lo mismo:
+#
+# - PASOS son los datos que guarda la sesión, en el orden en que dependen
+#   unos de otros. Cambiar un paso borra todos los que van detrás
+#   (``_borrar_desde``). La interfaz no los ve como lista.
+# - ETAPAS son las pestañas de la interfaz. "inicio" no es un paso (no
+#   guarda nada) y "datos" y "variables" se abren con un solo paso, el
+#   dataset. Qué etapas se pueden abrir lo decide ``etapas_disponibles``.
+#
+# Las etapas viven aquí y no en la GUI porque su disponibilidad depende del
+# estado de la sesión (y se prueba sin interfaz).
+
 # Etapas de la interfaz (pestañas), en orden
 ETAPAS = ("inicio", "datos", "variables", "preprocesado", "modelo")
-# Orden del flujo: cambiar un paso borra todos los que van detrás
+# Pasos del flujo, en orden: cambiar uno borra todos los que van detrás
 PASOS = ("dataset", "seleccion", "separacion", "preprocesado", "modelo")
 
 
@@ -186,14 +198,19 @@ class Sesion:
         self.cargar_dataset(datos, ruta)
 
     def cargar_dataset(self, datos, ruta):
-        """Sustituye el dataset. Las columnas elegidas antes ya no valen."""
+        """Sustituye el dataset. Las columnas elegidas antes ya no valen.
+
+        Guarda lo que recibe sin comprobarlo (``importar_dataset`` es la
+        que lee y valida el archivo).
+        """
         self._borrar_desde("seleccion")
         self._dataset = Dataset(datos, str(Path(ruta).resolve()))
         self._avisar()
 
     def confirmar_seleccion(self, features, target):
         """Valida la selección elegida en la interfaz y, si es correcta, la
-        guarda.
+        guarda. Es la que se usa desde la interfaz (``guardar_seleccion``
+        no valida).
 
         Raises:
             ErrorSeleccion: Si no hay dataset o la selección no es válida.
@@ -205,7 +222,11 @@ class Sesion:
         self.guardar_seleccion(features, target)
 
     def guardar_seleccion(self, features, target):
-        """Guarda una selección ya validada. Obliga a repetir la separación."""
+        """Guarda una selección ya validada. Obliga a repetir la separación.
+
+        No comprueba nada: si no se sabe que la selección es correcta hay
+        que usar ``confirmar_seleccion``.
+        """
         self._borrar_desde("separacion")
         self._seleccion = Seleccion(tuple(features), target)
         self._avisar()
@@ -213,7 +234,11 @@ class Sesion:
     def guardar_separacion(
         self, entrenamiento, test, porcentaje_test, semilla
     ):
-        """Guarda los conjuntos y borra el preprocesado y el modelo."""
+        """Guarda los conjuntos y borra el preprocesado y el modelo.
+
+        No comprueba nada: separar los datos y validar los valores es cosa
+        de ``separar``, que es la que se usa desde la interfaz.
+        """
         self._borrar_desde("preprocesado")
         self._separacion = Separacion(
             entrenamiento, test, porcentaje_test, semilla
@@ -224,7 +249,7 @@ class Sesion:
         """Separa el dataset con los valores escritos en el formulario.
 
         Interpreta el porcentaje de test y la semilla, separa y guarda los
-        conjuntos.
+        conjuntos. A diferencia de ``guardar_separacion``, valida todo.
 
         Raises:
             ErrorSeparacion: Si falta la selección de columnas, los valores
