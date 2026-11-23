@@ -16,7 +16,10 @@ from nicegui import ui
 from sikorius.aplicacion import EXTENSION, ruta_con_extension
 from sikorius.gui.avisos import notificar_error
 from sikorius.gui.componentes.confirmacion import confirmar
-from sikorius.gui.componentes.explorador_archivos import NavegadorCarpetas
+from sikorius.gui.componentes.explorador_archivos import (
+    NavegadorCarpetas,
+    carpeta_valida,
+)
 
 # Caracteres que Windows no admite en un nombre de archivo. Se rechazan en
 # todos los sistemas para que los modelos se puedan copiar a cualquiera.
@@ -93,16 +96,6 @@ def ruta_destino(carpeta, nombre):
         La ruta como ``Path``, terminada en ``.json``.
     """
     return ruta_con_extension(Path(carpeta) / nombre.strip())
-
-
-def carpeta_valida(carpeta):
-    """La carpeta resuelta si existe; si no, la carpeta personal."""
-    if carpeta is None:
-        return Path.home()
-    carpeta = Path(carpeta).resolve()
-    if carpeta.is_dir():
-        return carpeta
-    return Path.home()
 
 
 class DialogoGuardado:

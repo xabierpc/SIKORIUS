@@ -8,7 +8,7 @@ los cambios suscribiéndose con ``al_cambiar``.
 """
 
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pandas as pd
@@ -24,9 +24,21 @@ from sikorius.dominio.errores import (
     ErrorSeparacion,
 )
 
+# Dos listas parecidas que no son lo mismo:
+#
+# - PASOS son los datos que guarda la sesión, en el orden en que dependen
+#   unos de otros. Cambiar un paso borra todos los que van detrás
+#   (``_borrar_desde``). La interfaz no los ve como lista.
+# - ETAPAS son las pestañas de la interfaz. "inicio" no es un paso (no
+#   guarda nada) y "datos" y "variables" se abren con un solo paso, el
+#   dataset. Qué etapas se pueden abrir lo decide ``etapas_disponibles``.
+#
+# Las etapas viven aquí y no en la GUI porque su disponibilidad depende del
+# estado de la sesión (y se prueba sin interfaz).
+
 # Etapas de la interfaz (pestañas), en orden
 ETAPAS = ("inicio", "datos", "variables", "preprocesado", "modelo")
-# Orden del flujo: cambiar un paso borra todos los que van detrás
+# Pasos del flujo, en orden: cambiar uno borra todos los que van detrás
 PASOS = ("dataset", "seleccion", "separacion", "preprocesado", "modelo")
 
 
@@ -40,12 +52,6 @@ class Dataset:
 class Seleccion:
     features: tuple
     target: str
-
-    @property
-    def tipo_regresion(self):
-        if len(self.features) == 1:
-            return "simple"
-        return "multiple"
 
 
 @dataclass(frozen=True, eq=False)
@@ -64,6 +70,26 @@ class Preprocesado:
     resumen: dict
 
 
+@dataclass(frozen=True)
+class ArchivoModelo:
+    """Lo que la sesión sabe del archivo del modelo actual.
+
+    Attributes:
+        ruta: Archivo en el que se guardó el modelo por última vez, o None
+            si todavía no se ha guardado.
+        sin_guardar: True si el modelo ha cambiado desde entonces (un modelo
+            recién creado aún no se ha guardado; cambiar la descripción
+            también es un cambio).
+        metricas: Métricas leídas del archivo de un modelo cargado. Un
+            modelo cargado no tiene datos con los que recalcularlas; con
+            uno creado es None.
+    """
+
+    ruta: str | None = None
+    sin_guardar: bool = False
+    metricas: dict | None = None
+
+
 class Sesion:
     """Resultado de cada paso del flujo y aviso de cambios a la interfaz.
 
@@ -78,14 +104,7 @@ class Sesion:
         self._separacion = None
         self._preprocesado = None
         self._modelo = None
-        # Archivo en el que se guardó el modelo actual por última vez, y si
-        # ha cambiado desde entonces (un modelo recién creado aún no se ha
-        # guardado; cambiar la descripción también es un cambio).
-        self._ruta_modelo = None
-        self._modelo_sin_guardar = False
-        # Métricas leídas del archivo del modelo cargado. Un modelo cargado
-        # no tiene datos con los que recalcularlas; con uno creado es None.
-        self._metricas_cargadas = None
+        self._archivo = ArchivoModelo()
         self._oyentes = []
 
     # --- Estado (solo lectura) ---
@@ -118,12 +137,12 @@ class Sesion:
     @property
     def ruta_modelo(self):
         """Archivo en el que se guardó el modelo por última vez, o None."""
-        return self._ruta_modelo
+        return self._archivo.ruta
 
     @property
     def modelo_sin_guardar(self):
         """True si el modelo actual tiene cambios que no están guardados."""
-        return self._modelo_sin_guardar
+        return self._archivo.sin_guardar
 
     # --- Avisos ---
 
@@ -164,9 +183,7 @@ class Sesion:
         # El modelo va siempre detrás: cualquier cambio lo borra, y sin
         # modelo no hay nada que guardar
         self._modelo = None
-        self._ruta_modelo = None
-        self._modelo_sin_guardar = False
-        self._metricas_cargadas = None
+        self._archivo = ArchivoModelo()
 
     # --- Pasos del flujo ---
 
@@ -181,14 +198,19 @@ class Sesion:
         self.cargar_dataset(datos, ruta)
 
     def cargar_dataset(self, datos, ruta):
-        """Sustituye el dataset. Las columnas elegidas antes ya no valen."""
+        """Sustituye el dataset. Las columnas elegidas antes ya no valen.
+
+        Guarda lo que recibe sin comprobarlo (``importar_dataset`` es la
+        que lee y valida el archivo).
+        """
         self._borrar_desde("seleccion")
         self._dataset = Dataset(datos, str(Path(ruta).resolve()))
         self._avisar()
 
     def confirmar_seleccion(self, features, target):
         """Valida la selección elegida en la interfaz y, si es correcta, la
-        guarda.
+        guarda. Es la que se usa desde la interfaz (``guardar_seleccion``
+        no valida).
 
         Raises:
             ErrorSeleccion: Si no hay dataset o la selección no es válida.
@@ -200,7 +222,11 @@ class Sesion:
         self.guardar_seleccion(features, target)
 
     def guardar_seleccion(self, features, target):
-        """Guarda una selección ya validada. Obliga a repetir la separación."""
+        """Guarda una selección ya validada. Obliga a repetir la separación.
+
+        No comprueba nada: si no se sabe que la selección es correcta hay
+        que usar ``confirmar_seleccion``.
+        """
         self._borrar_desde("separacion")
         self._seleccion = Seleccion(tuple(features), target)
         self._avisar()
@@ -208,7 +234,11 @@ class Sesion:
     def guardar_separacion(
         self, entrenamiento, test, porcentaje_test, semilla
     ):
-        """Guarda los conjuntos y borra el preprocesado y el modelo."""
+        """Guarda los conjuntos y borra el preprocesado y el modelo.
+
+        No comprueba nada: separar los datos y validar los valores es cosa
+        de ``separar``, que es la que se usa desde la interfaz.
+        """
         self._borrar_desde("preprocesado")
         self._separacion = Separacion(
             entrenamiento, test, porcentaje_test, semilla
@@ -219,7 +249,7 @@ class Sesion:
         """Separa el dataset con los valores escritos en el formulario.
 
         Interpreta el porcentaje de test y la semilla, separa y guarda los
-        conjuntos.
+        conjuntos. A diferencia de ``guardar_separacion``, valida todo.
 
         Raises:
             ErrorSeparacion: Si falta la selección de columnas, los valores
@@ -302,8 +332,7 @@ class Sesion:
         entrenamiento, _ = self.conjuntos_actuales()
         *features, target = self.columnas_modelo()
         self._modelo = modelo.entrenar_modelo(entrenamiento, features, target)
-        self._ruta_modelo = None
-        self._modelo_sin_guardar = True
+        self._archivo = replace(self._archivo, ruta=None, sin_guardar=True)
         self._avisar()
         return self.modelo
 
@@ -320,7 +349,7 @@ class Sesion:
         texto = str(texto)
         if texto != self.modelo.descripcion:
             self.modelo.descripcion = texto
-            self._modelo_sin_guardar = True
+            self._archivo = replace(self._archivo, sin_guardar=True)
 
     def guardar_modelo(self, ruta):
         """Guarda el modelo actual, con sus métricas, en un archivo JSON.
@@ -342,8 +371,9 @@ class Sesion:
         guardada = persistencia.guardar_modelo(
             self.modelo, self.metricas_modelo(), ruta
         )
-        self._ruta_modelo = str(guardada)
-        self._modelo_sin_guardar = False
+        self._archivo = replace(
+            self._archivo, ruta=str(guardada), sin_guardar=False
+        )
         self._avisar()
         return guardada
 
@@ -365,8 +395,9 @@ class Sesion:
         cargado, metricas = persistencia.cargar_modelo(ruta)
         self._borrar_desde("dataset")
         self._modelo = cargado
-        self._metricas_cargadas = metricas
-        self._ruta_modelo = str(Path(ruta).resolve())
+        self._archivo = ArchivoModelo(
+            ruta=str(Path(ruta).resolve()), metricas=metricas
+        )
         self._avisar()
         return cargado
 
@@ -394,7 +425,7 @@ class Sesion:
     @property
     def modelo_cargado(self):
         """True si el modelo actual se cargó de un archivo (no hay datos)."""
-        return self.modelo is not None and self._metricas_cargadas is not None
+        return self.modelo is not None and self._archivo.metricas is not None
 
     def columnas_modelo(self):
         """Columnas reales de entrada seguidas de la de salida."""
@@ -420,7 +451,7 @@ class Sesion:
         if self.modelo is None:
             return None
         if self.modelo_cargado:
-            return copy.deepcopy(self._metricas_cargadas)
+            return copy.deepcopy(self._archivo.metricas)
         entrenamiento, test = self.conjuntos_actuales()
         return modelo.metricas_modelo(self.modelo, entrenamiento, test)
 
@@ -465,7 +496,7 @@ class Sesion:
         """True si hay un modelo con cambios que se perderían al cargar otro
         dataset u otro modelo (recién creado o con la descripción cambiada).
         """
-        return self._modelo is not None and self._modelo_sin_guardar
+        return self._modelo is not None and self._archivo.sin_guardar
 
     def puede_crear_modelo(self):
         """True si hay separación y no quedan valores inexistentes."""

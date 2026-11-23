@@ -20,6 +20,7 @@ from sikorius.datos.formatos import (
     extension,
 )
 from sikorius.dominio.errores import ErrorImportacion
+from sikorius.dominio.preprocesado import celdas_vacias
 
 
 def importar_datos(ruta_archivo) -> pd.DataFrame:
@@ -83,9 +84,7 @@ def _vaciar_celdas_en_blanco(df) -> pd.DataFrame:
         if pd.api.types.is_object_dtype(serie) or pd.api.types.is_string_dtype(
             serie
         ):
-            en_blanco = serie.map(
-                lambda valor: isinstance(valor, str) and valor.strip() == ""
-            ).astype(bool)
+            en_blanco = celdas_vacias(serie)
             if en_blanco.any():
                 df[columna] = serie.mask(en_blanco)
     return df

@@ -5,7 +5,7 @@
 Bloques:
     - Constantes y jerarquía de errores.
     - normalizar_espacios_vacios: celdas vacías o con espacios pasan a NaN.
-    - detectar_nulos / quedan_nulos / detectar_nulos_conjuntos / hay_nulos.
+    - detectar_nulos / detectar_nulos_conjuntos / hay_nulos.
     - interpretar_constante: números válidos ("2,5", " 3 "...) y errores.
     - aplicar_preprocesado: las cuatro estrategias, resumen y errores.
 """
@@ -24,12 +24,12 @@ from sikorius.dominio.preprocesado import (
     ErrorColumnasNoEncontradas,
     ErrorPreprocesado,
     aplicar_preprocesado,
+    celdas_vacias,
     detectar_nulos,
     detectar_nulos_conjuntos,
     hay_nulos,
     interpretar_constante,
     normalizar_espacios_vacios,
-    quedan_nulos,
 )
 
 # =============================================================================
@@ -97,6 +97,18 @@ def test_normalizar_celdas_vacias_pasan_a_nan(vacio):
     assert resultado.at[2, "a"] == 3.0
 
 
+def test_celdas_vacias_marca_solo_el_texto_en_blanco():
+    serie = pd.Series(["", "  ", "x", None, 0, np.nan])
+    assert celdas_vacias(serie).tolist() == [
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]
+
+
 def test_normalizar_no_toca_textos_con_contenido():
     df = pd.DataFrame({"a": ["0", " x ", "nan"]})
     resultado = normalizar_espacios_vacios(df, ["a"])
@@ -162,25 +174,6 @@ def test_detectar_columnas_inexistentes_las_nombra_todas():
     with pytest.raises(ErrorColumnasNoEncontradas) as error:
         detectar_nulos(crear_train(), ["a", "x", "b"])
     assert "a, b" in str(error.value)
-
-
-@pytest.mark.parametrize(
-    "columnas, esperado",
-    [
-        (["x"], True),
-        (["y"], True),
-        (["x", "y"], True),
-        (("x", "y"), True),
-        ([], False),
-    ],
-)
-def test_quedan_nulos(columnas, esperado):
-    assert quedan_nulos(crear_train(), columnas) is esperado
-
-
-def test_quedan_nulos_sin_valores_inexistentes():
-    df = pd.DataFrame({"x": [1.0, 2.0], "y": ["a", "b"]})
-    assert quedan_nulos(df, ["x", "y"]) is False
 
 
 def test_detectar_conjuntos_por_separado():
@@ -374,8 +367,8 @@ def test_rellenar_resumen_y_sin_nulos(estrategia):
         "train": {"filas_eliminadas": 0, "valores_rellenados": 2},
         "test": {"filas_eliminadas": 0, "valores_rellenados": 1},
     }
-    assert not quedan_nulos(train, COLUMNAS)
-    assert not quedan_nulos(test, COLUMNAS)
+    assert sum(detectar_nulos(train, COLUMNAS).values()) == 0
+    assert sum(detectar_nulos(test, COLUMNAS).values()) == 0
     assert len(train) == 4 and len(test) == 2  # no se quita ninguna fila
 
 
@@ -440,7 +433,7 @@ def test_acepta_columnas_como_tupla(estrategia):
     train, _, _ = aplicar_preprocesado(
         crear_train(), crear_test(), ("x", "y"), estrategia, 1
     )
-    assert not quedan_nulos(train, COLUMNAS)
+    assert sum(detectar_nulos(train, COLUMNAS).values()) == 0
 
 
 def test_conserva_columnas_e_indice():

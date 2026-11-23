@@ -22,6 +22,21 @@ def _es_windows():
     return os.name == "nt"
 
 
+def carpeta_valida(carpeta):
+    """La carpeta resuelta si existe; si no, la carpeta personal.
+
+    La usan el explorador de datasets y el diálogo de guardado: si la
+    carpeta de la última vez ya no existe (o no se indicó ninguna), se
+    abre la carpeta personal en vez de fallar.
+    """
+    if carpeta is None:
+        return Path.home()
+    carpeta = Path(carpeta).resolve()
+    if carpeta.is_dir():
+        return carpeta
+    return Path.home()
+
+
 def unidades_disponibles():
     """Devuelve las unidades de disco de Windows que existen (C:\\, D:\\...).
 
@@ -230,10 +245,7 @@ async def seleccionar_archivo(
                 "flat"
             )
 
-    inicio = Path(carpeta_inicial).resolve()
-    if not inicio.is_dir():
-        inicio = Path.home()
-    navegador.mostrar(inicio)
+    navegador.mostrar(carpeta_valida(carpeta_inicial))
 
     ruta = await dialogo
     dialogo.delete()

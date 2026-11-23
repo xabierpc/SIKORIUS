@@ -54,14 +54,29 @@ def _eje(nombre, vertical):
 # cada una con el nombre de su eje. Es JavaScript (la clave empieza por ":"
 # para que NiceGUI lo envíe como función y no como texto). Los nombres de
 # los ejes llegan en "dimensionNames", que sale de "dimensions" de la serie.
+#
+# El tooltip de ECharts interpreta el texto como HTML, y los nombres de los
+# ejes son los de las columnas del archivo del usuario: sin escapar, una
+# cabecera como <img src=x onerror=alert(1)> ejecutaría código al pasar el
+# ratón. Por eso todo nombre pasa por "esc". El escape se hace aquí, en
+# JavaScript, y no en Python, porque esos mismos nombres también se usan en
+# la leyenda y los ejes, que son texto plano y mostrarían "&lt;" literal.
 JS_TOOLTIP = """
 (punto) => {
     const numero = (v) => Number(v).toLocaleString(
         'en-US', {maximumFractionDigits: 4}
     );
-    return '<b>' + punto.seriesName + '</b><br/>'
-        + punto.dimensionNames[0] + ': ' + numero(punto.value[0]) + '<br/>'
-        + punto.dimensionNames[1] + ': ' + numero(punto.value[1]);
+    const esc = (texto) => String(texto).replace(
+        /[&<>"']/g,
+        (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;',
+            '"': '&quot;', "'": '&#39;'
+        })[c]
+    );
+    return '<b>' + esc(punto.seriesName) + '</b><br/>'
+        + esc(punto.dimensionNames[0]) + ': ' + numero(punto.value[0])
+        + '<br/>'
+        + esc(punto.dimensionNames[1]) + ': ' + numero(punto.value[1]);
 }
 """
 

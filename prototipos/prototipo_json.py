@@ -19,16 +19,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from sikorius.nucleo.errores import ErrorModelo
-from sikorius.nucleo.importador import importar_datos
-from sikorius.nucleo.modelo import (
+from sikorius.datos.importador import importar_datos
+from sikorius.dominio.errores import ErrorModelo
+from sikorius.dominio.modelo import (
     ModeloLineal,
     entrenar_modelo,
     formula_texto,
     metricas_modelo,
 )
-from sikorius.nucleo.preprocesado import ELIMINAR, aplicar_preprocesado
-from sikorius.nucleo.separacion import separar_datos
+from sikorius.dominio.preprocesado import ELIMINAR, aplicar_preprocesado
+from sikorius.dominio.separacion import separar_datos
 
 RUTA_DATOS = Path(__file__).resolve().parents[1] / "data" / "housing.csv"
 RUTA_MODELO = Path(__file__).resolve().parent / "modelo_housing.json"

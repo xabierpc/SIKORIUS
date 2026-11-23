@@ -16,12 +16,14 @@ from nicegui import ui
 from sikorius.gui.componentes.dialogo_guardado import (
     CARACTERES_PROHIBIDOS,
     DialogoGuardado,
-    carpeta_valida,
     es_modelo,
     motivo_nombre_no_valido,
     ruta_destino,
 )
-from sikorius.gui.componentes.explorador_archivos import listar_carpeta
+from sikorius.gui.componentes.explorador_archivos import (
+    carpeta_valida,
+    listar_carpeta,
+)
 
 # =============================================================================
 # Utilidades

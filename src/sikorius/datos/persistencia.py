@@ -201,6 +201,27 @@ def diccionario_a_modelo(datos):
     Raises:
         ErrorPersistencia: Si falta algún dato o no tiene el tipo esperado.
     """
+    modelo = _leer_cabecera(datos)
+    features, target = _leer_columnas(modelo)
+    coeficientes, independiente = _leer_coeficientes(modelo, features)
+
+    descripcion = datos.get("descripcion", "")
+    if not isinstance(descripcion, str):
+        raise ErrorPersistencia("La descripción del modelo no es un texto.")
+
+    resultado = ModeloLineal(
+        features=features,
+        target=target,
+        coeficientes=coeficientes,
+        termino_independiente=independiente,
+        descripcion=descripcion,
+    )
+    return resultado, _metricas_desde_diccionario(datos.get("metricas"))
+
+
+def _leer_cabecera(datos):
+    """Comprueba que es un modelo de SIKORIUS de esta versión del formato y
+    devuelve el diccionario con los datos del modelo."""
     if not isinstance(datos, dict) or datos.get("formato") != FORMATO:
         raise ErrorPersistencia(
             "El archivo no es un modelo guardado con SIKORIUS."
@@ -214,11 +235,13 @@ def diccionario_a_modelo(datos):
     modelo = datos.get("modelo")
     if not isinstance(modelo, dict):
         raise ErrorPersistencia("Al archivo le faltan los datos del modelo.")
+    return modelo
 
+
+def _leer_columnas(modelo):
+    """Devuelve ``(features, target)`` si son nombres de columna válidos."""
     features = modelo.get("features")
     target = modelo.get("target")
-    coeficientes = modelo.get("coeficientes")
-    independiente = modelo.get("termino_independiente")
     if (
         not isinstance(features, list)
         or not features
@@ -231,6 +254,17 @@ def diccionario_a_modelo(datos):
         raise ErrorPersistencia(
             "La columna de salida del modelo no es válida."
         )
+    return features, target
+
+
+def _leer_coeficientes(modelo, features):
+    """Devuelve ``(coeficientes, termino_independiente)`` como números.
+
+    Debe haber un coeficiente por cada columna de entrada y todos los
+    números tienen que ser finitos.
+    """
+    coeficientes = modelo.get("coeficientes")
+    independiente = modelo.get("termino_independiente")
     if not isinstance(coeficientes, list) or len(coeficientes) != len(
         features
     ):
@@ -242,19 +276,7 @@ def diccionario_a_modelo(datos):
             raise ErrorPersistencia(
                 "El modelo tiene un coeficiente que no es un número finito."
             )
-
-    descripcion = datos.get("descripcion", "")
-    if not isinstance(descripcion, str):
-        raise ErrorPersistencia("La descripción del modelo no es un texto.")
-
-    resultado = ModeloLineal(
-        features=features,
-        target=target,
-        coeficientes=[float(c) for c in coeficientes],
-        termino_independiente=float(independiente),
-        descripcion=descripcion,
-    )
-    return resultado, _metricas_desde_diccionario(datos.get("metricas"))
+    return [float(c) for c in coeficientes], float(independiente)
 
 
 def _es_nombre_columna(valor):

@@ -33,8 +33,11 @@ def _comprobar_columnas(df, columnas):
         )
 
 
-def _celdas_vacias(serie):
-    """True en las celdas de texto vacías o con solo espacios."""
+def celdas_vacias(serie):
+    """True en las celdas de texto vacías o con solo espacios.
+
+    Es pública porque el importador la usa para la misma comprobación.
+    """
     vacias = serie.map(
         lambda valor: isinstance(valor, str) and valor.strip() == ""
     )
@@ -43,7 +46,7 @@ def _celdas_vacias(serie):
 
 def _mascara_nulos(serie):
     """True en las celdas sin valor: NaN, None o texto vacío."""
-    return serie.isna() | _celdas_vacias(serie)
+    return serie.isna() | celdas_vacias(serie)
 
 
 def normalizar_espacios_vacios(
@@ -64,7 +67,7 @@ def normalizar_espacios_vacios(
     _comprobar_columnas(df, columnas)
     copia = df.copy()
     for columna in columnas:
-        copia[columna] = copia[columna].mask(_celdas_vacias(copia[columna]))
+        copia[columna] = copia[columna].mask(celdas_vacias(copia[columna]))
     return copia
 
 
@@ -86,19 +89,6 @@ def detectar_nulos(df: pd.DataFrame, columnas: list) -> dict:
     for columna in columnas:
         num_nulos[columna] = int(_mascara_nulos(df[columna]).sum())
     return num_nulos
-
-
-def quedan_nulos(df, columnas):
-    """Indica si queda algún valor inexistente en las columnas indicadas.
-
-    Args:
-        df: DataFrame a revisar.
-        columnas: Lista de nombres de columnas.
-
-    Returns:
-        True si hay al menos un valor inexistente, False en caso contrario.
-    """
-    return any(n > 0 for n in detectar_nulos(df, list(columnas)).values())
 
 
 def detectar_nulos_conjuntos(train, test, columnas):
