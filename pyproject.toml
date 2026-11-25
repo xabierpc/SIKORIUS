@@ -31,9 +31,16 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.17.3",
 ]
+probador = [
+    "groq>=1.7.0",
+    "playwright>=1.65.2",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# El probador con LLM (herramientas/probador_llm) no es parte del paquete:
+# así sus tests lo importan sin instalarlo
+pythonpath = ["herramientas"]
 # importlib permite archivos con el mismo nombre en tests/nucleo y tests/gui
 addopts = "-ra --strict-markers --import-mode=importlib"
 
@@ -48,7 +55,7 @@ skip_covered = true
 [tool.ruff]
 line-length = 79
 target-version = "py312"
-src = ["src", "tests"]
+src = ["src", "tests", "herramientas"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
