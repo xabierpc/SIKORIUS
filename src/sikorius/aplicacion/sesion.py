@@ -149,6 +149,10 @@ class Sesion:
     def al_cambiar(self, funcion):
         """Llama a funcion() cada vez que cambie algún paso.
 
+        Args:
+            funcion: Función sin argumentos a la que se avisa de cada
+                cambio.
+
         Returns:
             Función sin argumentos que cancela la suscripción.
         """
@@ -190,6 +194,10 @@ class Sesion:
     def importar_dataset(self, ruta):
         """Lee el archivo de datos y lo carga como dataset actual.
 
+        Args:
+            ruta: Ruta del archivo CSV, Excel o SQLite, como texto o
+                ``Path``.
+
         Raises:
             ErrorImportacion: Si el archivo no se puede leer. En ese caso
                 la sesión no cambia.
@@ -202,6 +210,11 @@ class Sesion:
 
         Guarda lo que recibe sin comprobarlo (``importar_dataset`` es la
         que lee y valida el archivo).
+
+        Args:
+            datos: DataFrame con los datos del dataset.
+            ruta: Ruta del archivo del que se leyeron los datos. Se guarda
+                como ruta absoluta.
         """
         self._borrar_desde("seleccion")
         self._dataset = Dataset(datos, str(Path(ruta).resolve()))
@@ -211,6 +224,10 @@ class Sesion:
         """Valida la selección elegida en la interfaz y, si es correcta, la
         guarda. Es la que se usa desde la interfaz (``guardar_seleccion``
         no valida).
+
+        Args:
+            features: Nombres de las columnas de entrada.
+            target: Nombre de la columna de salida (o None si no hay).
 
         Raises:
             ErrorSeleccion: Si no hay dataset o la selección no es válida.
@@ -226,6 +243,10 @@ class Sesion:
 
         No comprueba nada: si no se sabe que la selección es correcta hay
         que usar ``confirmar_seleccion``.
+
+        Args:
+            features: Nombres de las columnas de entrada.
+            target: Nombre de la columna de salida.
         """
         self._borrar_desde("separacion")
         self._seleccion = Seleccion(tuple(features), target)
@@ -238,6 +259,12 @@ class Sesion:
 
         No comprueba nada: separar los datos y validar los valores es cosa
         de ``separar``, que es la que se usa desde la interfaz.
+
+        Args:
+            entrenamiento: DataFrame del conjunto de entrenamiento.
+            test: DataFrame del conjunto de test.
+            porcentaje_test: Porcentaje de filas que van a test.
+            semilla: Semilla con la que se hizo la separación.
         """
         self._borrar_desde("preprocesado")
         self._separacion = Separacion(
@@ -250,6 +277,12 @@ class Sesion:
 
         Interpreta el porcentaje de test y la semilla, separa y guarda los
         conjuntos. A diferencia de ``guardar_separacion``, valida todo.
+
+        Args:
+            texto_porcentaje: Porcentaje de test escrito por el usuario
+                (número o texto como "20" o "12,5").
+            texto_semilla: Semilla escrita por el usuario (entero o texto
+                como "42").
 
         Raises:
             ErrorSeparacion: Si falta la selección de columnas, los valores
@@ -267,6 +300,14 @@ class Sesion:
 
     def aplicar_preprocesado(self, estrategia, constante=None):
         """Preprocesa los conjuntos de la separación actual.
+
+        Args:
+            estrategia: "eliminar", "media", "mediana" o "constante".
+            constante: Valor con el que rellenar (solo para "constante").
+
+        Returns:
+            El resumen de ``preprocesado.aplicar_preprocesado``: filas
+            eliminadas y valores rellenados en entrenamiento y en test.
 
         Raises:
             ErrorPreprocesado: Si faltan pasos previos o el preprocesado
@@ -295,6 +336,10 @@ class Sesion:
     def preprocesar_y_crear_modelo(self, estrategia, constante=None):
         """Aplica el preprocesado y, con los datos ya tratados, crea el
         modelo.
+
+        Args:
+            estrategia: "eliminar", "media", "mediana" o "constante".
+            constante: Valor con el que rellenar (solo para "constante").
 
         Returns:
             Tupla ``(resumen, error)``. ``resumen`` es el de
@@ -339,6 +384,10 @@ class Sesion:
     def guardar_descripcion(self, texto):
         """Guarda la descripción del modelo actual.
 
+        Args:
+            texto: Descripción escrita por el usuario. None se guarda como
+                texto vacío.
+
         Raises:
             ErrorModelo: Si todavía no hay modelo.
         """
@@ -356,6 +405,9 @@ class Sesion:
 
         Escribe exactamente en ruta (sobrescribe si ya existe): añadir la
         extensión y pedir confirmación es cosa de la interfaz.
+
+        Args:
+            ruta: Ruta del archivo en el que se guarda el modelo.
 
         Returns:
             La ruta absoluta del archivo guardado, como ``Path``.
@@ -384,6 +436,9 @@ class Sesion:
         pasos. El modelo queda como guardado en ruta, sin cambios: para
         volver a guardarlo se propone ese mismo archivo. Pedir confirmación
         si el modelo anterior tenía cambios es cosa de la interfaz.
+
+        Args:
+            ruta: Ruta del archivo ``.json`` guardado con SIKORIUS.
 
         Returns:
             El ModeloLineal cargado.
@@ -428,12 +483,22 @@ class Sesion:
         return self.modelo is not None and self._archivo.metricas is not None
 
     def columnas_modelo(self):
-        """Columnas reales de entrada seguidas de la de salida."""
+        """Columnas reales de entrada seguidas de la de salida.
+
+        Returns:
+            Lista con las columnas de entrada y, al final, la de salida,
+            con los nombres tal como están en el dataset.
+        """
         nombres = list(self.seleccion.features) + [self.seleccion.target]
         return resolver_columnas(self.dataset.datos, nombres)
 
     def conjuntos_actuales(self):
-        """(entrenamiento, test) más recientes: preprocesados si los hay."""
+        """Conjuntos de entrenamiento y test más recientes.
+
+        Returns:
+            Tupla ``(entrenamiento, test)`` de DataFrames: los
+            preprocesados si los hay, y si no, los de la separación.
+        """
         if self.preprocesado is not None:
             return self.preprocesado.entrenamiento, self.preprocesado.test
         return self.separacion.entrenamiento, self.separacion.test
@@ -456,8 +521,12 @@ class Sesion:
         return modelo.metricas_modelo(self.modelo, entrenamiento, test)
 
     def detectar_nulos(self):
-        """Nulos por columna en train y test, o None si aún no hay
-        selección y separación."""
+        """Valores inexistentes por columna en los conjuntos actuales.
+
+        Returns:
+            Diccionario ``{"train": {columna: n}, "test": {columna: n}}``,
+            o None si aún no hay selección y separación.
+        """
         if self.seleccion is None or self.separacion is None:
             return None
         entrenamiento, test = self.conjuntos_actuales()
@@ -471,6 +540,10 @@ class Sesion:
 
         Así, después de preprocesar, se siguen viendo los valores que había
         y se puede cambiar de estrategia.
+
+        Returns:
+            Diccionario ``{"train": {columna: n}, "test": {columna: n}}``,
+            o None si aún no hay selección y separación.
         """
         if self.seleccion is None or self.separacion is None:
             return None
@@ -493,13 +566,21 @@ class Sesion:
         return modelo.datos_ajuste(self.modelo, entrenamiento, test)
 
     def hay_cambios_sin_guardar(self):
-        """True si hay un modelo con cambios que se perderían al cargar otro
-        dataset u otro modelo (recién creado o con la descripción cambiada).
+        """Indica si hay cambios del modelo que se perderían.
+
+        Returns:
+            True si hay un modelo con cambios que se perderían al cargar
+            otro dataset u otro modelo (recién creado o con la descripción
+            cambiada).
         """
         return self._modelo is not None and self._archivo.sin_guardar
 
     def puede_crear_modelo(self):
-        """True si hay separación y no quedan valores inexistentes."""
+        """Indica si ya se puede crear el modelo.
+
+        Returns:
+            True si hay separación y no quedan valores inexistentes.
+        """
         deteccion = self.detectar_nulos()
         if deteccion is None:
             return False
@@ -514,6 +595,9 @@ class Sesion:
         abre a la vez que "preprocesado"). Con un modelo cargado de un
         archivo no hay datos con los que trabajar: solo "inicio" (para
         empezar de nuevo) y "modelo".
+
+        Returns:
+            Tupla con los nombres de las etapas disponibles, en orden.
         """
         if self.modelo_cargado:
             return ("inicio", "modelo")
@@ -533,6 +617,9 @@ class Sesion:
         ``etapas_disponibles``), así que se puede continuar justo cuando la
         siguiente ya está disponible. Con un modelo cargado de un archivo,
         desde "Inicio" se continúa a "Modelo".
+
+        Args:
+            actual: Nombre de la etapa que se está viendo.
 
         Returns:
             El nombre de la siguiente etapa, o None si aún no se puede

@@ -37,6 +37,13 @@ def celdas_vacias(serie):
     """True en las celdas de texto vacías o con solo espacios.
 
     Es pública porque el importador la usa para la misma comprobación.
+
+    Args:
+        serie: Serie de pandas a revisar.
+
+    Returns:
+        Serie de booleanos, True en las celdas de texto vacías o con solo
+        espacios.
     """
     vacias = serie.map(
         lambda valor: isinstance(valor, str) and valor.strip() == ""
@@ -127,6 +134,12 @@ def interpretar_constante(valor):
     """Convierte el valor constante escrito por el usuario en un número.
 
     Admite números y textos como "3", "2.5" o "2,5".
+
+    Args:
+        valor: Valor escrito por el usuario, como número o como texto.
+
+    Returns:
+        El valor como float.
 
     Raises:
         ErrorPreprocesado: Si no es un número válido.

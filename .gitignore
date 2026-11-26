@@ -5,3 +5,4 @@ data/
 htmlcov/
 .env
 *.joblib
+prototipos/modelo_housing.json

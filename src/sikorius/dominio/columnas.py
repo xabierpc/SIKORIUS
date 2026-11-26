@@ -14,6 +14,15 @@ def resolver_columnas(df, nombres):
     """Traduce los nombres en texto del selector a las columnas reales.
 
     Un nombre que no corresponde a ninguna columna se devuelve tal cual.
+
+    Args:
+        df: DataFrame con los datos cargados.
+        nombres: Nombres de las columnas como texto, tal como los muestra
+            el selector.
+
+    Returns:
+        Lista con las columnas reales del DataFrame (que pueden no ser
+        texto, por ejemplo 1 en lugar de "1"), en el mismo orden.
     """
     reales = {}
     for columna in df.columns:
