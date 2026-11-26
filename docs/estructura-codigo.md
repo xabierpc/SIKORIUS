@@ -115,6 +115,10 @@ Ejemplo, separar los datos:
 
 `tests/` tiene la misma estructura que `src/sikorius/`: `tests/dominio/`, `tests/datos/`, `tests/aplicacion/` y `tests/gui/`. Los datos y sesiones comunes están en `tests/conftest.py`. Cómo ejecutarlos: [CONTRIBUTING.md](../CONTRIBUTING.md#comprobar-antes-de-fusionar).
 
+### Pruebas funcionales
+
+`herramientas/` está fuera del paquete (`src/`) y no forma parte de la aplicación. Contiene las pruebas funcionales del plan de pruebas: `herramientas/funcionales/` (Playwright) y `herramientas/probador_llm/` (agente con un LLM). Sus dependencias están en el grupo `probador` del `pyproject.toml`, y sus propios tests en `tests/herramientas/`. Ver [`pruebas_funcionales.md`](pruebas_funcionales.md) y [`pruebas_con_llm.md`](pruebas_con_llm.md).
+
 ## 5. Dónde añadir una funcionalidad nueva
 
 1. La lógica, en `dominio/` (o en `datos/` si lee o escribe archivos), con sus tests.

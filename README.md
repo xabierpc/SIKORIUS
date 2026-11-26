@@ -131,7 +131,7 @@ uv run pytest --cov --cov-report=term-missing      # con cobertura
 uv run ruff format --check src tests               # revisar el formato
 uv run ruff check src tests                        # revisar el estilo
 ```
-
+Las pruebas funcionales del plan de pruebas, que manejan la aplicación en un navegador, se ejecutan aparte: ver [`docs/pruebas_funcionales.md`](docs/pruebas_funcionales.md).
 GitHub Actions ejecuta estas mismas comprobaciones en cada push a cualquier rama y en cada pull request hacia `dev` o `main` (`.github/workflows/tests.yml`). La insignia del principio indica si la última ejecución en `dev` ha pasado. El funcionamiento del flujo está explicado en [`docs/integracion-continua.md`](docs/integracion-continua.md).
 
 ### Estructura
@@ -153,6 +153,7 @@ SIKORIUS/
 ├── tests/               # Misma estructura que src/sikorius
 ├── docs/                # Documentación del proyecto
 ├── prototipos/          # Pruebas de concepto de las investigaciones
+├── herramientas/        # Pruebas funcionales (Playwright y LLM), fuera del paquete
 ├── data/                # Datos locales (no se sube)
 ├── .github/workflows/   # Integración continua (GitHub Actions)
 ├── .vscode/             # Configuración compartida de VS Code
