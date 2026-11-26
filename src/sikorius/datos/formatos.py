@@ -11,10 +11,25 @@ EXTENSIONES_ADMITIDAS = (
 
 
 def extension(ruta):
-    """Extensión del archivo en minúsculas, con el punto."""
+    """Extensión del archivo en minúsculas, con el punto.
+
+    Args:
+        ruta: Ruta del archivo, como texto o ``Path``.
+
+    Returns:
+        La extensión, por ejemplo ".csv", o "" si no tiene.
+    """
     return Path(ruta).suffix.lower()
 
 
 def es_admitido(ruta):
-    """Indica si el archivo tiene una extensión que se puede importar."""
+    """Indica si el archivo tiene una extensión que se puede importar.
+
+    Args:
+        ruta: Ruta del archivo, como texto o ``Path``.
+
+    Returns:
+        True si la extensión está en ``EXTENSIONES_ADMITIDAS`` (sin
+        distinguir mayúsculas).
+    """
     return extension(ruta) in EXTENSIONES_ADMITIDAS

@@ -185,7 +185,7 @@ Los nombres dentro de `modelo` son los mismos que los atributos de `ModeloLineal
 Funciones `guardar_modelo` y `cargar_modelo` de `prototipos/prototipo_json.py`:
 
 ```python
-from sikorius.nucleo.modelo import entrenar_modelo, metricas_modelo
+from sikorius.dominio.modelo import entrenar_modelo, metricas_modelo
 from prototipo_json import cargar_modelo, guardar_modelo
 
 # Guardar

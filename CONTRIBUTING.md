@@ -282,8 +282,9 @@ git show v0.1.0 --stat   # comprueba que apunta a la fusión
 2. En **Choose a tag**, elige `v0.1.0`.
 3. Título: `v0.1.0`.
 4. En la descripción, pega las notas de la versión (paso 6).
-5. Mientras la aplicación no permita crear modelos, marca
-   **Set as a pre-release**.
+5. Mientras la versión empiece por `0.` (aplicación en desarrollo), marca
+   **Set as a pre-release**. La versión final (`1.0.0`) se publica sin
+   marcarla.
 6. Pulsa **Publish release**.
 
 ### 6. Redactar las notas

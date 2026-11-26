@@ -22,6 +22,12 @@ def interpretar_porcentaje(valor):
 
     Admite números y textos como "20", "12.5" o "12,5".
 
+    Args:
+        valor: Porcentaje escrito por el usuario, como número o texto.
+
+    Returns:
+        El porcentaje como float, entre 1 y 99.
+
     Raises:
         ErrorSeparacion: Si no es un número entre 1 y 99 (ambos incluidos).
     """
@@ -46,6 +52,12 @@ def interpretar_semilla(valor):
     """Convierte la semilla escrita por el usuario en un entero no negativo.
 
     Admite enteros y textos como "42". No admite decimales ("4.5").
+
+    Args:
+        valor: Semilla escrita por el usuario, como número o texto.
+
+    Returns:
+        La semilla como int, 0 o mayor.
 
     Raises:
         ErrorSeparacion: Si no es un número entero mayor o igual que 0.
@@ -76,6 +88,13 @@ def calcular_tamanos(num_filas, porcentaje_test):
     La cuenta se hace con fracciones exactas para que los errores de los
     decimales en coma flotante no sumen una fila de más (por ejemplo, 64.4 %
     de 250 filas son 161 de test exactas, no 162).
+
+    Args:
+        num_filas: Número de filas del dataset.
+        porcentaje_test: Porcentaje de filas que van a test (1 a 99).
+
+    Returns:
+        Tupla ``(filas_entrenamiento, filas_test)``.
 
     Raises:
         ErrorSeparacion: Si hay menos de 5 filas o algún conjunto queda vacío.

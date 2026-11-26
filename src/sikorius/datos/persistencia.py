@@ -195,6 +195,9 @@ def diccionario_a_modelo(datos):
     Es la operación inversa de ``modelo_a_diccionario``. La fórmula del
     archivo no se usa: se vuelve a calcular a partir de los coeficientes.
 
+    Args:
+        datos: Diccionario leído del archivo JSON.
+
     Returns:
         Tupla ``(modelo, metricas)``, como ``cargar_modelo``.
 
