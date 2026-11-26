@@ -17,6 +17,7 @@ Para instalar y usar la aplicación, empieza por el [README](../README.md). Para
 - [Plan de pruebas funcionales](plan_pruebas.md) (#29): casos de prueba de todas las historias.
 - [Pruebas funcionales automatizadas](pruebas_funcionales.md) (#29): el plan de pruebas con Playwright.
 - [Pruebas funcionales con un LLM](pruebas_con_llm.md) (#29): cómo un agente con un LLM ejecuta el plan de pruebas.
+- [Prueba de usabilidad](prueba-usabilidad.md) (#37).
 - [Integración continua con GitHub Actions](integracion-continua.md) (#64).
 
 ## Releases

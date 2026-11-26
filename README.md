@@ -1,6 +1,6 @@
 # SIKORIUS
 
-[![Tests](https://github.com/xabierpc/SIKORIUS/actions/workflows/tests.yml/badge.svg?branch=dev)](https://github.com/xabierpc/SIKORIUS/actions/workflows/tests.yml)
+[![Tests](https://github.com/xabierpc/SIKORIUS/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/xabierpc/SIKORIUS/actions/workflows/tests.yml)
 
 Aplicación en Python para crear y visualizar modelos de regresión lineal simple y múltiple a partir de datos almacenados en archivos CSV, Excel y bases de datos SQLite, hacer predicciones y guardar los modelos para cargarlos más tarde, todo desde una interfaz gráfica que se abre en el navegador.
 
@@ -9,7 +9,7 @@ La versión actual es la **1.0.0**, la versión final del proyecto.
 ## Funcionalidades
 
 - **Cargar un dataset** CSV, Excel o SQLite con un explorador de archivos y verlo en una tabla.
-- **Elegir las columnas del modelo**: una o varias columnas de entrada (*features*) y una de salida (*target*), solo entre las columnas numéricas.
+- **Elegir las columnas del modelo**: una o varias columnas de entrada (*features*) y una de salida (*target*). Solo se admiten columnas numéricas: si se elige otra, la aplicación avisa al confirmar.
 - **Separar los datos en entrenamiento y test**, con el porcentaje de test y una semilla para que la separación se pueda repetir.
 - **Detectar y tratar los valores inexistentes** de las columnas elegidas: eliminar las filas, o rellenar con la media, la mediana o un valor constante.
 - **Crear el modelo de regresión lineal** simple o múltiple con los datos de entrenamiento.
@@ -23,6 +23,8 @@ La versión actual es la **1.0.0**, la versión final del proyecto.
 - [Git](https://git-scm.com/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - Un navegador web (la interfaz se abre en él).
+
+Probado en Linux con uv 0.11 y 0.13.
 
 uv se encarga de instalar la versión de Python del proyecto (fijada en `.python-version`), crear el entorno virtual e instalar las dependencias. No hace falta instalar Python ni usar `pip`.
 
@@ -50,6 +52,8 @@ uv run sikorius
 
 La aplicación abre una pestaña del navegador en <http://localhost:8080>. Si no se abre sola, escribe esa dirección en el navegador. Para cerrar la aplicación, pulsa `Ctrl+C` en la terminal.
 
+La aplicación usa siempre el puerto 8080. Si al arrancar aparece un error de dirección en uso (*address already in use*), es que ya hay otro programa en ese puerto, normalmente otra ejecución de SIKORIUS: ciérrala y vuelve a ejecutar `uv run sikorius`.
+
 ## Formato de los archivos de datos
 
 La aplicación acepta estos archivos:
@@ -62,24 +66,29 @@ La aplicación acepta estos archivos:
 
 Además:
 
-- Las columnas de entrada y de salida del modelo deben ser **numéricas**. El archivo puede tener otras columnas (texto, fechas…): se ven en la tabla, pero no se pueden elegir para el modelo.
+- Las columnas de entrada y de salida del modelo deben ser **numéricas**. El archivo puede tener otras columnas (texto, fechas…): se ven en la tabla y aparecen en los selectores, pero si se eligen, al pulsar **Confirmar selección** la aplicación avisa de que no son numéricas.
 - Puede haber **valores inexistentes** (celdas vacías). No hace falta quitarlos antes: la aplicación los detecta y permite tratarlos en el paso de preprocesado.
 - Hacen falta al menos 5 filas para separar los datos en entrenamiento y test.
 
-Ejemplo de CSV válido:
+El repositorio no incluye datasets. Para probar la aplicación, guarda este ejemplo en un archivo `ejemplo.csv` y cárgalo:
 
 ```csv
-superficie,habitaciones,precio
-80,3,150000
-95,4,
-60,2,110000
+superficie,habitaciones,ciudad,precio
+80,3,Coruña,150000
+95,4,Vigo,
+60,2,Coruña,110000
+120,4,Lugo,210000
+70,2,Vigo,125000
+100,3,Lugo,180000
+85,3,Coruña,
+110,4,Vigo,195000
 ```
 
 ## Guía de uso
 
 La aplicación se divide en pestañas que se abren a medida que se completa cada paso. El botón **Continuar** de la barra superior lleva al paso siguiente cuando el actual está completo, y las pestañas sirven para volver atrás. Cambiar un paso borra los que van detrás (por ejemplo, elegir otras columnas obliga a separar los datos otra vez).
 
-1. **Inicio.** Pulsa **Subir dataset** y elige el archivo en el explorador, o **Cargar modelo** para abrir un modelo guardado (paso 7).
+1. **Inicio.** Pulsa **Subir dataset** y elige el archivo en el explorador, que se abre en tu carpeta personal, o **Cargar modelo** para abrir un modelo guardado (paso 7).
 2. **Datos.** Se ven la ruta del archivo, el número de filas y columnas y la tabla. Con **Cargar otro** se cambia de dataset.
 3. **Variables y separacion.**
    - En **Columnas del modelo**, elige una o varias columnas en **Features (selección múltiple)** y una en **Target (columna de salida)**, y pulsa **Confirmar selección**.
@@ -117,7 +126,7 @@ Los modelos se guardan en **JSON**, un formato de texto. Al cargarlos, la aplica
 
 ## Datos
 
-Los datasets y los modelos guardados **no se suben al repositorio**. Cada desarrollador los guarda en local en la carpeta `data/` en la raíz del proyecto, que está excluida en el `.gitignore`.
+Los datasets y los modelos guardados **no se suben al repositorio**. Cada desarrollador los guarda en local en la carpeta `data/` en la raíz del proyecto, que está excluida en el `.gitignore`. Esa carpeta no viene al clonar: hay que crearla (`mkdir data`).
 
 ## Desarrollo
 
@@ -131,8 +140,10 @@ uv run pytest --cov --cov-report=term-missing      # con cobertura
 uv run ruff format --check src tests               # revisar el formato
 uv run ruff check src tests                        # revisar el estilo
 ```
+
 Las pruebas funcionales del plan de pruebas, que manejan la aplicación en un navegador, se ejecutan aparte: ver [`docs/pruebas_funcionales.md`](docs/pruebas_funcionales.md).
-GitHub Actions ejecuta estas mismas comprobaciones en cada push a cualquier rama y en cada pull request hacia `dev` o `main` (`.github/workflows/tests.yml`). La insignia del principio indica si la última ejecución en `dev` ha pasado. El funcionamiento del flujo está explicado en [`docs/integracion-continua.md`](docs/integracion-continua.md).
+
+GitHub Actions ejecuta estas mismas comprobaciones en cada push a cualquier rama y en cada pull request hacia `dev` o `main` (`.github/workflows/tests.yml`). La insignia del principio indica si la última ejecución en `main` ha pasado. El funcionamiento del flujo está explicado en [`docs/integracion-continua.md`](docs/integracion-continua.md).
 
 ### Estructura
 
@@ -154,7 +165,7 @@ SIKORIUS/
 ├── docs/                # Documentación del proyecto
 ├── prototipos/          # Pruebas de concepto de las investigaciones
 ├── herramientas/        # Pruebas funcionales (Playwright y LLM), fuera del paquete
-├── data/                # Datos locales (no se sube)
+├── data/                # Datos locales (no se sube; se crea a mano)
 ├── .github/workflows/   # Integración continua (GitHub Actions)
 ├── .vscode/             # Configuración compartida de VS Code
 ├── pyproject.toml       # Configuración, dependencias, ruff y pytest
