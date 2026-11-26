@@ -141,7 +141,7 @@ uv run ruff format --check src tests               # revisar el formato
 uv run ruff check src tests                        # revisar el estilo
 ```
 
-Las pruebas funcionales del plan de pruebas, que manejan la aplicación en un navegador, se ejecutan aparte: ver [`docs/pruebas_funcionales.md`](docs/pruebas_funcionales.md).
+Las pruebas funcionales del plan de pruebas, que manejan la aplicación en un navegador, se ejecutan aparte: ver [`docs/pruebas-funcionales.md`](docs/pruebas-funcionales.md).
 
 GitHub Actions ejecuta estas mismas comprobaciones en cada push a cualquier rama y en cada pull request hacia `dev` o `main` (`.github/workflows/tests.yml`). La insignia del principio indica si la última ejecución en `main` ha pasado. El funcionamiento del flujo está explicado en [`docs/integracion-continua.md`](docs/integracion-continua.md).
 

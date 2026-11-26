@@ -117,7 +117,7 @@ Ejemplo, separar los datos:
 
 ### Pruebas funcionales
 
-`herramientas/` está fuera del paquete (`src/`) y no forma parte de la aplicación. Contiene las pruebas funcionales del plan de pruebas: `herramientas/funcionales/` (Playwright) y `herramientas/probador_llm/` (agente con un LLM). Sus dependencias están en el grupo `probador` del `pyproject.toml`, y sus propios tests en `tests/herramientas/`. Ver [`pruebas_funcionales.md`](pruebas_funcionales.md) y [`pruebas_con_llm.md`](pruebas_con_llm.md).
+`herramientas/` está fuera del paquete (`src/`) y no forma parte de la aplicación. Contiene las pruebas funcionales del plan de pruebas: `herramientas/funcionales/` (Playwright) y `herramientas/probador_llm/` (agente con un LLM). Sus dependencias están en el grupo `probador` del `pyproject.toml`, y sus propios tests en `tests/herramientas/`. Ver [`pruebas-funcionales.md`](pruebas-funcionales.md) y [`pruebas_con_llm.md`](pruebas_con_llm.md).
 
 ## 5. Dónde añadir una funcionalidad nueva
 

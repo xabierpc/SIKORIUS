@@ -1279,7 +1279,7 @@ x,y
 
 ## 5. Ejecución
 
-- Las pruebas se ejecutan sobre `dev` (sección 1.1), después de que pasen todas las pruebas automatizadas, en el orden del plan. Un caso que continúa a otro («CP-xx ejecutado, sin cerrar la aplicación») se ejecuta justo después de CP-xx. Los casos están automatizados con Playwright en `herramientas/funcionales/` (ver [pruebas_funcionales.md](pruebas_funcionales.md)); también se pueden ejecutar con un LLM (ver [pruebas_con_llm.md](pruebas_con_llm.md)).
+- Las pruebas se ejecutan sobre `dev` (sección 1.1), después de que pasen todas las pruebas automatizadas, en el orden del plan. Un caso que continúa a otro («CP-xx ejecutado, sin cerrar la aplicación») se ejecuta justo después de CP-xx. Los casos están automatizados con Playwright en `herramientas/funcionales/` (ver [pruebas-funcionales.md](pruebas-funcionales.md)); también se pueden ejecutar con un LLM (ver [pruebas_con_llm.md](pruebas_con_llm.md)).
 - Cada caso lo ejecuta un miembro que no haya implementado la funcionalidad probada.
 - Cada error encontrado se registra en Taiga como tarea de corrección dentro de la historia #29, indicando el caso que lo detectó, los pasos para reproducirlo y el resultado obtenido. Se corrige en una rama `fix/<número de la tarea>-<descripción>` creada desde `dev`.
 - Tras las correcciones, se vuelven a ejecutar los casos fallidos y CP-93.
