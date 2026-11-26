@@ -3,3 +3,6 @@ __pycache__/
 data/
 .coverage
 htmlcov/
+.env
+*.joblib
+prototipos/modelo_housing.json

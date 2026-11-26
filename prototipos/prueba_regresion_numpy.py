@@ -19,9 +19,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from sikorius.nucleo.importador import importar_datos
-from sikorius.nucleo.preprocesado import ELIMINAR, aplicar_preprocesado
-from sikorius.nucleo.separacion import separar_datos
+from sikorius.datos.importador import importar_datos
+from sikorius.dominio.preprocesado import ELIMINAR, aplicar_preprocesado
+from sikorius.dominio.separacion import separar_datos
 
 RUTA_DEFECTO = Path(__file__).resolve().parents[1] / "data" / "housing.csv"
 TARGET = "median_house_value"

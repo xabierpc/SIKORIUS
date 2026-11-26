@@ -1,9 +1,14 @@
 """Arranque de la aplicación."""
 
+from pathlib import Path
+
 from nicegui import ui
 
+from sikorius.aplicacion.sesion import Sesion
 from sikorius.gui.pagina import construir_pagina
-from sikorius.sesion import Sesion
+
+# Icono de la pestaña del navegador: la S del logo
+RUTA_ICONO = Path(__file__).parent / "gui" / "recursos" / "favicon.svg"
 
 
 def main():
@@ -18,4 +23,4 @@ def main():
     def pagina_principal():
         construir_pagina(sesion)
 
-    ui.run(title="SIKORIUS", reload=False)
+    ui.run(title="SIKORIUS", favicon=RUTA_ICONO, reload=False)

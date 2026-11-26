@@ -10,18 +10,18 @@ import pandas as pd
 import pytest
 from nicegui import ui
 
-from sikorius.gui.paneles.panel_preprocesado import (
-    PanelPreprocesado,
-    texto_resumen,
-)
-from sikorius.nucleo.preprocesado import (
+from sikorius.aplicacion.sesion import Sesion
+from sikorius.dominio.preprocesado import (
     CONSTANTE,
     ELIMINAR,
     ESTRATEGIAS,
     MEDIA,
     MEDIANA,
 )
-from sikorius.sesion import Sesion
+from sikorius.gui.paneles.panel_preprocesado import (
+    PanelPreprocesado,
+    texto_resumen,
+)
 
 # =============================================================================
 # Utilidades
@@ -134,7 +134,7 @@ def test_muestra_nulos_por_conjunto(sesion_con_nulos):
         {"columna": "y", "train": 1, "test": 0},
     ]
     assert "Entrenamiento: 2 | Test: 1" in panel.aviso.text
-    assert "text-orange-700" in panel.aviso.classes
+    assert "text-warning" in panel.aviso.classes
     assert panel.controles.visible
 
 
@@ -145,7 +145,7 @@ def test_sin_nulos_oculta_controles(sesion_sin_nulos):
         {"columna": "y", "train": 0, "test": 0},
     ]
     assert "No hay valores inexistentes" in panel.aviso.text
-    assert "text-green-700" in panel.aviso.classes
+    assert "text-positive" in panel.aviso.classes
     assert not panel.controles.visible
 
 
@@ -394,6 +394,6 @@ def test_no_contiene_logica_de_preprocesado():
     import sikorius.gui.paneles.panel_preprocesado as panel
 
     codigo = inspect.getsource(panel)
-    assert "detectar_nulos_conjuntos(" in codigo
+    assert "detectar_nulos_originales(" in codigo
     for prohibido in ("fillna", "dropna", "isna", "mean(", "median("):
         assert prohibido not in codigo

@@ -1,20 +1,20 @@
 """Selección de las columnas de entrada y salida del modelo (historia #11).
 
 El panel junta los selectores de ``sikorius.gui.componentes.selectores`` con
-el botón de confirmar. Valida la selección con el núcleo y, si es correcta,
-la guarda en la sesión. Los paneles siguientes se enteran solos porque
+el botón de confirmar. La sesión valida la selección y, si es correcta, la
+guarda. Los paneles siguientes se enteran solos porque
 están suscritos a la sesión.
 """
 
 from nicegui import ui
 
+from sikorius.dominio.errores import ErrorSeleccion
 from sikorius.gui.avisos import notificar_error, notificar_exito
 from sikorius.gui.componentes.selectores import (
     SelectorFeatures,
     SelectorTarget,
 )
 from sikorius.gui.paneles.base import Panel
-from sikorius.nucleo.columnas import ErrorSeleccion, validar_seleccion
 
 
 def texto_seleccion(seleccion):
@@ -39,7 +39,7 @@ class PanelColumnas(Panel):
                 "Confirmar selección", icon="check", on_click=self.confirmar
             )
             self.etiqueta_seleccion = ui.label("").classes(
-                "text-sm text-gray-500"
+                "text-sm text-secondary"
             )
 
         # Dataset cuyas columnas tienen ahora los selectores. Solo se
@@ -92,11 +92,10 @@ class PanelColumnas(Panel):
         features = self.features.obtener_seleccion()
         objetivo = self.target.obtener_seleccion()
         try:
-            validar_seleccion(self.sesion.dataset.datos, features, objetivo)
+            self.sesion.confirmar_seleccion(features, objetivo)
         except ErrorSeleccion as error:
             notificar_error(error)
             return
-        self.sesion.guardar_seleccion(features, objetivo)
         notificar_exito(
             "Selección confirmada. " + texto_seleccion(self.sesion.seleccion)
         )

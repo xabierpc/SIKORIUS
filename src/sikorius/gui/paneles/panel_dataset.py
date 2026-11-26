@@ -1,22 +1,44 @@
-"""Carga del dataset: botón, ruta del archivo y tabla con los datos."""
+"""Pestaña "Datos": la tabla con el dataset cargado.
 
-from pathlib import Path
+La pantalla de inicio (logo y botones de subir un dataset o cargar un
+modelo) es otra pestaña, ver ``panel_inicio``. Esta solo tiene sentido con
+un dataset: sin él, la pestaña no se ve (``Sesion.etapas_disponibles``).
+"""
 
 from nicegui import ui
 
-from sikorius.gui.avisos import notificar_error, notificar_exito
-from sikorius.gui.componentes.explorador_archivos import seleccionar_archivo
+from sikorius.gui.componentes import carga_dataset
 from sikorius.gui.componentes.tabla_datos import TablaDatos
 from sikorius.gui.paneles.base import Panel
-from sikorius.nucleo.errores import ErrorImportacion
-from sikorius.nucleo.importador import importar_datos
+from sikorius.gui.tema import colores_columnas
+
+# Alto en píxeles de cada fila de la tabla (modo "dense") y de sus bordes
+ALTO_FILA = 28.5
+ALTO_BORDES = 3
 
 
-def carpeta_inicial(sesion):
-    """Carpeta del último archivo cargado o, si no hay, la carpeta personal."""
-    if sesion.dataset is not None:
-        return Path(sesion.dataset.ruta).parent
-    return Path.home()
+def alto_tabla(filas):
+    """Alto CSS de la tabla: el justo para sus filas, con un máximo.
+
+    Una tabla de 10 filas no debe dejar un hueco vacío debajo; una de miles
+    ocupa como mucho el 70% de la pantalla y saca su propio scroll.
+    """
+    justo = round((filas + 1) * ALTO_FILA) + ALTO_BORDES  # +1: cabecera
+    return "min(70vh, " + str(justo) + "px)"
+
+
+def colores_elegidos(sesion):
+    """{columna: color} de las columnas de la selección confirmada.
+
+    Cada columna lleva el mismo color que su "chip" en el panel de columnas.
+    Si todavía no hay selección, el diccionario está vacío.
+    """
+    seleccion = sesion.seleccion
+    if sesion.dataset is None or seleccion is None:
+        return {}
+    todos = colores_columnas(sesion.dataset.datos.columns)
+    elegidas = list(seleccion.features) + [seleccion.target]
+    return {c: todos[c] for c in elegidas if c in todos}
 
 
 def texto_resumen(datos):
@@ -27,56 +49,62 @@ def texto_resumen(datos):
 
 
 class PanelDataset(Panel):
-    """Dos tarjetas: la carga del archivo y la tabla con sus datos."""
+    """Ruta y tamaño del dataset, la tabla y el botón de cargar otro.
+
+    Para cargar un modelo guardado se vuelve a la pestaña "Inicio".
+    """
 
     def __init__(self, sesion):
-        with ui.card().classes("w-full"):
-            ui.label("Dataset").classes("text-lg font-semibold")
+        self.contenido = ui.column().classes("w-full")
+        with self.contenido:
             with ui.row().classes("w-full items-center no-wrap"):
-                self.boton_cargar = ui.button(
-                    "Cargar dataset", icon="folder_open", on_click=self.cargar
-                )
                 with ui.column().classes("gap-0 min-w-0"):
-                    ui.label("Ruta:").classes("text-sm text-gray-500")
                     self.etiqueta_ruta = ui.label("").classes(
-                        "font-mono break-all"
+                        "font-mono text-sm break-all"
                     )
-
-        with ui.card().classes("w-full"):
-            ui.label("Datos").classes("text-lg font-semibold")
+                    self.etiqueta_resumen = ui.label("").classes(
+                        "text-sm opacity-70"
+                    )
+                ui.space()
+                self.boton_otro = ui.button(
+                    "Cargar otro", icon="folder_open", on_click=self.cargar
+                ).props("outline")
             self.tabla = TablaDatos()
-            self.etiqueta_resumen = ui.label("").classes(
-                "text-sm text-gray-500"
-            )
 
         # Dataset que se ve ahora en la tabla. La sesión avisa en cada paso
         # (columnas, separación...), y volver a enviar todas las filas al
         # navegador en cada aviso haría la página muy lenta.
         self._mostrado = None
+        # Colores que lleva ahora la tabla (para no tocarla si no cambian)
+        self._coloreado = {}
         super().__init__(sesion)
 
     def actualizar(self):
         dataset = self.sesion.dataset
+        self.contenido.set_visibility(dataset is not None)
         if dataset is None:
             self.etiqueta_ruta.set_text("Ningún archivo cargado")
             self.etiqueta_resumen.set_text("")
             return
-        if dataset is self._mostrado:
-            return
+        if dataset is not self._mostrado:
+            self._mostrar_dataset(dataset)
+        # Las columnas elegidas se tiñen; al cambiar la selección (o al
+        # cargar otro dataset, que la borra) se actualizan los colores
+        colores = colores_elegidos(self.sesion)
+        if colores != self._coloreado:
+            self._coloreado = colores
+            self.tabla.colorear(colores)
+
+    def _mostrar_dataset(self, dataset):
+        """Pone el dataset en la tabla (solo cuando es uno nuevo: enviar
+        todas las filas al navegador en cada aviso haría la página lenta)."""
         self._mostrado = dataset
+        self._coloreado = {}
         self.etiqueta_ruta.set_text(dataset.ruta)
         self.etiqueta_resumen.set_text(texto_resumen(dataset.datos))
         self.tabla.mostrar(dataset.datos)
+        self.tabla.tabla.style("height: " + alto_tabla(len(dataset.datos)))
 
     async def cargar(self):
-        """Abre el explorador e importa el archivo elegido."""
-        ruta = await seleccionar_archivo(carpeta_inicial(self.sesion))
-        if ruta is None:
-            return  # el usuario cerró el explorador: todo sigue igual
-        try:
-            datos = importar_datos(ruta)
-        except ErrorImportacion as error:
-            notificar_error(error)
-            return
-        self.sesion.cargar_dataset(datos, ruta)
-        notificar_exito("Dataset cargado correctamente")
+        """Carga otro dataset (ver ``componentes.carga_dataset``)."""
+        await carga_dataset.cargar_dataset(self.sesion)

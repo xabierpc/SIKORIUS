@@ -3,16 +3,33 @@
 uv run pytest tests/gui/test_panel_modelo.py -v
 """
 
+import asyncio
+import html
 import inspect
+import json
+import re
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 from nicegui import ui
 
-from sikorius.gui.paneles.panel_modelo import PanelModelo, texto_metrica
-from sikorius.sesion import Sesion
+from sikorius.aplicacion.sesion import Sesion
+from sikorius.dominio import modelo as modelo_dominio
+from sikorius.gui.componentes import dialogo_guardado
+from sikorius.gui.componentes.formula import html_formula
+from sikorius.gui.componentes.grafico_ajuste import opciones_grafico
+from sikorius.gui.paneles.panel_modelo import (
+    AVISO_SIN_DESCRIPCION,
+    PanelModelo,
+    aviso_antes_de_guardar,
+    destino_inicial,
+    texto_estado_guardado,
+    texto_metrica,
+)
+from sikorius.gui.tema import colores_columnas
 
 # =============================================================================
 # Utilidades
@@ -62,23 +79,30 @@ def avisos(monkeypatch):
     return lista
 
 
+def formula_visible(panel):
+    """Fórmula que se ve en el panel (sin las etiquetas HTML de los
+    colores) y con espacios normales."""
+    texto = re.sub("<[^>]+>", "", panel.formula.content)
+    return html.unescape(texto).replace("\u00a0", " ")
+
+
 # =============================================================================
 # texto_metrica
 # =============================================================================
 
 
 @pytest.mark.parametrize(
-    "nombre, valor, esperado",
+    "valor, esperado",
     [
-        ("R²", 0.98164, "R²: 0.9816"),
-        ("ECM", 238494173.71153, "ECM: 238494173.7115"),
-        ("R²", 1.0, "R²: 1"),
-        ("R²", -0.5, "R²: -0.5"),
-        ("R²", float("nan"), "R²: no calculable"),
+        (0.98164, "0.9816"),
+        (238494173.71153, "238494173.7115"),
+        (1.0, "1"),
+        (-0.5, "-0.5"),
+        (float("nan"), "no calculable"),
     ],
 )
-def test_texto_metrica(nombre, valor, esperado):
-    assert texto_metrica(nombre, valor) == esperado
+def test_texto_metrica(valor, esperado):
+    assert texto_metrica(valor) == esperado
 
 
 # =============================================================================
@@ -141,8 +165,30 @@ def test_crear_muestra_exito_y_resultados(sesion_lista, avisos):
 def test_muestra_la_formula_con_el_signo_correcto(sesion_lista):
     panel = PanelModelo(sesion_lista)
     panel.crear()
-    assert panel.formula.text == "y = 2.0000 * x1 - 3.0000 * x2 + 5.0000"
-    assert "+ -" not in panel.formula.text
+    assert formula_visible(panel) == "y = 2.0000 · x1 − 3.0000 · x2 + 5.0000"
+    assert "+ -" not in formula_visible(panel)
+    assert "\n" not in panel.formula.content  # todo en una línea
+
+
+def test_la_formula_colorea_cada_columna_con_su_color(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    colores = colores_columnas(sesion_lista.dataset.datos.columns)
+    for columna in sesion_lista.modelo.features:
+        assert colores[columna] in panel.formula.content
+    assert colores[sesion_lista.modelo.target] in panel.formula.content
+
+
+def test_html_formula_escapa_los_nombres_de_columna():
+    mod = modelo_de((2.0,), 1.0, features=("<b>x</b>",))
+    texto = html_formula(mod, {"<b>x</b>": "#38bdf8"})
+    assert "<b>" not in texto
+    assert "&lt;b&gt;x&lt;/b&gt;" in texto
+
+
+def test_html_formula_sin_color_no_pone_estilo():
+    texto = html_formula(modelo_de((2.0,), 1.0, features=("x1",)), {})
+    assert "style" not in texto
 
 
 def test_muestra_las_metricas_de_cada_conjunto(sesion_lista):
@@ -150,8 +196,8 @@ def test_muestra_las_metricas_de_cada_conjunto(sesion_lista):
     panel.crear()
     for clave in ("entrenamiento", "test"):
         r2, ecm = panel.metricas[clave]
-        assert r2.text == "R²: 1"  # ajuste perfecto: los datos no tienen ruido
-        assert ecm.text == "ECM: 0"
+        assert r2.text == "1"  # ajuste perfecto: los datos no tienen ruido
+        assert ecm.text == "0"
 
 
 def test_las_metricas_distinguen_entrenamiento_y_test():
@@ -159,36 +205,124 @@ def test_las_metricas_distinguen_entrenamiento_y_test():
     df.loc[15:, "y"] += 2  # el test tiene un error constante de 2
     panel = PanelModelo(crear_sesion(df))
     panel.crear()
-    assert panel.metricas["entrenamiento"][1].text == "ECM: 0"
-    assert panel.metricas["test"][1].text == "ECM: 4"
+    assert panel.metricas["entrenamiento"][1].text == "0"
+    assert panel.metricas["test"][1].text == "4"
 
 
 def test_r2_no_calculable_se_avisa_en_pantalla():
     df = datos_lineales().assign(y=7.0)  # salida constante
     panel = PanelModelo(crear_sesion(df))
     panel.crear()
-    assert panel.metricas["entrenamiento"][0].text == "R²: no calculable"
-    assert panel.metricas["test"][0].text == "R²: no calculable"
+    assert panel.metricas["entrenamiento"][0].text == "no calculable"
+    assert panel.metricas["test"][0].text == "no calculable"
+
+
+def nombres_de_series(grafico):
+    return [serie["name"] for serie in grafico.options["series"]]
 
 
 def test_grafico_regresion_multiple(sesion_lista):
     panel = PanelModelo(sesion_lista)
     panel.crear()
-    ejes = panel.grafico.fig.axes[0]
-    assert ejes.get_xlabel() == "Valor predicho"
-    assert ejes.get_ylabel() == "Valor real"
-    textos = [t.get_text() for t in ejes.get_legend().get_texts()]
-    assert textos == ["Entrenamiento", "Test", "Real = predicho"]
+    opciones = panel.grafico.options
+    assert opciones["xAxis"]["name"] == "Valor predicho"
+    assert opciones["yAxis"]["name"] == "Valor real"
+    assert nombres_de_series(panel.grafico) == [
+        "Entrenamiento",
+        "Test",
+        "Real = predicho",
+    ]
 
 
 def test_grafico_regresion_simple():
     panel = PanelModelo(crear_sesion(features=("x1",)))
     panel.crear()
-    ejes = panel.grafico.fig.axes[0]
-    assert ejes.get_xlabel() == "x1"
-    assert ejes.get_ylabel() == "y"
-    textos = [t.get_text() for t in ejes.get_legend().get_texts()]
-    assert textos == ["Entrenamiento", "Test", "Recta del modelo"]
+    opciones = panel.grafico.options
+    assert opciones["xAxis"]["name"] == "x1"
+    assert opciones["yAxis"]["name"] == "y"
+    assert nombres_de_series(panel.grafico) == [
+        "Entrenamiento",
+        "Test",
+        "Recta del modelo",
+    ]
+
+
+def test_el_grafico_lleva_los_puntos_de_cada_conjunto(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    entrenamiento, test, recta = panel.grafico.options["series"]
+    assert len(entrenamiento["data"]) == 15
+    assert len(test["data"]) == 5
+    assert len(recta["data"]) == 2
+    # cada punto es [valor predicho, valor real]; el ajuste es perfecto
+    for predicho, real in entrenamiento["data"] + test["data"]:
+        assert predicho == pytest.approx(real)
+
+
+def test_opciones_del_grafico_son_datos_planos_para_el_navegador(sesion_lista):
+    """Nada de arrays de numpy: tienen que poder convertirse a JSON."""
+    sesion_lista.crear_modelo()
+    entrenamiento, test = sesion_lista.conjuntos_actuales()
+    datos = modelo_dominio.datos_ajuste(
+        sesion_lista.modelo, entrenamiento, test
+    )
+
+    opciones = opciones_grafico(datos)
+
+    json.dumps(opciones)  # falla si queda algo que no sea JSON
+    for serie in opciones["series"]:
+        for punto in serie["data"]:
+            assert type(punto[0]) is float
+            assert type(punto[1]) is float
+
+
+def test_el_grafico_usa_los_colores_de_la_marca(sesion_lista):
+    sesion_lista.crear_modelo()
+    entrenamiento, test = sesion_lista.conjuntos_actuales()
+    datos = modelo_dominio.datos_ajuste(
+        sesion_lista.modelo, entrenamiento, test
+    )
+    series = opciones_grafico(datos)["series"]
+    assert series[0]["itemStyle"]["color"] == "#8b5cf6"
+    assert series[1]["itemStyle"]["color"] == "#7dd3fc"
+
+
+def test_el_tooltip_muestra_las_dos_coordenadas_con_su_nombre(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    opciones = panel.grafico.options
+    # La función de JavaScript va en una clave con ":" delante
+    formateador = opciones["tooltip"][":formatter"]
+    assert "dimensionNames[0]" in formateador
+    assert "dimensionNames[1]" in formateador
+    for serie in opciones["series"]:
+        assert serie["dimensions"] == ["Valor predicho", "Valor real"]
+
+
+def test_el_tooltip_escapa_los_nombres_de_columna(sesion_lista):
+    """El tooltip de ECharts interpreta HTML y los nombres de los ejes son
+    los de las columnas del archivo: sin escapar, una cabecera como
+    <img onerror=...> ejecutaría código al pasar el ratón por un punto."""
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    formateador = panel.grafico.options["tooltip"][":formatter"]
+    for valor in (
+        "punto.seriesName",
+        "punto.dimensionNames[0]",
+        "punto.dimensionNames[1]",
+    ):
+        # Cada vez que se usa, va dentro de esc(...)
+        assert formateador.count(valor) == formateador.count(
+            "esc(" + valor + ")"
+        )
+        assert "esc(" + valor + ")" in formateador
+
+
+def test_los_ejes_no_obligan_a_empezar_en_cero(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    assert panel.grafico.options["xAxis"]["scale"] is True
+    assert panel.grafico.options["yAxis"]["scale"] is True
 
 
 def test_crear_otra_vez_sustituye_al_modelo(sesion_lista, avisos):
@@ -200,12 +334,13 @@ def test_crear_otra_vez_sustituye_al_modelo(sesion_lista, avisos):
 
     assert sesion_lista.modelo is not primero
     assert [tipo for _, tipo in avisos] == ["positive", "positive"]
-    assert len(panel.grafico.fig.axes) == 1  # se redibuja, no se apila
+    # se sustituye el contenido, no se apila
+    assert len(panel.grafico.options["series"]) == 3
 
 
 def test_error_al_crear_avisa_y_no_cambia_nada(sesion_lista, avisos):
     constante = sesion_lista.separacion.entrenamiento.assign(x1=1.0)
-    sesion_lista.separacion = replace(
+    sesion_lista._separacion = replace(
         sesion_lista.separacion, entrenamiento=constante
     )
     panel = PanelModelo(sesion_lista)
@@ -239,6 +374,45 @@ def test_sin_separacion_avisa_al_pulsar(avisos):
     assert "Separa primero" in mensaje
 
 
+def modelo_de(coeficientes, independiente, features=("x1", "x2")):
+    return modelo_dominio.ModeloLineal(
+        features, "y", coeficientes, independiente
+    )
+
+
+def formula_sin_colores(mod):
+    """La fórmula tal como la escribe html_formula si ninguna columna
+    tiene color."""
+    return html_formula(mod, {})
+
+
+def test_formula_sin_colores_en_una_linea():
+    mod = modelo_de((2.0, -3.0), 5.0)
+    texto = formula_sin_colores(mod).replace("\u00a0", " ")
+    assert texto == "y = 2.0000 · x1 − 3.0000 · x2 + 5.0000"
+
+
+def test_formula_sin_colores_primer_coeficiente_negativo_con_el_signo_pegado():
+    mod = modelo_de((-2.0, 3.0), -5.0)
+    texto = formula_sin_colores(mod).replace("\u00a0", " ")
+    assert texto == "y = −2.0000 · x1 + 3.0000 · x2 − 5.0000"
+
+
+def test_formula_sin_colores_regresion_simple():
+    mod = modelo_de((2.0,), 1.0, features=("x",))
+    texto = formula_sin_colores(mod).replace("\u00a0", " ")
+    assert texto == "y = 2.0000 · x + 1.0000"
+
+
+def test_formula_sin_colores_solo_se_parte_entre_terminos():
+    """Cada término lleva espacios duros: el signo no se queda solo."""
+    texto = formula_sin_colores(modelo_de((2.0, -3.0), 5.0))
+    assert "−\u00a03.0000\u00a0·\u00a0x2" in texto
+    assert "+\u00a05.0000" in texto
+    # los únicos espacios normales separan "y =" y los términos
+    assert texto.count(" ") == 4
+
+
 # =============================================================================
 # Camino completo
 # =============================================================================
@@ -258,8 +432,8 @@ def test_camino_completo_con_valores_inexistentes(sesion_separada, avisos):
     assert avisos[-1] == ("Modelo creado correctamente.", "positive")
     assert sesion_separada.modelo.features == ("x1", "x2")
     assert panel.resultados.visible
-    assert panel.formula.text.startswith("y = ")
-    assert "R²" in panel.metricas["test"][0].text
+    assert formula_visible(panel).startswith("y = ")
+    assert panel.metricas["test"][0].text != ""
 
 
 # =============================================================================
@@ -316,17 +490,23 @@ def test_al_recargar_la_pagina_se_ve_el_modelo(sesion_lista):
     panel = PanelModelo(sesion_lista)
 
     assert panel.resultados.visible
-    assert panel.formula.text == "y = 2.0000 * x1 - 3.0000 * x2 + 5.0000"
+    expected = "y = 2.0000 · x1 − 3.0000 · x2 + 5.0000"
+    assert formula_visible(panel) == expected
 
 
 def test_no_contiene_logica_del_modelo():
+    import sikorius.gui.componentes.formula as formula
+    import sikorius.gui.componentes.grafico_ajuste as grafico
     import sikorius.gui.paneles.panel_modelo as panel
 
     codigo = inspect.getsource(panel)
-    for llamada in ("formula_texto(", "metricas_modelo(", "datos_ajuste("):
+    for llamada in ("html_formula(", "metricas_modelo(", "datos_ajuste("):
         assert llamada in codigo
-    for prohibido in ("lstsq", "polyfit", "numpy", "np.", "mean("):
-        assert prohibido not in codigo
+    assert "terminos_formula(" in inspect.getsource(formula)
+    for modulo in (panel, formula, grafico):
+        codigo = inspect.getsource(modulo)
+        for prohibido in ("lstsq", "polyfit", "numpy", "np.", "mean("):
+            assert prohibido not in codigo
 
 
 # =============================================================================
@@ -419,3 +599,597 @@ def test_otros_avisos_no_pisan_lo_que_se_escribe(sesion_lista):
 
     assert panel.descripcion.value == "lo que escribo"
     assert sesion_lista.modelo.descripcion == "lo que escribo"
+
+
+# =============================================================================
+# Guardar el modelo (historia #21)
+# =============================================================================
+
+
+def elegir_al_guardar(monkeypatch, ruta):
+    """El diálogo de guardado devuelve ruta sin abrirse.
+
+    Returns:
+        Lista con los argumentos (carpeta, nombre, aviso) de cada llamada.
+    """
+    llamadas = []
+
+    async def dialogo_falso(carpeta, nombre, aviso=None):
+        llamadas.append((carpeta, nombre, aviso))
+        return ruta
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_falso
+    )
+    return llamadas
+
+
+def leer_json(ruta):
+    with open(ruta, encoding="utf-8") as archivo:
+        return json.load(archivo)
+
+
+def test_sin_modelo_no_se_puede_guardar(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    assert panel.boton_guardar.text == "Guardar modelo"
+    assert not panel.boton_guardar.enabled
+
+
+def test_sin_nada_no_se_puede_guardar():
+    panel = PanelModelo(Sesion())
+    assert not panel.boton_guardar.enabled
+
+
+def test_al_crear_el_modelo_se_habilita_guardar(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    assert panel.boton_guardar.enabled
+
+
+def test_al_borrarse_el_modelo_se_deshabilita_guardar(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    sesion_lista.aplicar_preprocesado("media")  # borra el modelo
+    assert not panel.boton_guardar.enabled
+
+
+def test_al_recargar_la_pagina_se_puede_guardar(sesion_lista):
+    sesion_lista.crear_modelo()
+    panel = PanelModelo(sesion_lista)
+    assert panel.boton_guardar.enabled
+
+
+def test_guardar_escribe_el_archivo_y_avisa(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    ruta = tmp_path / "Mis modelos ñ" / "modelo.json"
+    ruta.parent.mkdir()
+    elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("Descripción del modelo")
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert avisos == [("Modelo guardado en " + str(ruta), "positive")]
+    datos = leer_json(ruta)
+    assert datos["descripcion"] == "Descripción del modelo"
+    assert datos["formula"] == modelo_dominio.formula_texto(
+        sesion_lista.modelo
+    )
+    assert datos["modelo"]["features"] == ["x1", "x2"]
+    assert datos["modelo"]["target"] == "y"
+    assert set(datos["metricas"]) == {"entrenamiento", "test"}
+    assert not sesion_lista.modelo_sin_guardar
+
+
+def test_lo_guardado_es_lo_que_se_ve(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    """Las métricas del archivo son las que muestra el panel."""
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    datos = leer_json(tmp_path / "m.json")
+    for clave, (r2, ecm) in panel.metricas.items():
+        assert r2.text == texto_metrica(datos["metricas"][clave]["r2"])
+        assert ecm.text == texto_metrica(datos["metricas"][clave]["ecm"])
+
+
+def test_cerrar_el_dialogo_no_guarda_nada(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, None)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert avisos == []
+    assert list(tmp_path.iterdir()) == []
+    assert sesion_lista.modelo_sin_guardar
+    assert sesion_lista.ruta_modelo is None
+
+
+def test_sin_descripcion_el_dialogo_avisa(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    llamadas = elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    assert llamadas[0][2] == AVISO_SIN_DESCRIPCION
+    # El aviso no impide guardar
+    assert leer_json(tmp_path / "m.json")["descripcion"] == ""
+
+
+def test_descripcion_solo_con_espacios_tambien_avisa(sesion_lista):
+    sesion_lista.crear_modelo()
+    sesion_lista.guardar_descripcion("  \n ")
+    assert aviso_antes_de_guardar(sesion_lista.modelo) is not None
+
+
+def test_con_descripcion_no_hay_aviso(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    llamadas = elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("algo")
+
+    asyncio.run(panel.guardar())
+
+    assert llamadas[0][2] is None
+
+
+def test_error_al_guardar_avisa_y_se_puede_reintentar(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "no_existe" / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert len(avisos) == 1
+    mensaje, tipo = avisos[0]
+    assert tipo == "negative"
+    assert "no existe la carpeta" in mensaje
+    assert panel.boton_guardar.enabled
+    assert sesion_lista.modelo is not None
+
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    asyncio.run(panel.guardar())
+    assert (tmp_path / "m.json").exists()
+    assert avisos[-1][1] == "positive"
+
+
+def test_sobrescribe_el_archivo_elegido(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    """La confirmación la pide el diálogo: si devuelve la ruta, se escribe."""
+    ruta = tmp_path / "m.json"
+    ruta.write_text("viejo", encoding="utf-8")
+    elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    assert leer_json(ruta)["modelo"]["target"] == "y"
+
+
+def test_guardar_no_redibuja_ni_cambia_el_modelo(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    panel.descripcion.set_value("texto")
+    modelo = sesion_lista.modelo
+
+    asyncio.run(panel.guardar())
+
+    assert sesion_lista.modelo is modelo
+    assert panel.descripcion.value == "texto"
+    assert panel.resultados.visible
+
+
+# --- Carpeta y nombre que propone el diálogo ---
+
+
+def test_destino_sin_dataset():
+    assert destino_inicial(Sesion()) == (Path.home(), "modelo.json")
+
+
+def test_destino_junto_al_dataset(tmp_path):
+    sesion = Sesion()
+    sesion.cargar_dataset(datos_lineales(), tmp_path / "pisos ñ.csv")
+    carpeta, nombre = destino_inicial(sesion)
+    assert carpeta == tmp_path.resolve()
+    assert nombre == "modelo_pisos ñ.json"
+
+
+def test_destino_tras_guardar_es_el_mismo_archivo(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    ruta = tmp_path / "guardado.json"
+    llamadas = elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+    panel.descripcion.set_value("cambio")
+    asyncio.run(panel.guardar())
+
+    assert llamadas[1][0] == tmp_path
+    assert llamadas[1][1] == "guardado.json"
+    assert leer_json(ruta)["descripcion"] == "cambio"
+
+
+def test_destino_de_un_modelo_nuevo_vuelve_al_dataset(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "guardado.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    asyncio.run(panel.guardar())
+
+    panel.crear()
+
+    _, nombre = destino_inicial(sesion_lista)
+    assert nombre == "modelo_datos.json"
+
+
+def test_el_panel_no_escribe_archivos_por_su_cuenta():
+    """El panel delega: el JSON lo escribe datos.persistencia."""
+    import sikorius.gui.paneles.panel_modelo as panel
+
+    codigo = inspect.getsource(panel)
+    assert "guardar_modelo(" in codigo
+    for prohibido in ("import json", "json.", "open(", "write_text"):
+        assert prohibido not in codigo
+
+
+def test_guardar_no_vuelve_a_dibujar_el_grafico(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    veces = []
+    monkeypatch.setattr(
+        panel, "_mostrar_resultados", lambda: veces.append("dibujo")
+    )
+
+    asyncio.run(panel.guardar())
+    assert veces == []
+
+    panel.crear()  # un modelo nuevo sí se dibuja
+    assert veces == ["dibujo"]
+
+
+# =============================================================================
+# Mejoras: estado de guardado, doble clic y modelo que cambia
+# =============================================================================
+
+
+def test_estado_sin_modelo_no_se_ve(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    assert texto_estado_guardado(sesion_lista) == ""
+    assert not panel.estado_guardado.visible
+
+
+def test_estado_modelo_nuevo_sin_guardar(sesion_lista):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    assert panel.estado_guardado.text == "Sin guardar"
+    assert panel.estado_guardado.visible
+
+
+def test_estado_tras_guardar_muestra_la_ruta(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    ruta = tmp_path / "m.json"
+    elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    assert panel.estado_guardado.text == "Guardado en " + str(ruta)
+
+
+def test_estado_cambiar_la_descripcion_deja_cambios_sin_guardar(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    ruta = tmp_path / "m.json"
+    elegir_al_guardar(monkeypatch, ruta)
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    asyncio.run(panel.guardar())
+
+    panel.descripcion.set_value("nueva descripción")
+
+    assert panel.estado_guardado.text.startswith("Cambios sin guardar")
+    assert str(ruta) in panel.estado_guardado.text
+
+
+def test_estado_modelo_nuevo_tras_guardar_vuelve_a_sin_guardar(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    elegir_al_guardar(monkeypatch, tmp_path / "m.json")
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    asyncio.run(panel.guardar())
+
+    panel.crear()
+
+    assert panel.estado_guardado.text == "Sin guardar"
+
+
+def test_con_el_dialogo_abierto_el_boton_esta_deshabilitado(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    estados = []
+    panel = PanelModelo(sesion_lista)
+
+    async def dialogo_falso(carpeta, nombre, aviso=None):
+        estados.append(panel.boton_guardar.enabled)
+        panel.actualizar()  # la sesión avisa con el diálogo abierto
+        estados.append(panel.boton_guardar.enabled)
+        return None
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_falso
+    )
+    panel.crear()
+
+    asyncio.run(panel.guardar())
+
+    assert estados == [False, False]
+    assert panel.boton_guardar.enabled  # al cerrar se vuelve a habilitar
+
+
+def test_doble_clic_solo_abre_un_dialogo(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    llamadas = []
+
+    async def dialogo_lento(carpeta, nombre, aviso=None):
+        llamadas.append(nombre)
+        await asyncio.sleep(0.01)
+        return tmp_path / "m.json"
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_lento
+    )
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    avisos.clear()
+
+    async def dos_clics():
+        await asyncio.gather(panel.guardar(), panel.guardar())
+
+    asyncio.run(dos_clics())
+
+    assert len(llamadas) == 1
+    assert avisos == [
+        ("Modelo guardado en " + str(tmp_path / "m.json"), "positive")
+    ]
+
+
+def test_si_el_modelo_cambia_con_el_dialogo_abierto_no_se_guarda(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    """Desde otra pestaña se crea otro modelo mientras se elige archivo."""
+    panel = PanelModelo(sesion_lista)
+
+    async def dialogo_falso(carpeta, nombre, aviso=None):
+        sesion_lista.crear_modelo()
+        return tmp_path / "m.json"
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_falso
+    )
+    panel.crear()
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert not (tmp_path / "m.json").exists()
+    assert len(avisos) == 1
+    assert avisos[0][1] == "negative"
+    assert "ha cambiado" in avisos[0][0]
+    assert panel.boton_guardar.enabled
+
+
+def test_si_el_modelo_se_borra_con_el_dialogo_abierto_no_se_guarda(
+    sesion_lista, tmp_path, monkeypatch, avisos
+):
+    panel = PanelModelo(sesion_lista)
+
+    async def dialogo_falso(carpeta, nombre, aviso=None):
+        sesion_lista.aplicar_preprocesado("media")  # borra el modelo
+        return tmp_path / "m.json"
+
+    monkeypatch.setattr(
+        dialogo_guardado, "elegir_ruta_guardado", dialogo_falso
+    )
+    panel.crear()
+    avisos.clear()
+
+    asyncio.run(panel.guardar())
+
+    assert not (tmp_path / "m.json").exists()
+    assert avisos[0][1] == "negative"
+    assert not panel.boton_guardar.enabled
+
+
+# =============================================================================
+# Modelo cargado de un archivo (historia #24)
+# =============================================================================
+
+
+def sin_duros(texto):
+    return texto.replace("\u00a0", " ")
+
+
+def sesion_con_modelo_cargado(tmp_path, descripcion="Para probar"):
+    """Guarda un modelo desde otra sesión y lo carga en una nueva."""
+    origen = crear_sesion()
+    origen.crear_modelo()
+    origen.guardar_descripcion(descripcion)
+    ruta = origen.guardar_modelo(tmp_path / "guardado.json")
+    sesion = Sesion()
+    sesion.cargar_modelo(ruta)
+    return sesion, origen
+
+
+def test_cargado_muestra_formula_metricas_y_descripcion(tmp_path):
+    sesion, origen = sesion_con_modelo_cargado(tmp_path)
+
+    panel = PanelModelo(sesion)
+
+    assert panel.resultados.visible
+    assert formula_visible(panel) == sin_duros(
+        formula_sin_colores(origen.modelo)
+    )
+    metricas = origen.metricas_modelo()
+    for clave, (r2, ecm) in panel.metricas.items():
+        assert r2.text == texto_metrica(metricas[clave]["r2"])
+        assert ecm.text == texto_metrica(metricas[clave]["ecm"])
+    assert panel.descripcion.value == "Para probar"
+
+
+def test_cargado_sin_descripcion_deja_el_campo_vacio(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path, descripcion="")
+    panel = PanelModelo(sesion)
+    assert panel.descripcion.value == ""
+
+
+def test_cargado_no_tiene_grafico_ni_boton_de_crear(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+    assert not panel.grafico.visible
+    assert not panel.boton.visible
+    assert not panel.aviso.visible
+
+
+def test_cargado_colorea_la_formula_con_sus_columnas(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+    colores = colores_columnas(["x1", "x2", "y"])
+    assert panel.formula.content == html_formula(sesion.modelo, colores)
+
+
+def test_cargado_metrica_no_calculable(tmp_path):
+    ruta = tmp_path / "m.json"
+    datos = {
+        "formato": "sikorius-modelo",
+        "version_formato": 1,
+        "descripcion": "",
+        "formula": "",
+        "modelo": {
+            "features": ["x"],
+            "target": "y",
+            "coeficientes": [2.0],
+            "termino_independiente": 1.0,
+        },
+        "metricas": {
+            "entrenamiento": {"r2": 1.0, "ecm": 0.0},
+            "test": {"r2": None, "ecm": 0.5},
+        },
+    }
+    ruta.write_text(json.dumps(datos), encoding="utf-8")
+    sesion = Sesion()
+    sesion.cargar_modelo(ruta)
+    panel = PanelModelo(sesion)
+    assert panel.metricas["test"][0].text == "no calculable"
+
+
+def test_cargado_se_ve_al_cargarlo_con_el_panel_abierto(
+    sesion_lista, tmp_path
+):
+    panel = PanelModelo(sesion_lista)
+    panel.crear()
+    ruta = tmp_path / "otro.json"
+    origen = crear_sesion(features=("x1",))
+    origen.crear_modelo()
+    origen.guardar_modelo(ruta)
+
+    sesion_lista.cargar_modelo(ruta)
+
+    assert formula_visible(panel) == sin_duros(
+        formula_sin_colores(origen.modelo)
+    )
+    assert not panel.grafico.visible
+    assert not panel.boton.visible
+
+
+def test_al_volver_a_crear_se_ve_el_grafico_y_el_boton(tmp_path, datos):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+    df = datos_lineales()
+    sesion.cargar_dataset(df, "datos.csv")
+    sesion.guardar_seleccion(["x1", "x2"], "y")
+    sesion.guardar_separacion(df.iloc[:15], df.iloc[15:], 20, 42)
+
+    panel.crear()
+
+    assert panel.boton.visible
+    assert panel.boton.enabled
+    assert panel.grafico.visible
+
+
+def test_cargado_la_descripcion_es_editable(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+
+    panel.descripcion.set_value("Descripción nueva")
+
+    assert sesion.modelo.descripcion == "Descripción nueva"
+    assert sesion.modelo_sin_guardar
+    assert panel.estado_guardado.text.startswith("Cambios sin guardar")
+
+
+def test_cargado_se_puede_guardar_y_propone_su_archivo(tmp_path):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    panel = PanelModelo(sesion)
+    assert panel.boton_guardar.enabled
+    assert panel.estado_guardado.text == "Guardado en " + str(
+        (tmp_path / "guardado.json").resolve()
+    )
+    assert destino_inicial(sesion) == (
+        (tmp_path / "guardado.json").resolve().parent,
+        "guardado.json",
+    )
+
+
+def test_guardar_el_cargado_conserva_todo_menos_la_descripcion(
+    tmp_path, monkeypatch, avisos
+):
+    sesion, _ = sesion_con_modelo_cargado(tmp_path)
+    ruta = tmp_path / "guardado.json"
+    antes = leer_json(ruta)
+    panel = PanelModelo(sesion)
+    panel.descripcion.set_value("Revisada")
+    elegir_al_guardar(monkeypatch, ruta)
+
+    asyncio.run(panel.guardar())
+
+    despues = leer_json(ruta)
+    assert despues["descripcion"] == "Revisada"
+    antes.pop("descripcion")
+    despues.pop("descripcion")
+    assert despues == antes
+    assert not sesion.modelo_sin_guardar
+    assert avisos[-1][1] == "positive"

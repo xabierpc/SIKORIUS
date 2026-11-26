@@ -9,9 +9,10 @@ from pathlib import Path
 import pytest
 from nicegui import ui
 
-from sikorius.gui.paneles import panel_dataset
-from sikorius.gui.paneles.panel_dataset import PanelDataset, carpeta_inicial
-from sikorius.nucleo.separacion import separar_datos
+from sikorius.dominio.separacion import separar_datos
+from sikorius.gui.componentes import carga_dataset, carga_modelo
+from sikorius.gui.componentes.carga_dataset import carpeta_inicial
+from sikorius.gui.paneles.panel_dataset import PanelDataset
 
 
 @pytest.fixture
@@ -32,7 +33,7 @@ def elegir_en_explorador(monkeypatch, ruta):
     async def explorador_falso(_carpeta):
         return ruta
 
-    monkeypatch.setattr(panel_dataset, "seleccionar_archivo", explorador_falso)
+    monkeypatch.setattr(carga_dataset, "seleccionar_archivo", explorador_falso)
 
 
 # --- carpeta_inicial (antes en pagina.py, con el estado global) ---
@@ -137,3 +138,113 @@ def test_cerrar_el_explorador_no_cambia_nada(sesion, monkeypatch, avisos):
 
     assert sesion.dataset is None
     assert avisos == []
+
+
+# --- Botón "Cargar modelo" (historia #24) ---
+
+
+def modelo_guardado(sesion_separada, ruta):
+    """Crea y guarda un modelo con la sesión de los fixtures."""
+    sesion_separada.aplicar_preprocesado("media")
+    sesion_separada.crear_modelo()
+    return sesion_separada.guardar_modelo(ruta)
+
+
+def responder_confirmacion(monkeypatch, respuesta):
+    """La confirmación responde sola; devuelve la lista de mensajes."""
+    mensajes = []
+
+    async def falsa(titulo, mensaje, texto_aceptar="Aceptar"):
+        mensajes.append(mensaje)
+        return respuesta
+
+    monkeypatch.setattr(carga_modelo, "confirmar", falsa)
+    return mensajes
+
+
+def test_con_datos_solo_esta_el_boton_cargar_otro(sesion, datos):
+    """Cargar un modelo se hace desde "Inicio", no desde "Datos"."""
+    sesion.cargar_dataset(datos, "datos.csv")
+    panel = PanelDataset(sesion)
+    botones = [
+        e.text
+        for e in panel.contenido.descendants()
+        if isinstance(e, ui.button)
+    ]
+    assert botones == ["Cargar otro"]
+
+
+def test_al_cargar_un_modelo_la_tabla_no_se_ve(
+    sesion, sesion_separada, tmp_path
+):
+    panel = PanelDataset(sesion)
+    sesion.cargar_modelo(modelo_guardado(sesion_separada, tmp_path / "m.json"))
+    assert not panel.contenido.visible  # el modelo no trae datos
+
+
+def test_cargar_dataset_con_modelo_cargado_con_cambios_pregunta(
+    sesion, sesion_separada, tmp_path, monkeypatch, avisos
+):
+    sesion.cargar_modelo(modelo_guardado(sesion_separada, tmp_path / "m.json"))
+    sesion.guardar_descripcion("Cambiada")
+    mensajes = responder_confirmacion(monkeypatch, False)
+    archivo = tmp_path / "pisos.csv"
+    archivo.write_text("x,y\n1,2\n3,4\n", encoding="utf-8")
+    elegir_en_explorador(monkeypatch, str(archivo))
+    panel = PanelDataset(sesion)
+
+    asyncio.run(panel.cargar())
+
+    assert len(mensajes) == 1
+    assert sesion.modelo_cargado
+    assert sesion.dataset is None
+
+
+def test_si_confirma_el_dataset_sustituye_al_modelo_cargado(
+    sesion, sesion_separada, tmp_path, monkeypatch, avisos
+):
+    sesion.cargar_modelo(modelo_guardado(sesion_separada, tmp_path / "m.json"))
+    sesion.guardar_descripcion("Cambiada")
+    responder_confirmacion(monkeypatch, True)
+    archivo = tmp_path / "pisos.csv"
+    archivo.write_text("x,y\n1,2\n3,4\n", encoding="utf-8")
+    elegir_en_explorador(monkeypatch, str(archivo))
+    panel = PanelDataset(sesion)
+
+    asyncio.run(panel.cargar())
+
+    assert sesion.modelo is None
+    assert sesion.dataset is not None
+    assert panel.contenido.visible
+
+
+def test_modelo_cargado_sin_cambios_no_pregunta(
+    sesion, sesion_separada, tmp_path, monkeypatch, avisos
+):
+    sesion.cargar_modelo(modelo_guardado(sesion_separada, tmp_path / "m.json"))
+    mensajes = responder_confirmacion(monkeypatch, False)
+    archivo = tmp_path / "pisos.csv"
+    archivo.write_text("x,y\n1,2\n3,4\n", encoding="utf-8")
+    elegir_en_explorador(monkeypatch, str(archivo))
+
+    asyncio.run(PanelDataset(sesion).cargar())
+
+    assert mensajes == []
+    assert sesion.dataset is not None
+
+
+def test_modelo_creado_sin_guardar_no_cambia_la_carga_de_datasets(
+    sesion_separada, tmp_path, monkeypatch, avisos
+):
+    """La confirmación es solo para modelos cargados (criterio de #24)."""
+    sesion_separada.aplicar_preprocesado("media")
+    sesion_separada.crear_modelo()
+    mensajes = responder_confirmacion(monkeypatch, False)
+    archivo = tmp_path / "pisos.csv"
+    archivo.write_text("x,y\n1,2\n3,4\n", encoding="utf-8")
+    elegir_en_explorador(monkeypatch, str(archivo))
+
+    asyncio.run(PanelDataset(sesion_separada).cargar())
+
+    assert mensajes == []
+    assert sesion_separada.modelo is None

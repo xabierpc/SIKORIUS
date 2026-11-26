@@ -6,7 +6,7 @@ a medida que se termina cada una:
     uv run pytest tests/gui/test_carga_gui.py -v              # todos
     uv run pytest tests/gui/test_carga_gui.py -v -k tarea2    # una tarea
 
-    Tarea 2 -> sikorius/nucleo/formatos.py                (es_admitido)
+    Tarea 2 -> sikorius/datos/formatos.py                (es_admitido)
                sikorius/gui/componentes/explorador_archivos.py
                                                        (listar_carpeta)
     Tarea 3 -> sikorius/gui/componentes/tabla_datos.py (dataframe_a_tabla)
@@ -87,7 +87,7 @@ def carpeta_rara(tmp_path):
     ],
 )
 def test_tarea2_extensiones_permitidas(nombre):
-    from sikorius.nucleo.formatos import es_admitido
+    from sikorius.datos.formatos import es_admitido
 
     assert es_admitido(nombre)
 
@@ -106,13 +106,13 @@ def test_tarea2_extensiones_permitidas(nombre):
     ],
 )
 def test_tarea2_extensiones_no_permitidas(nombre):
-    from sikorius.nucleo.formatos import es_admitido
+    from sikorius.datos.formatos import es_admitido
 
     assert not es_admitido(nombre)
 
 
 def test_tarea2_acepta_path_y_str():
-    from sikorius.nucleo.formatos import es_admitido
+    from sikorius.datos.formatos import es_admitido
 
     assert es_admitido(Path("/una/carpeta/datos.csv"))
     assert es_admitido("/una/carpeta/datos.csv")
@@ -227,7 +227,10 @@ def test_tarea3_encabezados_son_los_nombres_de_columna():
 
     columnas, filas = dataframe_a_tabla(df)
 
+    # La etiqueta es el nombre original de la columna, sin cambiarlo...
     assert etiquetas_de(columnas) == ["superficie", "precio"]
+    # ...y el nombre real de la columna también se guarda en "real"
+    assert [c["real"] for c in columnas] == ["superficie", "precio"]
 
 
 def test_tarea3_formato_de_cada_columna():
@@ -345,8 +348,8 @@ def test_tarea3_dataframe_vacio():
 
 def test_tarea3_con_datos_del_importador(carpeta_rara):
     """Lo que devuelve el importador se puede pasar tal cual a la tabla."""
+    from sikorius.datos.importador import importar_datos
     from sikorius.gui.componentes.tabla_datos import dataframe_a_tabla
-    from sikorius.nucleo.importador import importar_datos
 
     archivo = crear_csv(
         carpeta_rara / "pisos.csv", "barrio;superficie\nElviña;60,5\nRiazor;\n"

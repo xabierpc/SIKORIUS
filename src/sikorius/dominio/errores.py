@@ -1,0 +1,47 @@
+"""Errores esperados de SIKORIUS: la GUI muestra su mensaje tal cual.
+
+Están todos aquí, en la capa más baja, para que cualquier capa los pueda
+lanzar y la GUI los pueda capturar sin importar la capa de datos. Por eso
+``ErrorImportacion`` y ``ErrorPersistencia``, aunque los lanza ``datos/``,
+también viven en este archivo.
+"""
+
+
+class ErrorSikorius(Exception):
+    """Base de todos los errores que se explican al usuario."""
+
+
+class ErrorImportacion(ErrorSikorius):
+    """No se puede importar el archivo de datos."""
+
+
+class ErrorSeleccion(ErrorSikorius):
+    """Selección de columnas no válida para una regresión lineal."""
+
+
+class ErrorSeparacion(ErrorSikorius):
+    """Parámetros o dataset no válidos para separar en entrenamiento y test."""
+
+
+class ErrorPreprocesado(ErrorSikorius):
+    """No se puede aplicar el preprocesado."""
+
+
+class ErrorModelo(ErrorSikorius):
+    """No se puede crear el modelo de regresión lineal."""
+
+
+class ErrorPersistencia(ErrorSikorius):
+    """No se puede guardar el modelo en un archivo ni cargarlo de él."""
+
+
+class ErrorPrediccion(ErrorSikorius):
+    """No se puede hacer la predicción con los valores introducidos."""
+
+
+class AvisoPreprocesado(ErrorPreprocesado):
+    """El preprocesado se podría hacer, pero el resultado no sería válido."""
+
+
+class ErrorColumnasNoEncontradas(ErrorPreprocesado, ValueError):
+    """Alguna columna seleccionada no existe en el DataFrame."""
