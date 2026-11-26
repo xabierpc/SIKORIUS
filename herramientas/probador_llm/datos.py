@@ -1,4 +1,4 @@
-"""Crea los archivos de prueba de la sección 2.2 del plan (F-1 a F-13).
+"""Crea los archivos de prueba de la sección 2.2 del plan (F-1 a F-14).
 
 Son los mismos archivos que el plan explica cómo crear a mano. Aquí se
 crean con código para que todas las ejecuciones partan exactamente de los
@@ -21,6 +21,7 @@ ARCHIVOS_TEXTO = {
     "falso.db": "esto no es una base de datos\n",
     "notas.txt": "hola\n",
     "cuatro_filas.csv": "x,y\n1,2\n2,4\n3,6\n4,8\n",
+    "cinco_filas.csv": "x,y\n1,2\n2,4\n3,6\n4,8\n5,10\n",
     "lineal.csv": (
         "x1,x2,y\n"
         "1,0,7\n"
@@ -48,6 +49,7 @@ GENERADOS = (
     "sin_descripcion.json",
     "reintento.json",
     "flujo_completo.json",
+    "prohibido.json",
 )
 
 

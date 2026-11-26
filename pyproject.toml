@@ -56,6 +56,8 @@ skip_covered = true
 line-length = 79
 target-version = "py312"
 src = ["src", "tests", "herramientas"]
+# Script generado automáticamente por el probador con LLM
+extend-exclude = ["herramientas/generados/test_plan_llm.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]

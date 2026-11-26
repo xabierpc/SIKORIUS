@@ -5,6 +5,7 @@ página no la borra). Para que cada caso empiece con la aplicación recién
 abierta, como pide el procedimiento PR-1, se para y se vuelve a arrancar.
 """
 
+import os
 import socket
 import subprocess
 import sys
@@ -37,11 +38,14 @@ class Aplicacion:
         raiz: Carpeta raíz del repositorio (donde se ejecuta la app).
         puerto: Puerto en el que escucha.
         registro: Archivo donde se guarda lo que escribe la aplicación.
+        carpeta_personal: Carpeta que la aplicación ve como carpeta
+            personal (donde empieza el explorador). None: la real.
     """
 
-    def __init__(self, raiz, registro):
+    def __init__(self, raiz, registro, carpeta_personal=None):
         self.raiz = Path(raiz)
         self.registro = Path(registro)
+        self.carpeta_personal = carpeta_personal
         self.puerto = None
         self._proceso = None
         self._salida = None
@@ -61,6 +65,16 @@ class Aplicacion:
         self.registro.parent.mkdir(parents=True, exist_ok=True)
         # Se cierra en parar(): el proceso escribe en él mientras dura
         self._salida = open(self.registro, "a", encoding="utf-8")  # noqa: SIM115
+        # La carpeta personal de la aplicación es data/: así el explorador
+        # de archivos empieza ahí y el agente no tiene que bajar desde la
+        # carpeta personal real (ahorra unas 8 acciones por carga)
+        entorno = dict(os.environ)
+        # Si se lanza desde pytest (script generado), NiceGUI vería esta
+        # variable y creería que está en sus propios tests
+        entorno.pop("PYTEST_CURRENT_TEST", None)
+        if self.carpeta_personal is not None:
+            entorno["HOME"] = str(self.carpeta_personal)
+            entorno["USERPROFILE"] = str(self.carpeta_personal)
         self._proceso = subprocess.Popen(
             # -P: no añade la carpeta del lanzador a sys.path, para que sus
             # vecinos (plan.py, datos.py...) no tapen otros módulos
@@ -68,6 +82,7 @@ class Aplicacion:
             cwd=self.raiz,
             stdout=self._salida,
             stderr=subprocess.STDOUT,
+            env=entorno,
         )
         limite = time.monotonic() + ESPERA_MAXIMA
         while time.monotonic() < limite:
@@ -81,6 +96,10 @@ class Aplicacion:
             time.sleep(0.3)
         self.parar()
         raise ErrorArranque("La aplicación no responde en " + self.url)
+
+    @property
+    def en_marcha(self):
+        return self._proceso is not None and self._proceso.poll() is None
 
     def reiniciar(self):
         """Cierra la aplicación y la vuelve a abrir (sesión nueva)."""

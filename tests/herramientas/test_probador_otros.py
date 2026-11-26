@@ -15,9 +15,12 @@ from probador_llm.cliente_groq import (
     VARIABLE_CLAVE,
     ErrorClave,
     convertir_respuesta,
+    es_limite_diario,
     leer_clave,
+    segundos_de_espera,
 )
-from probador_llm.navegador import ErrorAccion
+from probador_llm.navegador import ErrorAccion, compactar
+from probador_llm.plan import leer_plan
 
 # --- Datos de prueba ---
 
@@ -35,6 +38,11 @@ def test_lineal_cumple_la_formula(tmp_path):
     assert len(tabla) == 12
     esperado = 2 * tabla["x1"] - 3 * tabla["x2"] + 5
     assert (tabla["y"] == esperado).all()
+
+
+def test_cinco_filas(tmp_path):
+    tabla = pd.read_csv(datos.preparar(tmp_path) / "cinco_filas.csv")
+    assert len(tabla) == 5
 
 
 def test_nulos_total_tiene_x_vacia(tmp_path):
@@ -191,6 +199,82 @@ def test_convertir_respuesta_con_argumentos_no_validos(argumentos):
     assert llamada.error
 
 
+def test_tokens_de_cache_no_cuentan():
+    respuesta = respuesta_sdk('{"texto": "Crear"}')
+    respuesta.usage.prompt_tokens_details = SimpleNamespace(cached_tokens=100)
+    convertida = convertir_respuesta(respuesta)
+    assert convertida.tokens == 23
+    assert convertida.tokens_cache == 100
+
+
+@pytest.mark.parametrize(
+    ("mensaje", "segundos"),
+    [
+        ("Please try again in 7.5s. Need more tokens?", 7.5),
+        ("Please try again in 1m2.5s.", 62.5),
+        ("sin indicación", None),
+    ],
+)
+def test_segundos_de_espera(mensaje, segundos):
+    assert segundos_de_espera(mensaje) == segundos
+
+
+def test_limite_diario():
+    assert es_limite_diario("on tokens per day (TPD): Limit 200000")
+    assert es_limite_diario("on requests per day (RPD): Limit 1000")
+    assert not es_limite_diario("on tokens per minute (TPM): Limit 8000")
+
+
+# --- Pantalla compacta ---
+
+ARBOL = """- banner:
+  - img "SIKORIUS"
+  - tab "Datos"
+- main:
+  - table:
+    - rowgroup:
+      - row "a b":
+        - columnheader "a"
+        - columnheader "b"
+    - rowgroup:
+      - row "1 2":
+        - cell "1"
+        - cell "2"
+      - row "3 4":
+        - cell "3"
+        - cell "4"
+      - row "5 6":
+        - cell "5"
+        - cell "6"
+      - row "7 8":
+        - cell "7"
+        - cell "8"
+      - row "9 10":
+        - cell "9"
+        - cell "10"
+  - button "Cargar otro"
+- alert:
+  - text: Dataset cargado"""
+
+
+def test_compactar_quita_imagenes_y_mensajes():
+    texto = compactar(ARBOL)
+    assert "img" not in texto
+    assert "alert" not in texto
+    assert 'tab "Datos"' in texto
+    assert 'button "Cargar otro"' in texto
+
+
+def test_compactar_recorta_las_tablas():
+    texto = compactar(ARBOL)
+    assert 'row "a b"' in texto
+    assert 'row "5 6"' in texto
+    assert 'row "7 8"' not in texto
+    assert "2 filas más" in texto
+    # Las celdas sobran: el nombre de la fila ya las incluye
+    assert "cell" not in texto
+
+
 def test_respuesta_sin_herramientas():
     mensaje = SimpleNamespace(content="Hola", tool_calls=None)
     respuesta = convertir_respuesta(
@@ -251,6 +335,105 @@ def test_combinar_repeticiones_distintas():
 def test_dataset_d1_sin_rellenar():
     texto = "| D-1 (CSV) | `data/⟨dataset⟩.csv` |"
     assert ejecutor.dataset_d1(texto) is None
+
+
+def test_datasets_del_plan():
+    texto = (
+        "| D-1 (CSV) | `data/a.csv` |\n| D-3 (SQLite) | `data/a.db`, tabla |"
+    )
+    rutas = ejecutor.datasets(texto)
+    assert rutas["D-1"] == ejecutor.RAIZ / "data" / "a.csv"
+    assert rutas["D-3"] == ejecutor.RAIZ / "data" / "a.db"
+
+
+def test_datasets_que_faltan(tmp_path):
+    plan = leer_plan(
+        "#### CP-01. Uno\n- **Pasos:** PR-2 con D-1 y copia F-11.\n\n"
+        "#### CP-02. Dos\n- **Pasos:** como CP-01.\n\n"
+        "#### CP-03. Tres\n- **Pasos:** usa lineal.csv.\n"
+    )
+    existe = tmp_path / "a.csv"
+    existe.write_text("x\n1\n")
+    no_existe = ejecutor.RAIZ / "data" / "no_existe_nunca.csv"
+    assert (
+        ejecutor.datasets_que_faltan(
+            plan, plan.casos["CP-01"], {"D-1": existe}
+        )
+        == []
+    )
+    faltan = ejecutor.datasets_que_faltan(
+        plan, plan.casos["CP-02"], {"D-1": no_existe}
+    )
+    assert faltan == ["data/no_existe_nunca.csv"]
+    assert (
+        ejecutor.datasets_que_faltan(
+            plan, plan.casos["CP-03"], {"D-1": no_existe}
+        )
+        == []
+    )
+
+
+PLAN_INICIO = """
+#### CP-01. Recién abierta
+- **Precondiciones:** aplicación recién abierta (PR-1).
+
+#### CP-02. Continúa
+- **Precondiciones:** D-1 cargado.
+
+#### CP-03. Hijo de CP-02
+- **Precondiciones:** CP-02 ejecutado, sin cerrar la aplicación.
+"""
+
+
+@pytest.mark.parametrize(
+    ("caso", "ultimo", "en_marcha", "independiente", "esperado"),
+    [
+        # Primer caso: siempre se arranca
+        ("CP-02", None, False, False, (False, [])),
+        # Caso normal tras otro que fue bien: continúa
+        ("CP-02", ("CP-01", CORRECTO), True, False, (True, [])),
+        ("CP-02", ("CP-01", FALLIDO), True, False, (True, [])),
+        # El anterior dejó la aplicación en un estado desconocido
+        ("CP-02", ("CP-01", "Bloqueado"), True, False, (False, [])),
+        ("CP-02", ("CP-01", "Error"), True, False, (False, [])),
+        # La aplicación se ha cerrado
+        ("CP-02", ("CP-01", CORRECTO), False, False, (False, [])),
+        # Pide la aplicación recién abierta
+        ("CP-01", ("CP-02", CORRECTO), True, False, (False, [])),
+        # Ejecución independiente (repeticiones)
+        ("CP-02", ("CP-01", CORRECTO), True, True, (False, [])),
+        # Hijo justo después de su padre: continúa sin preparación
+        ("CP-03", ("CP-02", CORRECTO), True, False, (True, [])),
+        # Hijo sin su padre justo antes: se reinicia y se repite el padre
+        ("CP-03", ("CP-01", CORRECTO), True, False, (False, ["CP-02"])),
+        ("CP-03", ("CP-02", "Bloqueado"), True, False, (False, ["CP-02"])),
+    ],
+)
+def test_decidir_inicio(caso, ultimo, en_marcha, independiente, esperado):
+    plan = leer_plan(PLAN_INICIO)
+    continuar, preparacion = ejecutor.decidir_inicio(
+        plan, plan.casos[caso], ultimo, en_marcha, independiente
+    )
+    nombres = []
+    for previo in preparacion:
+        nombres.append(previo.id)
+    assert (continuar, nombres) == esperado
+
+
+class TargetClosedError(Exception):
+    """Imita el error de Playwright cuando se cierra el navegador."""
+
+
+@pytest.mark.parametrize(
+    ("error", "cerrado"),
+    [
+        (TargetClosedError("Target page has been closed"), True),
+        (RuntimeError("Browser has been closed"), True),
+        (RuntimeError("Timeout 30000ms exceeded"), False),
+    ],
+)
+def test_navegador_cerrado(error, cerrado):
+    assert ejecutor._navegador_cerrado(error) == cerrado
 
 
 def test_casos_manuales_existen_en_el_plan():

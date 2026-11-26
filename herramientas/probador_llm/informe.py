@@ -88,6 +88,19 @@ def texto_registro(resultados, datos):
     lineas.append("| Ejecutados por el LLM | " + str(ejecutados) + " |")
     for estado in ORDEN_ESTADOS:
         lineas.append("| " + estado + " | " + str(cuentas[estado]) + " |")
+    total = 0
+    cache = 0
+    for resultado in resultados:
+        total = total + resultado.tokens
+        cache = cache + resultado.tokens_cache
+    lineas.append("")
+    lineas.append(
+        "Tokens que cuentan para los límites de Groq: "
+        + str(total)
+        + " (más "
+        + str(cache)
+        + " reutilizados de la caché, que no cuentan)."
+    )
     lineas.append("")
     lineas.append(
         "**Revisar**: el LLM dio un veredicto, pero alguna evidencia que "
@@ -160,6 +173,9 @@ def _detalle(resultado):
         + str(resultado.turnos)
         + " · **Tokens:** "
         + str(resultado.tokens)
+        + " (+ "
+        + str(resultado.tokens_cache)
+        + " de caché)"
         + " · **Duración:** "
         + str(resultado.segundos)
         + " s · **Capturas:** `capturas/"

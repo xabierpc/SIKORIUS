@@ -18,10 +18,22 @@ PATRON_CASO = re.compile(r"^#### (CP-\d+)\. (.+)$", re.MULTILINE)
 PATRON_HUECO = re.compile("⟨([^⟩]+)⟩")
 # "CP-58 ejecutado" en las precondiciones
 PATRON_REQUISITO = re.compile(r"(CP-\d+) ejecutado")
+# Cualquier mención a otro caso ("como CP-35", "los pasos 1 a 3 de CP-35")
+PATRON_MENCION_CASO = re.compile(r"CP-\d+")
 # Clave del glosario: mayúsculas y guiones bajos
 PATRON_CLAVE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 TITULO_GLOSARIO = "### 1.3"
+
+# Párrafos del contexto que solo sirven a quien prepara las pruebas a mano
+SIN_INTERES = (
+    "Para crear un archivo de texto",
+    "Estos archivos los crea",
+    "Algunos casos repiten",
+    "Los archivos de datos",
+    "Los tres archivos contienen",
+    "**Bloque",
+)
 TITULO_CONTEXTO = "### 1.2"
 TITULO_FIN_CONTEXTO = "## 3."
 
@@ -39,6 +51,10 @@ class Caso:
         misma_sesion: True si el caso continúa con la aplicación tal como
             la dejó su primer requisito ("sin cerrar la aplicación").
         huecos: Valores que el equipo aún no ha rellenado.
+        citados: Otros casos que el texto menciona (por ejemplo, "como
+            CP-35"). El agente recibe su texto como referencia.
+        reinicio: True si el caso necesita la aplicación recién abierta.
+            Si no, continúa con lo que dejó el caso anterior.
     """
 
     id: str
@@ -47,6 +63,8 @@ class Caso:
     requisitos: list = field(default_factory=list)
     misma_sesion: bool = False
     huecos: list = field(default_factory=list)
+    citados: list = field(default_factory=list)
+    reinicio: bool = False
 
     @property
     def numero(self):
@@ -67,6 +85,60 @@ class Plan:
     casos: dict
     contexto: str
     glosario: dict
+
+    def orden(self, casos):
+        """Orden en que se ejecutan los casos elegidos.
+
+        Es el orden del plan, salvo que un caso que continúa a otro ("CP-47
+        ejecutado, sin cerrar la aplicación") se ejecuta justo después de
+        él, aunque en el plan esté más adelante o más atrás. Así continúa
+        exactamente donde lo dejó el anterior, sin repetir sus pasos.
+        """
+        elegidos = []
+        for caso in casos:
+            elegidos.append(caso.id)
+        hijos = {}
+        for caso in casos:
+            padre = self.padre(caso)
+            if padre is not None and padre.id in elegidos:
+                hijos.setdefault(padre.id, []).append(caso)
+        orden = []
+        emitidos = set()
+
+        def emitir(caso):
+            if caso.id in emitidos:
+                return
+            emitidos.add(caso.id)
+            orden.append(caso)
+            for hijo in hijos.get(caso.id, []):
+                emitir(hijo)
+
+        for caso in casos:
+            padre = self.padre(caso)
+            if padre is not None and padre.id in elegidos:
+                # Se ejecuta cuando le toque a su padre
+                continue
+            emitir(caso)
+        # Por si hubiera un ciclo en el plan: no se pierde ningún caso
+        for caso in casos:
+            emitir(caso)
+        return orden
+
+    def padre(self, caso):
+        """Caso al que continúa ``caso`` sin cerrar la aplicación, o None."""
+        if not caso.misma_sesion or not caso.requisitos:
+            return None
+        return self.casos.get(caso.requisitos[0])
+
+    def referencias(self, caso):
+        """Casos citados por ``caso`` que no se repiten como preparación."""
+        preparacion = self.preparacion(caso)
+        referencias = []
+        for identificador in caso.citados:
+            citado = self.casos.get(identificador)
+            if citado is not None and citado not in preparacion:
+                referencias.append(citado)
+        return referencias
 
     def preparacion(self, caso):
         """Casos que hay que repetir antes de ``caso`` en la misma sesión.
@@ -144,7 +216,7 @@ def leer_plan(texto):
     inicio = sustituido.find(TITULO_CONTEXTO)
     fin = sustituido.find(TITULO_FIN_CONTEXTO)
     if inicio >= 0 and fin > inicio:
-        contexto = sustituido[inicio:fin].strip()
+        contexto = compactar_contexto(sustituido[inicio:fin].strip())
 
     coincidencias = list(PATRON_CASO.finditer(sustituido))
     if not coincidencias:
@@ -164,6 +236,68 @@ def leer_plan(texto):
             coincidencia.group(1), coincidencia.group(2).strip(), bloque
         )
     return Plan(casos=casos, contexto=contexto, glosario=glosario)
+
+
+def compactar_contexto(texto):
+    """Quita del contexto lo que el agente no necesita, para gastar menos.
+
+    - El procedimiento PR-1 (abrir la aplicación): lo hace el probador.
+    - Las tablas pasan a listas: del glosario, "texto: dónde"; de los
+      archivos creados, "F-n: ruta (para qué)".
+    - Los bloques de código con el contenido de los archivos y las
+      instrucciones para crearlos: los crea el probador.
+    """
+    lineas = texto.splitlines()
+    salida = []
+    en_codigo = False
+    en_pr1 = False
+    for linea in lineas:
+        limpia = linea.strip()
+        if limpia.startswith("```"):
+            en_codigo = not en_codigo
+            continue
+        if en_codigo:
+            continue
+        if limpia.startswith("**PR-1."):
+            en_pr1 = True
+            continue
+        if en_pr1:
+            if limpia.startswith("**PR-") or limpia.startswith("#"):
+                en_pr1 = False
+            else:
+                continue
+        if limpia == "---" or limpia.startswith(SIN_INTERES):
+            continue
+        celdas = _celdas(linea)
+        if celdas:
+            fila = _fila_compacta(celdas)
+            if fila:
+                salida.append(fila)
+            continue
+        if limpia or (salida and salida[-1] != ""):
+            salida.append(linea.rstrip())
+    return "\n".join(salida).strip()
+
+
+def _fila_compacta(celdas):
+    """Una fila de tabla como línea de lista, o "" si es cabecera."""
+    primera = celdas[0]
+    if not primera or set(primera) <= set("-: "):
+        return ""
+    if primera in ("Clave", "Dato", "Id", "Caso"):
+        return ""
+    if PATRON_CLAVE.match(primera) or " / " in primera:
+        # Glosario: la clave ya está sustituida en los casos
+        if len(celdas) >= 3 and celdas[2]:
+            return "- " + celdas[1] + ": " + celdas[2]
+        return "- " + celdas[1]
+    if re.match(r"^F-\d+$", primera) and len(celdas) >= 4:
+        return "- " + primera + ": " + celdas[1] + " (" + celdas[3] + ")"
+    resto = []
+    for celda in celdas[1:]:
+        if celda and celda != "-":
+            resto.append(celda)
+    return "- " + primera + ": " + "; ".join(resto)
 
 
 def elegir_casos(plan, seleccion):
@@ -210,10 +344,15 @@ def _crear_caso(identificador, titulo, bloque):
             break
     requisitos = PATRON_REQUISITO.findall(precondiciones)
     misma_sesion = "sin cerrar la aplicación" in precondiciones
+    reinicio = "recién abierta" in precondiciones and not misma_sesion
     huecos = []
     for hueco in PATRON_HUECO.findall(bloque):
         if hueco not in huecos:
             huecos.append(hueco)
+    citados = []
+    for mencion in PATRON_MENCION_CASO.findall(bloque):
+        if mencion != identificador and mencion not in citados:
+            citados.append(mencion)
     return Caso(
         id=identificador,
         titulo=titulo,
@@ -221,6 +360,8 @@ def _crear_caso(identificador, titulo, bloque):
         requisitos=requisitos,
         misma_sesion=misma_sesion,
         huecos=huecos,
+        citados=citados,
+        reinicio=reinicio,
     )
 
 

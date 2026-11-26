@@ -12,6 +12,7 @@ se sube al repositorio.
 
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,13 +20,32 @@ from pathlib import Path
 MODELO_POR_DEFECTO = "openai/gpt-oss-120b"
 VARIABLE_CLAVE = "GROQ_API_KEY"
 
-# Reintentos si Groq responde que se ha superado el límite de uso
-REINTENTOS = 6
+# Reintentos si Groq responde que se ha superado el límite por minuto
+REINTENTOS = 8
 ESPERA_INICIAL = 5.0
+
+# Esfuerzo de razonamiento de los modelos gpt-oss: "low" gasta muchos
+# menos tokens de salida y basta para seguir pasos
+RAZONAMIENTO_POR_DEFECTO = "low"
+
+# "Please try again in 7.5s" / "in 1m2.5s" en los errores de límite
+PATRON_ESPERA = re.compile(r"try again in (?:(\d+)m)?([\d.]+)s")
 
 
 class ErrorClave(Exception):
     """No se ha encontrado la clave de la API."""
+
+
+class LimiteDiario(Exception):
+    """Se han agotado los tokens o peticiones del día en Groq.
+
+    No tiene sentido reintentar: hay que seguir otro día (o cambiar de
+    plan en Groq). El probador para y guarda lo hecho.
+    """
+
+
+class PeticionDemasiadoGrande(Exception):
+    """Una sola petición supera el límite de tokens por minuto."""
 
 
 @dataclass
@@ -52,12 +72,16 @@ class Respuesta:
     Attributes:
         mensaje: Mensaje del asistente, listo para añadir a la conversación.
         llamadas: Herramientas que quiere usar, en orden.
-        tokens: Tokens consumidos en este turno.
+        tokens: Tokens que cuentan para los límites de Groq en este turno
+            (los de entrada que no estaban en caché más los de salida).
+        tokens_cache: Tokens de entrada reutilizados de la caché, que no
+            cuentan para los límites.
     """
 
     mensaje: dict
     llamadas: list = field(default_factory=list)
     tokens: int = 0
+    tokens_cache: int = 0
 
 
 def leer_clave(raiz):
@@ -111,11 +135,36 @@ def convertir_respuesta(respuesta):
         )
         llamadas.append(_crear_llamada(cruda))
     tokens = 0
-    if getattr(respuesta, "usage", None) is not None:
-        tokens = respuesta.usage.total_tokens or 0
+    cache = 0
+    uso = getattr(respuesta, "usage", None)
+    if uso is not None:
+        tokens = uso.total_tokens or 0
+        detalles = getattr(uso, "prompt_tokens_details", None)
+        if detalles is not None:
+            cache = getattr(detalles, "cached_tokens", 0) or 0
     return Respuesta(
-        mensaje=para_conversacion, llamadas=llamadas, tokens=tokens
+        mensaje=para_conversacion,
+        llamadas=llamadas,
+        tokens=tokens - cache,
+        tokens_cache=cache,
     )
+
+
+def segundos_de_espera(mensaje):
+    """Segundos que Groq pide esperar en un error de límite, o None."""
+    coincidencia = PATRON_ESPERA.search(str(mensaje))
+    if coincidencia is None:
+        return None
+    segundos = float(coincidencia.group(2))
+    if coincidencia.group(1):
+        segundos = segundos + 60 * int(coincidencia.group(1))
+    return segundos
+
+
+def es_limite_diario(mensaje):
+    """True si el error es por el límite diario (tokens o peticiones)."""
+    texto = str(mensaje).lower()
+    return "per day" in texto or "(tpd)" in texto or "(rpd)" in texto
 
 
 def _crear_llamada(cruda):
@@ -147,7 +196,13 @@ class ClienteGroq:
         temperatura: 0 para que las respuestas varíen lo menos posible.
     """
 
-    def __init__(self, clave, modelo=MODELO_POR_DEFECTO, temperatura=0.0):
+    def __init__(
+        self,
+        clave,
+        modelo=MODELO_POR_DEFECTO,
+        temperatura=0.0,
+        razonamiento=RAZONAMIENTO_POR_DEFECTO,
+    ):
         # Se importa aquí: los tests y el resto del probador no necesitan
         # tener instalado el paquete groq
         import groq
@@ -156,33 +211,69 @@ class ClienteGroq:
         self._cliente = groq.Groq(api_key=clave)
         self.modelo = modelo
         self.temperatura = temperatura
+        self.razonamiento = razonamiento
 
     def responder(self, mensajes, herramientas):
         """Pide al modelo la siguiente acción.
 
-        Si se supera el límite de uso de Groq, espera y lo vuelve a
-        intentar, cada vez el doble de tiempo.
+        Si se supera el límite por minuto, espera lo que indica Groq (o, si
+        no lo indica, cada vez el doble) y lo vuelve a intentar.
+
+        Raises:
+            LimiteDiario: Si se han agotado los tokens o peticiones del día.
+            PeticionDemasiadoGrande: Si la petición no cabe en el límite
+                por minuto ni esperando.
         """
+        opciones = {
+            "model": self.modelo,
+            "tools": herramientas,
+            "tool_choice": "auto",
+            "temperature": self.temperatura,
+        }
+        if self.modelo.startswith("openai/gpt-oss") and self.razonamiento:
+            opciones["reasoning_effort"] = self.razonamiento
         espera = ESPERA_INICIAL
         for intento in range(REINTENTOS):
             try:
                 respuesta = self._cliente.chat.completions.create(
-                    model=self.modelo,
-                    messages=mensajes,
-                    tools=herramientas,
-                    tool_choice="auto",
-                    temperature=self.temperatura,
+                    messages=mensajes, **opciones
                 )
                 return convertir_respuesta(respuesta)
-            except self._groq.RateLimitError:
-                if intento == REINTENTOS - 1:
-                    raise
-                time.sleep(espera)
-                espera = espera * 2
-            except self._groq.BadRequestError as error:
+            except self._groq.APIStatusError as error:
+                if error.status_code in (401, 403):
+                    raise ErrorClave(
+                        "Groq rechaza la clave ("
+                        + str(error.status_code)
+                        + "). "
+                        "Revisa GROQ_API_KEY en el .env y que no haya una "
+                        "variable GROQ_API_KEY antigua en la terminal."
+                    ) from error
+                if error.status_code == 413:
+                    raise PeticionDemasiadoGrande(str(error)) from error
+                if error.status_code == 429:
+                    if es_limite_diario(error):
+                        raise LimiteDiario(str(error)) from error
+                    if intento == REINTENTOS - 1:
+                        raise
+                    pedida = segundos_de_espera(error)
+                    if pedida is None:
+                        time.sleep(espera)
+                        espera = espera * 2
+                    else:
+                        print(
+                            "  (límite por minuto de Groq: esperando "
+                            + str(round(pedida + 1))
+                            + " s)",
+                            flush=True,
+                        )
+                        time.sleep(pedida + 1)
+                    continue
                 # A veces el modelo escribe una llamada mal formada y Groq
                 # la rechaza: se le avisa para que lo intente otra vez
-                if "tool" not in str(error).lower():
+                if (
+                    error.status_code != 400
+                    or "tool" not in str(error).lower()
+                ):
                     raise
                 if intento == REINTENTOS - 1:
                     raise

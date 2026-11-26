@@ -55,6 +55,7 @@ PLAN = """# Plan
 
 #### CP-04. Cuarto caso
 - **Precondiciones:** aplicación recién abierta (PR-1). CP-01 ejecutado.
+- **Pasos:** realizar los pasos 1 a 3 de CP-02.
 
 ---
 
@@ -142,9 +143,24 @@ def test_preparacion_vacia_si_empieza_con_la_app_recien_abierta(plan):
     assert plan.preparacion(plan.casos["CP-04"]) == []
 
 
-def test_contexto_incluye_procedimientos_glosario_y_datos(plan):
-    assert "PR-1" in plan.contexto
-    assert "Crear modelo" in plan.contexto
+def test_casos_citados(plan):
+    assert plan.casos["CP-04"].citados == ["CP-01", "CP-02"]
+    assert plan.casos["CP-01"].citados == []
+
+
+def test_referencias_excluyen_la_preparacion(plan):
+    assert ids(plan.referencias(plan.casos["CP-04"])) == ["CP-01", "CP-02"]
+    # CP-03 repite CP-01 y CP-02 como preparación: no son referencias
+    assert plan.referencias(plan.casos["CP-03"]) == []
+
+
+def test_contexto_compacto(plan):
+    # PR-1 (abrir la aplicación) lo hace el probador
+    assert "PR-1" not in plan.contexto
+    # El glosario pasa a lista "texto: dónde", sin las claves
+    assert "- Crear modelo: Pestaña" in plan.contexto
+    assert "B_CREAR" not in plan.contexto
+    assert "|" not in plan.contexto
     assert "Datos de prueba" in plan.contexto
     assert "CP-01" not in plan.contexto
 
@@ -185,3 +201,68 @@ def test_el_plan_del_proyecto_se_lee():
         assert "**Resultado esperado:**" in caso.texto, caso.id
         # Las claves del glosario ya están sustituidas
         assert "⟨B_" not in caso.texto, caso.id
+    # Los datos de la sección 2.1 ya están rellenados
+    for caso in plan.casos.values():
+        assert caso.huecos == [], caso.id
+
+
+PLAN_ADITIVO = """
+#### CP-01. Carga inicial
+- **Precondiciones:** aplicación recién abierta (PR-1).
+
+#### CP-02. Usa lo cargado
+- **Precondiciones:** D-1 cargado.
+
+#### CP-03. Continúa a CP-05
+- **Precondiciones:** CP-05 ejecutado, sin cerrar la aplicación.
+
+#### CP-04. Otro independiente
+- **Precondiciones:** aplicación abierta, en el estado que dejó el anterior.
+
+#### CP-05. Padre de CP-03
+- **Precondiciones:** D-1 cargado.
+
+#### CP-06. Continúa a CP-03
+- **Precondiciones:** CP-03 ejecutado, sin cerrar la aplicación.
+"""
+
+
+def test_reinicio_solo_si_pide_la_aplicacion_recien_abierta():
+    plan = leer_plan(PLAN_ADITIVO)
+    assert plan.casos["CP-01"].reinicio
+    assert not plan.casos["CP-02"].reinicio
+    assert not plan.casos["CP-03"].reinicio
+    assert not plan.casos["CP-04"].reinicio
+
+
+def test_padre():
+    plan = leer_plan(PLAN_ADITIVO)
+    assert plan.padre(plan.casos["CP-03"]).id == "CP-05"
+    assert plan.padre(plan.casos["CP-02"]) is None
+
+
+def test_orden_encadena_cada_caso_tras_su_padre():
+    plan = leer_plan(PLAN_ADITIVO)
+    orden = plan.orden(list(plan.casos.values()))
+    assert ids(orden) == ["CP-01", "CP-02", "CP-04", "CP-05", "CP-03", "CP-06"]
+
+
+def test_orden_sin_el_padre_respeta_el_plan():
+    plan = leer_plan(PLAN_ADITIVO)
+    elegidos = [plan.casos["CP-03"], plan.casos["CP-04"]]
+    assert ids(plan.orden(elegidos)) == ["CP-03", "CP-04"]
+
+
+def test_orden_del_plan_del_proyecto():
+    """Todos los casos salen una vez y cada cadena va seguida."""
+    ruta = Path(__file__).parents[2] / "docs" / "plan_pruebas.md"
+    if not ruta.exists():
+        pytest.skip("No hay docs/plan_pruebas.md")
+    plan = leer_plan(ruta.read_text(encoding="utf-8"))
+    orden = ids(plan.orden(list(plan.casos.values())))
+    assert sorted(orden) == sorted(plan.casos)
+    assert orden[0] == "CP-01"
+    for caso in plan.casos.values():
+        padre = plan.padre(caso)
+        if padre is not None:
+            assert orden.index(caso.id) > orden.index(padre.id), caso.id

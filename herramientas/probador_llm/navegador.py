@@ -28,14 +28,30 @@ ROLES_PULSABLES = (
 # Teclas que puede pulsar el agente
 TECLAS = ("Enter", "Escape", "Tab", "PageDown", "PageUp", "End", "Home")
 
-# Milisegundos que se espera tras cada acción para que NiceGUI actualice
-ESPERA_TRAS_ACCION = 700
+# Tras cada acción se espera a que la pantalla deje de cambiar: se compara
+# cada INTERVALO ms y se da por quieta cuando no cambia en ese tiempo. Si
+# sigue cambiando (por ejemplo, cargando un archivo grande), se espera como
+# mucho ESPERA_MAXIMA ms.
+ESPERA_MINIMA = 300
+INTERVALO = 400
+ESPERA_MAXIMA = 20000
 
 # Tamaño máximo del texto de la pantalla que se manda al LLM
-MAX_CARACTERES = 9000
+MAX_CARACTERES = 5000
+
+# Filas de cada tabla que se mandan al LLM (la cabecera aparte)
+FILAS_TABLA = 3
 
 # Mensajes de NiceGUI (ui.notify) que aún se ven en la página
 SELECTOR_MENSAJES = ".q-notification"
+
+# Lee de una vez la clase y el texto de cada mensaje visible
+JS_MENSAJES = """() => Array.from(
+  document.querySelectorAll('.q-notification')
+).map((n) => {
+  const m = n.querySelector('.q-notification__message');
+  return [n.className, m ? m.innerText : ''];
+})"""
 
 # Lee la configuración de cada gráfico visible de ECharts
 JS_GRAFICOS = """() => {
@@ -74,6 +90,7 @@ class Navegador:
         carpeta: Carpeta donde se guardan las capturas.
         mensajes: Todos los mensajes de la aplicación vistos desde que se
             creó el navegador, en orden y sin repetir.
+        nuevos: Mensajes que han aparecido desde la última observación.
         textos_vistos: Todo el texto de pantalla observado, para comprobar
             después que las evidencias del agente son reales.
     """
@@ -83,30 +100,31 @@ class Navegador:
         self.carpeta = Path(carpeta)
         self.carpeta.mkdir(parents=True, exist_ok=True)
         self.mensajes = []
+        self.nuevos = []
         self.textos_vistos = []
         self._capturas = 0
 
     # --- Observar ---
 
     def observar(self):
-        """Devuelve el texto de la pantalla y los mensajes que se ven.
+        """Devuelve el texto de la pantalla (sin los mensajes).
 
-        Además lo guarda en ``textos_vistos`` y anota los mensajes nuevos.
+        Los mensajes nuevos de la aplicación quedan en ``nuevos`` (y se
+        acumulan en ``mensajes``), porque el agente los recibe junto al
+        resultado de cada acción. El texto se guarda también en
+        ``textos_vistos`` para comprobar después las evidencias.
         """
         arbol = self.pagina.locator("body").aria_snapshot()
-        nuevos = self._recoger_mensajes()
-        partes = ["PANTALLA:", arbol]
+        self.nuevos = self._recoger_mensajes()
+        partes = [compactar(arbol)]
         graficos = self.describir_graficos()
         if graficos:
-            partes.append("GRÁFICOS VISIBLES:")
+            partes.append("GRÁFICOS:")
             for grafico in graficos:
                 partes.append("- " + grafico)
-        if nuevos:
-            partes.append("MENSAJES NUEVOS DE LA APLICACIÓN:")
-            for mensaje in nuevos:
-                partes.append("- " + mensaje)
         texto = "\n".join(partes)
-        self.textos_vistos.append(texto)
+        # Para las evidencias se guarda el árbol completo
+        self.textos_vistos.append(arbol + "\n" + texto)
         if len(texto) > MAX_CARACTERES:
             texto = (
                 texto[:MAX_CARACTERES]
@@ -117,20 +135,43 @@ class Navegador:
     def _recoger_mensajes(self):
         """Lee los mensajes visibles y devuelve los que no se habían visto."""
         nuevos = []
-        elementos = self.pagina.locator(SELECTOR_MENSAJES)
-        for indice in range(elementos.count()):
-            elemento = elementos.nth(indice)
-            tipo = _tipo_mensaje(elemento.get_attribute("class") or "")
-            texto = (
-                elemento.locator(".q-notification__message")
-                .inner_text()
-                .strip()
-            )
-            texto = tipo + ": " + texto
+        for texto in self._leer_mensajes():
             if texto not in self.mensajes:
                 self.mensajes.append(texto)
                 nuevos.append(texto)
         return nuevos
+
+    def limpiar(self):
+        """Deja la pantalla lista para el siguiente caso sin cambiar datos.
+
+        Cierra los diálogos abiertos (Escape) y los mensajes que siguen en
+        pantalla, para que no se mezclen con los del caso siguiente.
+        """
+        for _ in range(3):
+            if self.pagina.get_by_role("dialog").count() == 0:
+                break
+            self.pagina.keyboard.press("Escape")
+            self.pagina.wait_for_timeout(300)
+        botones = self.pagina.locator(SELECTOR_MENSAJES + " button")
+        for indice in range(botones.count() - 1, -1, -1):
+            try:
+                botones.nth(indice).click(timeout=1000)
+            except Exception:  # noqa: BLE001 - ya se ha cerrado sola
+                continue
+        self.pagina.wait_for_timeout(400)
+
+    def _leer_mensajes(self):
+        """Textos de los mensajes visibles, con su tipo delante.
+
+        Se leen todos de una vez con JavaScript: los mensajes desaparecen
+        solos y, leyéndolos uno a uno, alguno podía irse a mitad.
+        """
+        textos = []
+        for clases, texto in self.pagina.evaluate(JS_MENSAJES):
+            texto = texto.strip()
+            if texto:
+                textos.append(_tipo_mensaje(clases) + ": " + texto)
+        return textos
 
     def describir_graficos(self):
         """Describe con texto los gráficos de ECharts que se ven.
@@ -315,7 +356,78 @@ class Navegador:
         return ", ".join(nombres)
 
     def _esperar(self):
-        self.pagina.wait_for_timeout(ESPERA_TRAS_ACCION)
+        """Espera a que la aplicación termine de actualizar la pantalla."""
+        self.pagina.wait_for_timeout(ESPERA_MINIMA)
+        anterior = self.pagina.locator("body").aria_snapshot()
+        esperado = ESPERA_MINIMA
+        while esperado < ESPERA_MAXIMA:
+            self.pagina.wait_for_timeout(INTERVALO)
+            esperado = esperado + INTERVALO
+            actual = self.pagina.locator("body").aria_snapshot()
+            if actual == anterior:
+                return
+            anterior = actual
+
+
+def compactar(arbol):
+    """Reduce el árbol de accesibilidad para gastar menos tokens.
+
+    - Quita las imágenes (no aportan nada a las pruebas).
+    - Quita los mensajes ("alert"), que se mandan aparte.
+    - De cada tabla deja la cabecera y las primeras filas, e indica cuántas
+      se han omitido.
+    """
+    lineas = arbol.splitlines()
+    salida = []
+    indice = 0
+    filas = {}
+    while indice < len(lineas):
+        linea = lineas[indice]
+        sangria = len(linea) - len(linea.lstrip())
+        contenido = linea.strip()
+        if contenido.startswith("- img") or contenido.startswith("- alert"):
+            indice = _saltar_hijos(lineas, indice, sangria)
+            continue
+        if contenido.startswith("- rowgroup"):
+            filas[sangria + 2] = 0
+        if contenido.startswith("- row") and sangria in filas:
+            filas[sangria] += 1
+            if filas[sangria] > FILAS_TABLA:
+                omitidas = 0
+                while indice < len(lineas):
+                    actual = lineas[indice]
+                    nivel = len(actual) - len(actual.lstrip())
+                    if nivel < sangria:
+                        break
+                    if nivel == sangria and actual.strip().startswith("- row"):
+                        omitidas += 1
+                    indice += 1
+                salida.append(
+                    " " * sangria
+                    + "- (... "
+                    + str(omitidas)
+                    + " filas más que no se muestran)"
+                )
+                continue
+            # De cada fila basta su nombre, que ya lleva el texto de las
+            # celdas: se quitan las celdas una a una
+            salida.append(linea.rstrip(":"))
+            indice = _saltar_hijos(lineas, indice, sangria)
+            continue
+        salida.append(linea)
+        indice += 1
+    return "\n".join(salida)
+
+
+def _saltar_hijos(lineas, indice, sangria):
+    """Índice de la primera línea después de ``lineas[indice]`` y sus hijos."""
+    indice += 1
+    while indice < len(lineas):
+        actual = lineas[indice]
+        if len(actual) - len(actual.lstrip()) <= sangria:
+            break
+        indice += 1
+    return indice
 
 
 def _tipo_mensaje(clases):

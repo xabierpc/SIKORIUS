@@ -26,12 +26,16 @@ class NavegadorFalso:
 
     def __init__(self):
         self.mensajes = []
+        self.nuevos = []
+        self._pendientes = []
         self.textos_vistos = []
         self.acciones = []
         self.capturas = 0
         self.pantalla = 'PANTALLA:\n- button "Crear modelo"'
 
     def observar(self):
+        self.nuevos = self._pendientes
+        self._pendientes = []
         self.textos_vistos.append(self.pantalla)
         return self.pantalla
 
@@ -43,6 +47,7 @@ class NavegadorFalso:
         if texto != "Crear modelo":
             raise ErrorAccion('No hay ningún elemento "' + texto + '"')
         self.mensajes.append("ÉXITO: Modelo creado correctamente.")
+        self._pendientes.append("ÉXITO: Modelo creado correctamente.")
         self.pantalla = "PANTALLA:\n- text: y = 2.0000 · x1 − 3.0000 · x2"
         return 'Pulsado "' + texto + '".'
 
@@ -188,18 +193,20 @@ def test_error_de_accion_se_devuelve_al_agente(caso):
         ]
     )
     ejecutar(cliente, NavegadorFalso(), caso)
-    ultimo = cliente.conversaciones[1][-1]
-    assert ultimo["role"] == "tool"
-    assert ultimo["content"].startswith("ERROR: No hay ningún elemento")
-    # Tras la acción se le enseña la pantalla
-    assert "PANTALLA:" in ultimo["content"]
+    respuesta = cliente.conversaciones[1][-2]
+    assert respuesta["role"] == "tool"
+    assert respuesta["content"].startswith("ERROR: No hay ningún elemento")
+    # Después se le enseña la pantalla actual
+    pantalla = cliente.conversaciones[1][-1]
+    assert pantalla["role"] == "user"
+    assert pantalla["content"].startswith(agente.CABECERA_PANTALLA)
 
 
 def test_llamada_con_argumentos_mal_formados(caso):
     mala = Llamada("1", "pulsar", {}, "los argumentos no son JSON válido")
     cliente = ClienteGuion([[mala], [terminar("bloqueado", [])]])
     ejecutar(cliente, NavegadorFalso(), caso)
-    assert "JSON" in cliente.conversaciones[1][-1]["content"]
+    assert "JSON" in cliente.conversaciones[1][-2]["content"]
 
 
 def test_herramienta_desconocida(caso):
@@ -208,14 +215,14 @@ def test_herramienta_desconocida(caso):
     )
     ejecutar(cliente, NavegadorFalso(), caso)
     assert (
-        "no existe la herramienta" in cliente.conversaciones[1][-1]["content"]
+        "no existe la herramienta" in cliente.conversaciones[1][-2]["content"]
     )
 
 
 def test_sin_llamadas_se_le_pide_una_herramienta(caso):
     cliente = ClienteGuion([[], [terminar("bloqueado", [])]])
     ejecutar(cliente, NavegadorFalso(), caso)
-    assert "Usa una herramienta" in cliente.conversaciones[1][-1]["content"]
+    assert "Usa una herramienta" in cliente.conversaciones[1][-2]["content"]
 
 
 def test_cada_llamada_recibe_su_respuesta(caso):
@@ -235,28 +242,59 @@ def test_cada_llamada_recibe_su_respuesta(caso):
             respuestas.append(mensaje)
     assert respuestas[0]["tool_call_id"] == "a"
     assert respuestas[1]["tool_call_id"] == "b"
-    # Solo la última respuesta del turno lleva la pantalla
-    assert "PANTALLA:" not in respuestas[0]["content"]
-    assert "PANTALLA:" in respuestas[1]["content"]
 
 
-def test_solo_se_mandan_completas_las_ultimas_pantallas(caso):
+def test_la_conversacion_no_cambia_entre_turnos(caso):
+    """Solo se añade al final: así Groq reutiliza lo anterior de su caché."""
     turnos = []
-    for numero in range(5):
+    for numero in range(4):
         turnos.append(
             [llamada("escribir", str(numero), campo="x", valor=str(numero))]
         )
     turnos.append([terminar("bloqueado", [])])
     cliente = ClienteGuion(turnos)
     ejecutar(cliente, NavegadorFalso(), caso)
-    ultima = cliente.conversaciones[-1]
-    completas = 0
-    for mensaje in ultima:
-        if "PANTALLA:" in str(mensaje.get("content")):
-            completas += 1
-    assert completas == agente.PANTALLAS_COMPLETAS
-    # El caso sigue en el primer mensaje aunque se quite su pantalla
-    assert "#### CP-47" in ultima[1]["content"]
+    for anterior, siguiente in zip(
+        cliente.conversaciones, cliente.conversaciones[1:], strict=False
+    ):
+        # Todo menos la pantalla actual (el último mensaje) se mantiene
+        assert siguiente[: len(anterior) - 1] == anterior[:-1]
+
+
+def test_la_pantalla_solo_va_en_el_ultimo_mensaje(caso):
+    cliente = ClienteGuion(
+        [
+            [llamada("escribir", campo="x", valor="1")],
+            [terminar("bloqueado", [])],
+        ]
+    )
+    ejecutar(cliente, NavegadorFalso(), caso)
+    for conversacion in cliente.conversaciones:
+        ultimo = conversacion[-1]
+        assert ultimo["content"].startswith(agente.CABECERA_PANTALLA)
+        for mensaje in conversacion[:-1]:
+            assert agente.CABECERA_PANTALLA not in str(mensaje["content"])
+
+
+def test_mensajes_de_la_aplicacion_con_el_resultado(caso):
+    cliente = ClienteGuion(
+        [
+            [llamada("pulsar", texto="Crear modelo")],
+            [terminar("bloqueado", [])],
+        ]
+    )
+    ejecutar(cliente, NavegadorFalso(), caso)
+    respuesta = cliente.conversaciones[1][-2]
+    assert "ÉXITO: Modelo creado correctamente." in respuesta["content"]
+
+
+def test_contexto_en_el_mensaje_de_sistema(caso):
+    cliente = ClienteGuion([[terminar("bloqueado", [])]])
+    ejecutar(cliente, NavegadorFalso(), caso)
+    sistema = cliente.conversaciones[0][0]["content"]
+    assert "CONTEXTO DEL PLAN:\ncontexto" in sistema
+    # El caso no va en el sistema, que es igual para todos los casos
+    assert "CP-47" not in sistema
 
 
 def test_preparacion_en_el_mensaje_inicial(caso):
@@ -264,6 +302,7 @@ def test_preparacion_en_el_mensaje_inicial(caso):
     cliente = ClienteGuion([[terminar("bloqueado", [])]])
     ejecutar(cliente, NavegadorFalso(), caso, preparacion=[previo])
     inicial = cliente.conversaciones[0][1]["content"]
+    assert inicial.startswith("La aplicación está recién abierta")
     assert "PREPARACIÓN" in inicial
     assert inicial.index("#### CP-46") < inicial.index("#### CP-47")
 

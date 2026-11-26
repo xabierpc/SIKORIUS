@@ -31,43 +31,39 @@ ESTADOS = {
 # Turnos que se dejan al LLM, como máximo, para un caso
 MAX_TURNOS = 40
 
-# Pantallas anteriores que se mandan completas. Las más antiguas se
-# resumen para no gastar tokens con pantallas que ya no sirven.
-PANTALLAS_COMPLETAS = 2
-MARCA_PANTALLA = "\n\nPANTALLA:"
-PANTALLA_OMITIDA = "\n\n[pantalla anterior omitida]"
+# La pantalla actual va siempre en el último mensaje y no se guarda en la
+# conversación. Así lo anterior no cambia entre turnos y Groq lo reutiliza
+# de su caché: esos tokens no cuentan para los límites de uso.
+CABECERA_PANTALLA = "PANTALLA ACTUAL:"
 
-SISTEMA = """Eres un probador de software. No conoces el código ni has \
-participado en el desarrollo de la aplicación SIKORIUS. Ejecutas UN caso \
-de prueba funcional siguiendo solo los pasos escritos y comparas lo que \
-ves con el resultado esperado.
+SISTEMA = """Eres un probador de software ajeno al proyecto: no conoces \
+el código de la aplicación SIKORIUS. Ejecutas UN caso de prueba siguiendo \
+solo sus pasos y comparas lo que ves con el resultado esperado.
 
-Cómo trabajas:
-- En cada turno ves la pantalla como un árbol de accesibilidad: botones \
-(button), pestañas (tab), campos (textbox) con su valor, desplegables \
-(combobox), listas y diálogos. "[disabled]" significa deshabilitado. Los \
-mensajes de la aplicación aparecen en "MENSAJES NUEVOS DE LA APLICACIÓN" \
-(ÉXITO, AVISO o ERROR). Los gráficos se describen en "GRÁFICOS VISIBLES".
-- Usa siempre una herramienta. Haz los pasos en orden.
-- La aplicación está organizada en pestañas. Si un paso nombra un botón, \
-campo o sección que no se ve, puedes cambiar de pestaña (pulsando su \
-nombre o "Continuar") para llegar a él. En el explorador de archivos, \
-navega por las carpetas pulsando sus nombres ("..": carpeta superior). \
-Esto no cuenta como un paso extra.
-- No hagas nada que el caso no pida: no cambies datos ni pulses botones \
-"por si acaso".
-- Si un paso no se puede seguir (el elemento no existe o no está claro qué \
-hacer), no improvises: termina con estado "bloqueado" e indica el paso.
-- Si hay una sección "Preparación", hazla primero, sin evaluarla: solo \
-deja la aplicación en el estado que pide el caso.
+- Al final de cada turno ves la pantalla actual como árbol de \
+accesibilidad: button, tab, textbox (con su valor), combobox, listas y \
+diálogos. "[disabled]" es deshabilitado. Los gráficos se describen en \
+"GRÁFICOS". Los mensajes de la aplicación (ÉXITO, AVISO, ERROR) llegan \
+con el resultado de cada acción.
+- Usa siempre herramientas. Puedes pedir varias acciones en un mismo \
+turno si no necesitas ver la pantalla entre ellas: ahorra turnos.
+- La aplicación va por pestañas. Si un paso nombra algo que no se ve, ve a \
+su pestaña (pulsando su nombre o "Continuar"). En el explorador de \
+archivos, pulsa el nombre de una carpeta para entrar y ".." para subir.
+- Los casos son aditivos: si la aplicación sigue como la dejó el caso \
+anterior, no repitas lo hecho. Con la precondición "D-1 cargado", si D-1 \
+ya es el dataset cargado (ruta en la pestaña Datos), no lo cargues.
+- Si al cargar algo aparece una confirmación por cambios sin guardar y el \
+caso no trata de eso, confírmala.
+- No hagas nada que el caso no pida. Si un paso no se puede seguir, no \
+improvises: termina con "bloqueado" e indica el paso.
+- Si hay "PREPARACIÓN", hazla antes sin evaluarla.
 
-Veredicto (herramienta "terminar"):
-- "correcto" solo si TODO lo del resultado esperado coincide.
-- "fallido" si algo no coincide: explica qué esperabas y qué has visto.
-- Considera equivalentes diferencias solo de formato con el mismo valor: \
-número de decimales (7 y 7.0000), "*" y "·", "-" y "−".
-- En "evidencias" copia LITERALMENTE textos de la pantalla o de los \
-mensajes (máximo 5). Se comprobará que existen."""
+Veredicto ("terminar"): "correcto" solo si TODO lo esperado coincide; \
+"fallido" si algo no coincide (di qué esperabas y qué viste). Son \
+equivalentes las diferencias solo de formato con el mismo valor (7 y \
+7.0000, "*" y "·", "-" y "−"). En "evidencias" copia LITERALMENTE hasta 5 \
+textos de la pantalla o de los mensajes: se comprobará que existen."""
 
 
 @dataclass
@@ -96,8 +92,11 @@ class Resultado:
         pasos: Acciones realizadas.
         mensajes: Mensajes de la aplicación vistos durante el caso.
         turnos: Llamadas al LLM.
-        tokens: Tokens consumidos (entrada + salida).
+        tokens: Tokens que cuentan para los límites de Groq.
+        tokens_cache: Tokens reutilizados de la caché (no cuentan).
         segundos: Duración del caso.
+        reiniciado: True si el caso empezó con la aplicación recién abierta;
+            False si continuó con lo que dejó el anterior.
     """
 
     caso: str
@@ -112,21 +111,44 @@ class Resultado:
     mensajes: list = field(default_factory=list)
     turnos: int = 0
     tokens: int = 0
+    tokens_cache: int = 0
     segundos: float = 0.0
+    reiniciado: bool = True
 
 
-def mensaje_inicial(caso, preparacion, contexto, carpeta_proyecto, pantalla):
-    """Texto con el que empieza la conversación de un caso."""
-    partes = [
-        "CONTEXTO DEL PLAN (procedimientos, glosario y datos de prueba):",
-        contexto,
-        "",
-        "La carpeta del proyecto es: " + str(carpeta_proyecto),
-        "La carpeta data/ es: " + str(carpeta_proyecto / "data"),
-        "",
-        "La aplicación ya está recién abierta (PR-1 hecho).",
-        "",
-    ]
+def instrucciones(contexto, carpeta_proyecto):
+    """Mensaje de sistema: igual en todas las llamadas de la ejecución.
+
+    Lleva las reglas, el contexto del plan y las carpetas. Como no cambia
+    de un caso a otro, Groq lo reutiliza de su caché.
+    """
+    return (
+        SISTEMA
+        + "\n\nCONTEXTO DEL PLAN:\n"
+        + contexto
+        + "\n\nCarpeta del proyecto: "
+        + str(carpeta_proyecto)
+        + "\nCarpeta data/: "
+        + str(carpeta_proyecto / "data")
+    )
+
+
+def mensaje_inicial(
+    caso,
+    preparacion,
+    referencias=(),
+    estado_inicial="La aplicación está recién abierta (PR-1 hecho).",
+):
+    """Primer mensaje de un caso: el caso y cómo empieza."""
+    partes = [estado_inicial, ""]
+    if referencias:
+        partes.append(
+            "CASOS CITADOS (solo como referencia: haz sus pasos únicamente "
+            "si el caso que ejecutas lo pide):"
+        )
+        for citado in referencias:
+            partes.append(citado.texto)
+            partes.append("")
     if preparacion:
         partes.append(
             "PREPARACIÓN: antes del caso, haz los pasos de estos casos, en "
@@ -134,15 +156,11 @@ def mensaje_inicial(caso, preparacion, contexto, carpeta_proyecto, pantalla):
             "la preparación):"
         )
         for previo in preparacion:
-            partes.append("")
             partes.append(previo.texto)
-        partes.append("")
-        partes.append("Cuando termines la preparación, ejecuta este caso:")
+            partes.append("")
+        partes.append("Cuando termines la preparación, ejecuta este caso.")
     partes.append("CASO QUE HAY QUE EJECUTAR Y EVALUAR:")
     partes.append(caso.texto)
-    # Línea en blanco + "PANTALLA:" (lo pone observar) forman la marca
-    partes.append("")
-    partes.append(pantalla)
     return "\n".join(partes)
 
 
@@ -155,18 +173,28 @@ def ejecutar_caso(
     contexto,
     carpeta_proyecto,
     max_turnos=MAX_TURNOS,
+    referencias=(),
+    estado_inicial="La aplicación está recién abierta (PR-1 hecho).",
 ):
     """Ejecuta un caso con el LLM y devuelve su ``Resultado``.
 
+    La conversación guarda las acciones y sus resultados (con los mensajes
+    de la aplicación), pero no las pantallas: la pantalla actual se añade
+    solo al final de cada llamada. Así lo anterior no cambia de un turno a
+    otro y Groq lo reutiliza de su caché.
+
     Args:
         cliente: Cliente del LLM (``responder(mensajes, herramientas)``).
-        navegador: ``Navegador`` con la aplicación recién abierta.
+        navegador: ``Navegador`` con la aplicación abierta.
         reiniciar: Función que cierra y abre la aplicación.
         caso: ``Caso`` que se ejecuta.
         preparacion: Casos que se repiten antes (``Plan.preparacion``).
         contexto: Contexto del plan.
         carpeta_proyecto: ``Path`` de la raíz del repositorio.
         max_turnos: Llamadas al LLM permitidas.
+        referencias: Casos citados por el caso (``Plan.referencias``).
+        estado_inicial: Cómo está la aplicación al empezar (recién abierta
+            o como la dejó el caso anterior).
     """
     inicio = time.monotonic()
     resultado = Resultado(
@@ -176,26 +204,30 @@ def ejecutar_caso(
         resultado_obtenido="",
     )
     mensajes = [
-        {"role": "system", "content": SISTEMA},
+        {
+            "role": "system",
+            "content": instrucciones(contexto, carpeta_proyecto),
+        },
         {
             "role": "user",
             "content": mensaje_inicial(
-                caso,
-                preparacion,
-                contexto,
-                carpeta_proyecto,
-                navegador.observar(),
+                caso, preparacion, referencias, estado_inicial
             ),
         },
     ]
+    pantalla = navegador.observar()
     navegador.capturar("inicio")
 
     terminado = False
     while not terminado and resultado.turnos < max_turnos:
         resultado.turnos += 1
-        _resumir_pantallas(mensajes)
-        respuesta = cliente.responder(mensajes, herramientas.HERRAMIENTAS)
+        envio = list(mensajes)
+        envio.append(
+            {"role": "user", "content": CABECERA_PANTALLA + "\n" + pantalla}
+        )
+        respuesta = cliente.responder(envio, herramientas.HERRAMIENTAS)
         resultado.tokens += respuesta.tokens
+        resultado.tokens_cache += getattr(respuesta, "tokens_cache", 0)
         mensajes.append(respuesta.mensaje)
         if not respuesta.llamadas:
             mensajes.append(
@@ -207,7 +239,7 @@ def ejecutar_caso(
             )
             continue
 
-        for indice, llamada in enumerate(respuesta.llamadas):
+        for llamada in respuesta.llamadas:
             if llamada.nombre == TERMINAR:
                 _aplicar_veredicto(resultado, llamada.argumentos, navegador)
                 texto = "Veredicto registrado."
@@ -220,10 +252,15 @@ def ejecutar_caso(
                     Paso(llamada.nombre, llamada.argumentos, texto)
                 )
                 navegador.capturar(llamada.nombre)
-            # La pantalla solo se añade tras la última acción del turno
-            ultima = indice == len(respuesta.llamadas) - 1
-            if ultima and not terminado:
-                texto = texto + "\n\n" + navegador.observar()
+                # Se mira la pantalla tras cada acción para no perder los
+                # mensajes, que desaparecen a los pocos segundos
+                pantalla = navegador.observar()
+                if navegador.nuevos:
+                    texto = (
+                        texto
+                        + "\nMensajes de la aplicación: "
+                        + " | ".join(navegador.nuevos)
+                    )
             mensajes.append(
                 {
                     "role": "tool",
@@ -310,22 +347,3 @@ def normalizar(texto):
     ):
         texto = texto.replace(original, cambio)
     return " ".join(texto.split())
-
-
-def _resumir_pantallas(mensajes):
-    """Deja completas solo las últimas pantallas de la conversación."""
-    vistas = 0
-    for mensaje in reversed(mensajes):
-        contenido = mensaje.get("content")
-        if not isinstance(contenido, str) or MARCA_PANTALLA not in contenido:
-            continue
-        if mensaje["role"] == "user" and contenido.startswith("CONTEXTO"):
-            # El mensaje inicial conserva el caso; solo se quita su pantalla
-            if vistas >= PANTALLAS_COMPLETAS:
-                corte = contenido.rfind(MARCA_PANTALLA)
-                mensaje["content"] = contenido[:corte] + PANTALLA_OMITIDA
-            continue
-        vistas += 1
-        if vistas > PANTALLAS_COMPLETAS:
-            corte = contenido.find(MARCA_PANTALLA)
-            mensaje["content"] = contenido[:corte] + PANTALLA_OMITIDA
