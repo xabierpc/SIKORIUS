@@ -817,8 +817,8 @@ x,y
 - **Precondiciones:** CP-38 ejecutado, sin cerrar la aplicación.
 - **Datos de prueba:** los de CP-38.
 - **Pasos:**
-  1. Realizar PR-5.
-- **Resultado esperado:** mensaje de éxito; se muestran fórmula con `total_bedrooms`, gráfico y métricas.
+  1. Ir a la pestaña "Modelo". Si el modelo no se ha creado al aplicar el preprocesado, realizar PR-5.
+- **Resultado esperado:** mensaje de éxito «Modelo creado correctamente.» (al aplicar el preprocesado, la aplicación ya crea el modelo); se muestran fórmula con `total_bedrooms`, gráfico y métricas.
 
 #### CP-53. Error durante la creación del modelo
 - **Historia:** #16
@@ -1279,7 +1279,7 @@ x,y
 
 ## 5. Ejecución
 
-- Las pruebas se ejecutan sobre `dev` (sección 1.1), después de que pasen todas las pruebas automatizadas, en el orden del plan. Un caso que continúa a otro («CP-xx ejecutado, sin cerrar la aplicación») se ejecuta justo después de CP-xx. Con el LLM se hace con `herramientas/probar_con_llm.py` (ver [pruebas_con_llm.md](pruebas_con_llm.md)).
+- Las pruebas se ejecutan sobre `dev` (sección 1.1), después de que pasen todas las pruebas automatizadas, en el orden del plan. Un caso que continúa a otro («CP-xx ejecutado, sin cerrar la aplicación») se ejecuta justo después de CP-xx. Los casos están automatizados con Playwright en `herramientas/funcionales/` (ver [pruebas_funcionales.md](pruebas_funcionales.md)); también se pueden ejecutar con un LLM (ver [pruebas_con_llm.md](pruebas_con_llm.md)).
 - Cada caso lo ejecuta un miembro que no haya implementado la funcionalidad probada.
 - Cada error encontrado se registra en Taiga como tarea de corrección dentro de la historia #29, indicando el caso que lo detectó, los pasos para reproducirlo y el resultado obtenido. Se corrige en una rama `fix/<número de la tarea>-<descripción>` creada desde `dev`.
 - Tras las correcciones, se vuelven a ejecutar los casos fallidos y CP-93.
